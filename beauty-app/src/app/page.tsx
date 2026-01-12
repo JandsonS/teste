@@ -44,7 +44,7 @@ export default function Home() {
             <div className="flex items-center gap-2 mb-2 text-rose-300 font-semibold uppercase tracking-wider text-sm">
               <Sparkles className="w-4 h-4" /> Realce sua beleza
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-4">Studio Beauty</h1>
+            <h1 className="text-4xl md:text-6xl font-bold mb-4">Studio Teste</h1>
             <p className="text-rose-100 text-lg max-w-lg">
               Agende seus procedimentos favoritos em segundos e receba atendimento exclusivo.
             </p>
