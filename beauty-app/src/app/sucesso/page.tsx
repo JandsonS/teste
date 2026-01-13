@@ -1,57 +1,56 @@
-import { ServiceCard } from "@/components/service-card";
+"use client";
 
-export default function Home() {
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+
+export default function SucessoPage() {
+  const searchParams = useSearchParams();
+  const paymentId = searchParams.get("payment_id");
+  const [whatsappLink, setWhatsappLink] = useState("#");
+
+  const whatsappNumber = "5587999999999"; // SEU NÚMERO AQUI
+
+  useEffect(() => {
+    // Recupera os dados que salvamos antes de ir pro Mercado Pago
+    const savedData = localStorage.getItem("agendamentoTemp");
+    
+    let message = "";
+    
+    if (savedData) {
+      const { service, date, time, client } = JSON.parse(savedData);
+      message = `✅ *Pagamento Confirmado!*\n\nOlá, sou *${client}*.\nAcabei de pagar o agendamento (ID: ${paymentId}).\n\n📌 *Serviço:* ${service}\n📅 *Data:* ${date}\n⏰ *Horário:* ${time}\n\nPodemos confirmar?`;
+    } else {
+      message = `Olá! Acabei de fazer o pagamento do agendamento (ID: ${paymentId}). Podemos combinar o horário?`;
+    }
+
+    setWhatsappLink(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`);
+  }, [paymentId]);
+
   return (
-    <main className="min-h-screen pb-20">
-      {/* Cabeçalho / Hero Section */}
-      <div className="relative pt-20 pb-16 text-center px-4 overflow-hidden">
-         {/* Efeito de luz de fundo */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-pink-600/20 blur-[100px] -z-10 rounded-full"></div>
-        
-        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4 bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent">
-          Realce sua <span className="text-pink-500">beleza única</span>
-        </h1>
-        <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
-          Procedimentos exclusivos e atendimento personalizado. Escolha seu serviço abaixo e agende em segundos.
-        </p>
-      </div>
-
-      {/* Grade de Serviços */}
-      <section className="container mx-auto px-4 max-w-5xl">
-        <h2 className="text-2xl font-bold mb-8 border-l-4 border-pink-500 pl-4 flex items-center gap-2">
-          Nossos Procedimentos
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          <ServiceCard 
-            title="Design de Sobrancelha"
-            price="R$ 45,00"
-            duration="45 min"
-            type="Presencial"
-            imageUrl="https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?q=80&w=600&auto=format&fit=crop"
-          />
-          
-          <ServiceCard 
-            title="Micropigmentação"
-            price="R$ 350,00"
-            duration="120 min"
-            type="Presencial"
-            imageUrl="https://images.unsplash.com/photo-1588066692676-72e3597f978e?q=80&w=600&auto=format&fit=crop"
-          />
-
-          <ServiceCard 
-            title="Lash Lifting"
-            price="R$ 120,00"
-            duration="60 min"
-            type="Presencial"
-            imageUrl="https://images.unsplash.com/photo-1587753510587-c4f8952824d7?q=80&w=600&auto=format&fit=crop"
-          />
-
-           {/* Adicione outros serviços aqui */}
-
+    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center">
+      <div className="bg-zinc-900 p-8 rounded-2xl border border-green-500/30 max-w-md w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-500/20">
+          <span className="text-4xl">🎉</span>
         </div>
-      </section>
-    </main>
+        
+        <h1 className="text-2xl font-bold text-green-400 mb-2">Tudo Certo!</h1>
+        <p className="text-zinc-400 mb-8 leading-relaxed">
+          Seu pagamento foi recebido. Para finalizar, clique no botão abaixo e confirme o horário no WhatsApp.
+        </p>
+
+        <a 
+          href={whatsappLink}
+          target="_blank"
+          className="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-green-500/20 hover:-translate-y-1"
+        >
+          Confirmar Agendamento no WhatsApp
+        </a>
+
+        <Link href="/" className="block mt-6 text-zinc-600 hover:text-white text-sm underline transition-colors">
+          Voltar para o início
+        </Link>
+      </div>
+    </div>
   );
 }
