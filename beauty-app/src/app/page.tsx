@@ -10,7 +10,7 @@ const handleBuy = async () => {
     },
     body: JSON.stringify({
       title: "Design de Sobrancelha",
-      price: 45.00
+      price: 1.00
     }),
   });
 
@@ -30,7 +30,7 @@ export default function Home() {
   const services = [
     {
       title: "Design de Sobrancelha",
-      price: "R$ 45,00",
+      price: "R$ 1,00",
       duration: "45 min",
       type: "presencial" as const,
       // Usando imagens do Placehold.co que nunca quebram, ou links estáveis
@@ -38,21 +38,21 @@ export default function Home() {
     },
     {
       title: "Alongamento de Cílios",
-      price: "R$ 40,00",
+      price: "R$ 1,00",
       duration: "100 min",
       type: "presencial" as const,
       imageUrl: "https://www.maybelline.com.br/-/media/project/loreal/brand-sites/mny/americas/br/artigos/2024/olhos/categoria-pai/volume-brasileiro/extensao-cilios.jpg?rev=dd3d34832430435c8e4fa468d6ebedf1&cx=0.49&cy=0.39&cw=650&ch=650&hash=7042D72335BE45CC570658DF20F77784"
     },
     {
       title: "Mentoria de Marketing",
-      price: "R$ 150,00",
+      price: "R$ 1,00",
       duration: "60 min",
       type: "online" as const,
       imageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&auto=format&fit=crop&q=60"
     },
     {
       title: "Limpeza de Pele",
-      price: "R$ 90,00",
+      price: "R$ 1,00",
       duration: "50 min",
       type: "presencial" as const,
       imageUrl: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800&auto=format&fit=crop&q=60"
