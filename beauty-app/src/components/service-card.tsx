@@ -163,7 +163,7 @@ _________________________
                 <div className="mb-3 p-2 bg-zinc-800 rounded border border-zinc-700 text-center text-pink-300 font-medium">
                     {selectedDate 
                         ? format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) 
-                        : "Selecione uma data abaixo 👇"}
+                        : "Selecione uma data abaixo no calendário"}
                 </div>
 
                 <div className="flex justify-center bg-zinc-950 rounded-xl border border-zinc-800 p-2">
