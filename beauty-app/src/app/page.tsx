@@ -1,6 +1,30 @@
 import { ServiceCard } from "@/components/service-card"
 import { Sparkles, CalendarHeart } from "lucide-react"
 
+// Adicione isso no topo do componente
+const handleBuy = async () => {
+  const response = await fetch('/api/payment', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: "Design de Sobrancelha",
+      price: 45.00
+    }),
+  });
+
+  const data = await response.json();
+  
+  // Redireciona o usuário para o checkout do Mercado Pago
+  if (data.url) {
+    window.location.href = data.url;
+  }
+};
+
+// No seu botão:
+// <button onClick={handleBuy}>Agendar e Pagar</button>
+
 export default function Home() {
   // Dados com imagens funcionais
   const services = [
