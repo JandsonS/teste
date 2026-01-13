@@ -1,69 +1,74 @@
-"use client"
+"use client"; 
 
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Clock, Video, MapPin, Sparkle } from "lucide-react"
-// Importamos o nosso novo Modal
-import { BookingModal } from "./booking-modal"
-
+// 1. AQUI FOI A MUDANÇA: Adicionamos o 'type' na lista de coisas permitidas
 interface ServiceProps {
-  title: string
-  price: string
-  duration: string
-  type: 'presencial' | 'online'
-  imageUrl: string
+  title: string;
+  price: string;
+  duration: string;
+  imageUrl?: string;
+  type?: string; // <--- Essa linha resolve o erro!
 }
 
-export function ServiceCard({ title, price, duration, type, imageUrl }: ServiceProps) {
+export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceProps) {
+  
+  const handleAgendar = async () => {
+    // Lógica do pagamento...
+    const numericPrice = parseFloat(price.replace("R$", "").replace(",", ".").trim());
+
+    try {
+      const response = await fetch('/api/payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title,
+          price: numericPrice
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Erro ao criar pagamento");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Erro de conexão.");
+    }
+  };
+
   return (
-    <Card className="group overflow-hidden bg-white border-gray-100 rounded-2xl shadow-md hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col h-full">
-      <div className="h-60 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10 z-10" />
+    <div className="border border-zinc-800 bg-zinc-900/50 rounded-xl p-4 flex flex-col gap-3 hover:border-pink-500/50 transition-colors">
+      {imageUrl && (
         <img 
           src={imageUrl} 
           alt={title} 
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          className="w-full h-32 object-cover rounded-lg mb-2"
         />
-        {type === 'online' && (
-          <Badge className="absolute top-4 right-4 bg-purple-100 text-purple-700 font-medium border-purple-200 z-20">
-            <Video className="w-3.5 h-3.5 mr-1.5" /> Online
-          </Badge>
-        )}
-         {type === 'presencial' && (
-          <Badge className="absolute top-4 right-4 bg-rose-50 text-rose-700 font-medium border-rose-200 z-20">
-            <MapPin className="w-3.5 h-3.5 mr-1.5" /> Studio
-          </Badge>
-        )}
+      )}
+
+      <div className="flex justify-between items-start">
+        <h3 className="font-semibold text-white text-lg">{title}</h3>
+        <span className="bg-pink-500/10 text-pink-400 px-2 py-1 rounded text-sm font-bold">
+          {price}
+        </span>
       </div>
 
-      <CardContent className="p-6 flex-1 flex flex-col justify-between">
-        <div>
-          <h3 className="font-bold text-xl text-gray-900 mb-3">{title}</h3>
-          <div className="flex flex-wrap gap-2 text-sm mb-6">
-            <div className="flex items-center text-gray-600 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-              <Clock className="w-4 h-4 mr-2 text-rose-500" /> 
-              <span className="font-medium">{duration}</span>
-            </div>
-          </div>
-        </div>
-        
-        <div>
-           <p className="text-xs text-gray-500 mb-0.5 font-medium uppercase">Valor</p>
-           <p className="text-3xl font-extrabold text-rose-600">{price}</p>
-        </div>
-      </CardContent>
+      <div className="text-zinc-400 text-sm flex items-center gap-2">
+        <span>⏱ {duration}</span>
+        {/* Mostrando se é Online ou Presencial se quiser */}
+        {type && <span className="text-xs border border-zinc-700 px-2 py-0.5 rounded">{type}</span>}
+      </div>
 
-      <CardFooter className="p-6 pt-0">
-        {/* AQUI ESTÁ A MUDANÇA: O botão agora está dentro do BookingModal */}
-        <BookingModal serviceName={title} price={price}>
-            <Button 
-              className="w-full bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-700 hover:to-rose-600 text-white font-bold h-14 text-lg rounded-xl shadow-md hover:shadow-lg transition-all"
-            >
-              <Sparkle className="w-5 h-5 mr-2" /> Agendar Horário
-            </Button>
-        </BookingModal>
-      </CardFooter>
-    </Card>
-  )
+      <button 
+        onClick={handleAgendar}
+        className="mt-2 w-full bg-pink-600 hover:bg-pink-500 text-white font-medium py-2 rounded-lg transition-all active:scale-95"
+      >
+        Agendar Agora
+      </button>
+    </div>
+  );
 }
