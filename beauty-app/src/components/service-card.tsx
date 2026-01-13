@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css"; // Estilos base do calendário
 
 interface ServiceProps {
   title: string;
@@ -10,51 +14,46 @@ interface ServiceProps {
   type?: string;
 }
 
-// --- REGRAS DE NEGÓCIO (CONFIGURE AQUI) ---
 const HORARIOS_DISPONIVEIS = [
   "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
 ];
 
-// Dias proibidos (0 = Domingo, 1 = Segunda, 2 = Terça... 6 = Sábado)
-const DIAS_BLOQUEADOS = [0, 1]; // Ex: Domingo e Segunda fechados
+// Dias proibidos (0 = Domingo, 1 = Segunda)
+const DIAS_BLOQUEADOS = [0, 1]; 
 
 export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState(""); // Agora time é selecionado por botão
+  
+  // Agora 'date' é um objeto Date real, não string
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [time, setTime] = useState("");
   const [clientName, setClientName] = useState("");
 
   const uniqueId = title.replace(/\s+/g, '-').toLowerCase();
   const whatsappNumber = "5587991537080"; 
 
-  // Pega a data de hoje no formato YYYY-MM-DD para bloquear o passado
-  const hoje = new Date().toISOString().split("T")[0];
-
-  // --- FUNÇÃO INTELIGENTE DE DATA ---
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const dataSelecionada = e.target.value;
-    const diaDaSemana = new Date(dataSelecionada).getUTCDay(); // Pega o dia (0-6)
-
-    if (DIAS_BLOQUEADOS.includes(diaDaSemana)) {
-      alert("Ops! Não funcionamos neste dia da semana. Por favor escolha outro.");
-      setDate(""); // Limpa o campo
-    } else {
-      setDate(dataSelecionada);
-    }
+  // Função para desabilitar dias passados + domingos/segundas
+  const isDayDisabled = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Zera hora para comparar apenas data
+    return date < today || DIAS_BLOQUEADOS.includes(date.getDay());
   };
 
   const handlePagarNoLocal = () => {
-    if (!date || !time || !clientName) {
+    if (!selectedDate || !time || !clientName) {
       alert("Preencha todos os dados: Nome, Data e Horário.");
       return;
     }
     
+    // Formata a data para enviar no Zap
+    const dataFormatada = format(selectedDate, "dd/MM/yyyy", { locale: ptBR });
+
     const message = `*NOVA SOLICITAÇÃO* 🗓️
 _________________________
 👤 *Cliente:* ${clientName}
 ✂️ *Serviço:* ${title}
 💵 *Valor:* ${price} (Pagar no Local)
-📅 *Data:* ${date.split('-').reverse().join('/')}
+📅 *Data:* ${dataFormatada}
 ⏰ *Horário:* ${time}
 _________________________
 *Aguardo confirmação!*`;
@@ -65,14 +64,16 @@ _________________________
   };
 
   const handlePagarOnline = async () => {
-    if (!date || !time || !clientName) {
-      alert("Preencha todos os dados: Nome, Data e Horário.");
+    if (!selectedDate || !time || !clientName) {
+      alert("Preencha todos os dados.");
       return;
     }
 
+    const dataFormatada = format(selectedDate, "dd/MM/yyyy", { locale: ptBR });
+
     const agendamentoData = {
       service: title,
-      date: date.split('-').reverse().join('/'),
+      date: dataFormatada,
       time: time,
       client: clientName
     };
@@ -94,7 +95,7 @@ _________________________
 
   return (
     <>
-      {/* CARD (Visual permanece igual) */}
+      {/* CARD (Sem alterações visuais aqui) */}
       <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-1 backdrop-blur-lg transition-all hover:border-pink-500/50 hover:shadow-2xl hover:shadow-pink-500/10">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-pink-500/0 via-pink-500/0 to-pink-500/0 transition-all group-hover:from-pink-500/10 group-hover:via-pink-500/5 group-hover:to-pink-500/0 opacity-0 group-hover:opacity-100 duration-500" />
         
@@ -126,48 +127,71 @@ _________________________
         </div>
       </div>
 
-      {/* --- MODAL COM AS NOVAS REGRAS --- */}
+      {/* --- MODAL NOVO --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-zinc-900 border border-zinc-700 w-full max-w-md p-6 rounded-2xl shadow-2xl relative my-auto animate-in fade-in zoom-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-700 w-full max-w-md rounded-2xl shadow-2xl relative my-auto animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
             
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white">✕</button>
-            
-            <h3 className="text-xl font-bold text-white mb-1">{title}</h3>
-            <p className="text-zinc-400 text-sm mb-6">Escolha o melhor horário para você.</p>
+            {/* Header do Modal */}
+            <div className="p-6 pb-2 border-b border-zinc-800">
+                <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white text-xl">✕</button>
+                <h3 className="text-xl font-bold text-white mb-1">{title}</h3>
+                <p className="text-zinc-400 text-sm">Preencha os dados abaixo.</p>
+            </div>
 
-            <div className="space-y-5">
+            {/* Corpo com Scroll */}
+            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
               
               {/* NOME */}
               <div>
-                <label htmlFor={`name-${uniqueId}`} className="block text-sm font-medium text-zinc-300 mb-2">Seu Nome Completo</label>
+                <label htmlFor={`name-${uniqueId}`} className="block text-sm font-medium text-zinc-300 mb-2">Seu Nome</label>
                 <input 
                   id={`name-${uniqueId}`}
                   type="text" 
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none transition-colors" 
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none" 
                   value={clientName} 
                   onChange={(e) => setClientName(e.target.value)} 
                   placeholder="Ex: Maria Silva" 
                 />
               </div>
               
-              {/* DATA (Com Validação) */}
+              {/* CALENDÁRIO VISUAL */}
               <div>
-                <label htmlFor={`date-${uniqueId}`} className="block text-sm font-medium text-zinc-300 mb-2">Data do Agendamento</label>
-                <input 
-                  id={`date-${uniqueId}`}
-                  type="date" 
-                  min={hoje} // REGRA 1: Bloqueia passado
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none transition-colors" 
-                  value={date} 
-                  onChange={handleDateChange} // REGRA 2: Valida dias da semana
-                />
-                <p className="text-xs text-zinc-500 mt-1">Funcionamos de Terça a Sábado.</p>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Data do Agendamento</label>
+                
+                {/* Mostra a data escolhida em texto para conferência */}
+                <div className="mb-3 p-2 bg-zinc-800 rounded border border-zinc-700 text-center text-pink-300 font-medium">
+                    {selectedDate 
+                        ? format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) 
+                        : "Selecione uma data abaixo 👇"}
+                </div>
+
+                <div className="flex justify-center bg-zinc-950 rounded-xl border border-zinc-800 p-2">
+                    <DayPicker
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        locale={ptBR}
+                        disabled={isDayDisabled}
+                        modifiersClassNames={{
+                            selected: "bg-pink-600 text-white font-bold rounded-full", // Dia selecionado rosa
+                            today: "text-pink-400 font-bold", // Dia de hoje
+                            disabled: "text-zinc-700 opacity-50 cursor-not-allowed" // Dias bloqueados
+                        }}
+                        styles={{
+                            caption: { color: "white" },
+                            head_cell: { color: "#a1a1aa" }, // Cor dos dias da semana (S T Q...)
+                            cell: { color: "white" },
+                            nav_button: { color: "white" }
+                        }}
+                    />
+                </div>
+                <p className="text-xs text-zinc-500 mt-2 text-center">Dias cinzas estão indisponíveis.</p>
               </div>
 
-              {/* HORÁRIOS (Botões em Grade) */}
+              {/* HORÁRIOS */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Horários Disponíveis</label>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Horário</label>
                 <div className="grid grid-cols-4 gap-2">
                   {HORARIOS_DISPONIVEIS.map((horario) => (
                     <button
@@ -183,24 +207,19 @@ _________________________
                     </button>
                   ))}
                 </div>
-                {!time && <p className="text-xs text-red-400 mt-2 animate-pulse">Selecione um horário acima</p>}
               </div>
-
             </div>
 
-            {/* Ações */}
-            <div className="mt-8 pt-6 border-t border-zinc-800">
+            {/* Footer Fixo */}
+            <div className="p-6 pt-4 border-t border-zinc-800 bg-zinc-900/95">
               <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={handlePagarNoLocal} 
-                  className="w-full py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-800 font-medium transition-colors text-sm"
-                >
+                <button onClick={handlePagarNoLocal} className="w-full py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-800 font-medium text-sm">
                   Pagar no Local
                 </button>
                 <button 
                   onClick={handlePagarOnline} 
-                  disabled={!date || !time || !clientName}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white font-bold hover:shadow-lg hover:shadow-pink-500/20 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!selectedDate || !time || !clientName}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white font-bold hover:shadow-lg hover:shadow-pink-500/20 disabled:opacity-50 text-sm"
                 >
                   Pagar Online
                 </button>
@@ -210,6 +229,15 @@ _________________________
           </div>
         </div>
       )}
+
+      {/* Ajuste fino de CSS para o Calendário ficar perfeito no Dark Mode */}
+      <style jsx global>{`
+        .rdp { --rdp-cell-size: 40px; margin: 0; }
+        .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { 
+            background-color: #27272a; 
+            border-radius: 50%;
+        }
+      `}</style>
     </>
   );
 }
