@@ -22,23 +22,32 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
 
   const whatsappNumber = "5587991537080"; // SEU NÚMERO AQUI
 
+ // ... resto do código anterior ...
+
   const handlePagarNoLocal = () => {
     if (!date || !time || !clientName) {
       alert("Por favor, preencha nome, data e horário.");
       return;
     }
     
-    const message = `Olá! Gostaria de agendar:
+    // MENSAGEM ORGANIZADA (Visual de Ticket)
+    const message = `*NOVA SOLICITAÇÃO DE AGENDAMENTO* 🗓️
+_________________________
+
+👤 *Cliente:* ${clientName}
 ✂️ *Serviço:* ${title}
+💵 *Valor:* ${price} (Pagar no Local)
+
 📅 *Data:* ${date.split('-').reverse().join('/')}
 ⏰ *Horário:* ${time}
-👤 *Cliente:* ${clientName}
-💰 *Pagamento:* No Local (${price})`;
+_________________________
+*Aguardo confirmação!*`;
 
     const link = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(link, "_blank");
     setIsModalOpen(false);
   };
+
 
   const handlePagarOnline = async () => {
     if (!date || !time || !clientName) {
