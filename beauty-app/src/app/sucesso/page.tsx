@@ -1,47 +1,58 @@
-"use client";
+import { ServiceCard } from "@/components/service-card";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-
-export default function SucessoPage() {
-  // Pega os dados que o Mercado Pago devolve na URL
-  const searchParams = useSearchParams();
-  const paymentId = searchParams.get("payment_id");
-  const status = searchParams.get("status");
-
-  // Número da Rosana (coloque o real aqui com DDD)
-  const whatsappNumber = "5587999999999"; 
-  
-  // Mensagem automática
-  const message = `Olá! Acabei de fazer o pagamento do agendamento (ID: ${paymentId}). Podemos confirmar o horário?`;
-  
-  const whatsappLink = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-
+export default function Home() {
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center">
-      <div className="bg-zinc-900 p-8 rounded-2xl border border-green-500/30 max-w-md w-full">
-        <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl">✅</span>
-        </div>
+    <main className="min-h-screen pb-20">
+      {/* Cabeçalho / Hero Section */}
+      <div className="relative pt-20 pb-16 text-center px-4 overflow-hidden">
+         {/* Efeito de luz de fundo no título */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-pink-600/20 blur-[100px] -z-10 rounded-full"></div>
         
-        <h1 className="text-2xl font-bold text-green-400 mb-2">Pagamento Aprovado!</h1>
-        <p className="text-zinc-400 mb-6">
-          Seu agendamento está quase pronto. Envie o comprovante para confirmar o horário.
+        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4 bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent">
+          Realce sua <span className="text-pink-500">beleza única</span>
+        </h1>
+        <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
+          Serviços exclusivos com Rosana Sena. Escolha seu procedimento abaixo e agende em segundos.
         </p>
-
-        {/* Botão Mágico que notifica a dona */}
-        <a 
-          href={whatsappLink}
-          target="_blank"
-          className="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl transition-all mb-4"
-        >
-          Enviar Comprovante no WhatsApp
-        </a>
-
-        <Link href="/" className="text-zinc-500 hover:text-white text-sm underline">
-          Voltar para o início
-        </Link>
       </div>
-    </div>
+
+      {/* Grade de Serviços */}
+      <section className="container mx-auto px-4 max-w-5xl">
+        <h2 className="text-2xl font-bold mb-8 border-l-4 border-pink-500 pl-4 flex items-center gap-2">
+          Procedimentos Disponíveis
+        </h2>
+        
+        {/* AQUI É O PULO DO GATO: Usar CSS Grid para organizar os cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          <ServiceCard 
+            title="Design de Sobrancelha"
+            price="R$ 45,00"
+            duration="45 min"
+            type="Presencial"
+            imageUrl="https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?q=80&w=600&auto=format&fit=crop"
+          />
+          
+          <ServiceCard 
+            title="Micropigmentação"
+            price="R$ 350,00"
+            duration="120 min"
+            type="Presencial"
+            imageUrl="https://images.unsplash.com/photo-1588066692676-72e3597f978e?q=80&w=600&auto=format&fit=crop"
+          />
+
+          <ServiceCard 
+            title="Lash Lifting"
+            price="R$ 120,00"
+            duration="60 min"
+            type="Presencial"
+            imageUrl="https://images.unsplash.com/photo-1587753510587-c4f8952824d7?q=80&w=600&auto=format&fit=crop"
+          />
+
+           {/* Adicione mais cards aqui se quiser */}
+
+        </div>
+      </section>
+    </main>
   );
 }
