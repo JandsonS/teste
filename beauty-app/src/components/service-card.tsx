@@ -20,7 +20,7 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
   // Removemos espaços do título para usar como ID (ex: "Corte-date")
   const uniqueId = title.replace(/\s+/g, '-').toLowerCase();
 
-  const whatsappNumber = "5587999999999"; 
+  const whatsappNumber = "5587991537080"; // SEU NÚMERO AQUI
 
   const handlePagarNoLocal = () => {
     if (!date || !time || !clientName) {
