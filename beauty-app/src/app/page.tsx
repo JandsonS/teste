@@ -43,13 +43,7 @@ export default function Home() {
       type: "presencial" as const,
       imageUrl: "https://www.maybelline.com.br/-/media/project/loreal/brand-sites/mny/americas/br/artigos/2024/olhos/categoria-pai/volume-brasileiro/extensao-cilios.jpg?rev=dd3d34832430435c8e4fa468d6ebedf1&cx=0.49&cy=0.39&cw=650&ch=650&hash=7042D72335BE45CC570658DF20F77784"
     },
-    {
-      title: "Mentoria de Marketing",
-      price: "R$ 1,00",
-      duration: "60 min",
-      type: "online" as const,
-      imageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&auto=format&fit=crop&q=60"
-    },
+    
     {
       title: "Limpeza de Pele",
       price: "R$ 1,00",
