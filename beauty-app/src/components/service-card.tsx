@@ -10,34 +10,50 @@ interface ServiceProps {
   type?: string;
 }
 
+// --- REGRAS DE NEGÓCIO (CONFIGURE AQUI) ---
+const HORARIOS_DISPONIVEIS = [
+  "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
+];
+
+// Dias proibidos (0 = Domingo, 1 = Segunda, 2 = Terça... 6 = Sábado)
+const DIAS_BLOQUEADOS = [0, 1]; // Ex: Domingo e Segunda fechados
+
 export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [time, setTime] = useState(""); // Agora time é selecionado por botão
   const [clientName, setClientName] = useState("");
 
-  // CRIA IDs ÚNICOS PARA CADA CARD (Isso resolve o erro!)
-  // Removemos espaços do título para usar como ID (ex: "Corte-date")
   const uniqueId = title.replace(/\s+/g, '-').toLowerCase();
+  const whatsappNumber = "5587991537080"; 
 
-  const whatsappNumber = "5587991537080"; // SEU NÚMERO AQUI
+  // Pega a data de hoje no formato YYYY-MM-DD para bloquear o passado
+  const hoje = new Date().toISOString().split("T")[0];
 
- // ... resto do código anterior ...
+  // --- FUNÇÃO INTELIGENTE DE DATA ---
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dataSelecionada = e.target.value;
+    const diaDaSemana = new Date(dataSelecionada).getUTCDay(); // Pega o dia (0-6)
+
+    if (DIAS_BLOQUEADOS.includes(diaDaSemana)) {
+      alert("Ops! Não funcionamos neste dia da semana. Por favor escolha outro.");
+      setDate(""); // Limpa o campo
+    } else {
+      setDate(dataSelecionada);
+    }
+  };
 
   const handlePagarNoLocal = () => {
     if (!date || !time || !clientName) {
-      alert("Por favor, preencha nome, data e horário.");
+      alert("Preencha todos os dados: Nome, Data e Horário.");
       return;
     }
     
-    // MENSAGEM ORGANIZADA (Visual de Ticket)
-    const message = `*NOVA SOLICITAÇÃO DE AGENDAMENTO* 🗓️
+    const message = `*NOVA SOLICITAÇÃO* 🗓️
 _________________________
-
 👤 *Cliente:* ${clientName}
 ✂️ *Serviço:* ${title}
 💵 *Valor:* ${price} (Pagar no Local)
-
 📅 *Data:* ${date.split('-').reverse().join('/')}
 ⏰ *Horário:* ${time}
 _________________________
@@ -48,10 +64,9 @@ _________________________
     setIsModalOpen(false);
   };
 
-
   const handlePagarOnline = async () => {
     if (!date || !time || !clientName) {
-      alert("Por favor, preencha nome, data e horário.");
+      alert("Preencha todos os dados: Nome, Data e Horário.");
       return;
     }
 
@@ -79,6 +94,7 @@ _________________________
 
   return (
     <>
+      {/* CARD (Visual permanece igual) */}
       <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-1 backdrop-blur-lg transition-all hover:border-pink-500/50 hover:shadow-2xl hover:shadow-pink-500/10">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-pink-500/0 via-pink-500/0 to-pink-500/0 transition-all group-hover:from-pink-500/10 group-hover:via-pink-500/5 group-hover:to-pink-500/0 opacity-0 group-hover:opacity-100 duration-500" />
         
@@ -110,62 +126,82 @@ _________________________
         </div>
       </div>
 
+      {/* --- MODAL COM AS NOVAS REGRAS --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-700 w-full max-w-md p-6 rounded-2xl shadow-2xl relative animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-700 w-full max-w-md p-6 rounded-2xl shadow-2xl relative my-auto animate-in fade-in zoom-in duration-200">
             
             <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white">✕</button>
             
-            <h3 className="text-xl font-bold text-white mb-1">Agendar: {title}</h3>
-            <p className="text-zinc-400 text-sm mb-6">Preencha seus dados para prosseguir.</p>
+            <h3 className="text-xl font-bold text-white mb-1">{title}</h3>
+            <p className="text-zinc-400 text-sm mb-6">Escolha o melhor horário para você.</p>
 
-            <div className="space-y-4">
-              {/* CORREÇÃO AQUI: Adicionamos htmlFor e id correspondentes */}
+            <div className="space-y-5">
+              
+              {/* NOME */}
               <div>
-                <label htmlFor={`name-${uniqueId}`} className="block text-sm text-zinc-400 mb-1">Seu Nome</label>
+                <label htmlFor={`name-${uniqueId}`} className="block text-sm font-medium text-zinc-300 mb-2">Seu Nome Completo</label>
                 <input 
                   id={`name-${uniqueId}`}
                   type="text" 
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none" 
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none transition-colors" 
                   value={clientName} 
                   onChange={(e) => setClientName(e.target.value)} 
                   placeholder="Ex: Maria Silva" 
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor={`date-${uniqueId}`} className="block text-sm text-zinc-400 mb-1">Data</label>
-                  <input 
-                    id={`date-${uniqueId}`}
-                    type="date" 
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none" 
-                    value={date} 
-                    onChange={(e) => setDate(e.target.value)} 
-                  />
-                </div>
-                <div>
-                  <label htmlFor={`time-${uniqueId}`} className="block text-sm text-zinc-400 mb-1">Horário</label>
-                  <input 
-                    id={`time-${uniqueId}`}
-                    type="time" 
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none" 
-                    value={time} 
-                    onChange={(e) => setTime(e.target.value)} 
-                  />
-                </div>
+              {/* DATA (Com Validação) */}
+              <div>
+                <label htmlFor={`date-${uniqueId}`} className="block text-sm font-medium text-zinc-300 mb-2">Data do Agendamento</label>
+                <input 
+                  id={`date-${uniqueId}`}
+                  type="date" 
+                  min={hoje} // REGRA 1: Bloqueia passado
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none transition-colors" 
+                  value={date} 
+                  onChange={handleDateChange} // REGRA 2: Valida dias da semana
+                />
+                <p className="text-xs text-zinc-500 mt-1">Funcionamos de Terça a Sábado.</p>
               </div>
+
+              {/* HORÁRIOS (Botões em Grade) */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Horários Disponíveis</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {HORARIOS_DISPONIVEIS.map((horario) => (
+                    <button
+                      key={horario}
+                      onClick={() => setTime(horario)}
+                      className={`py-2 rounded-lg text-sm font-medium transition-all
+                        ${time === horario 
+                          ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20 scale-105 border-transparent' 
+                          : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:border-zinc-500 hover:text-white'
+                        }`}
+                    >
+                      {horario}
+                    </button>
+                  ))}
+                </div>
+                {!time && <p className="text-xs text-red-400 mt-2 animate-pulse">Selecione um horário acima</p>}
+              </div>
+
             </div>
 
-            <div className="mt-8">
-              <p className="text-center text-zinc-500 text-xs mb-3">
-                Antecipe seu pagamento aqui ou se preferir pague no local.
-              </p>
+            {/* Ações */}
+            <div className="mt-8 pt-6 border-t border-zinc-800">
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={handlePagarNoLocal} className="w-full py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-800 font-medium transition-colors">
+                <button 
+                  onClick={handlePagarNoLocal} 
+                  className="w-full py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-800 font-medium transition-colors text-sm"
+                >
                   Pagar no Local
                 </button>
-                <button onClick={handlePagarOnline} className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white font-bold hover:shadow-lg hover:shadow-pink-500/20 transition-all">
+                <button 
+                  onClick={handlePagarOnline} 
+                  disabled={!date || !time || !clientName}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white font-bold hover:shadow-lg hover:shadow-pink-500/20 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Pagar Online
                 </button>
               </div>
