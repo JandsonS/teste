@@ -23,9 +23,9 @@ export async function POST(request: Request) {
         ],
         // Para onde o usuário vai depois de pagar?
         back_urls: {
-          success: 'https://seusite.vercel.app/',
-          failure: 'https://seusite.vercel.app/',
-          pending: 'https://seusite.vercel.app/',
+            success: 'https://seusite.vercel.app/sucesso', 
+            failure: 'https://seusite.vercel.app/',
+            pending: 'https://seusite.vercel.app/'
         },
         auto_return: 'approved',
       },
