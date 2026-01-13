@@ -11,25 +11,29 @@ export async function POST(request: Request) {
 
     const preference = new Preference(client);
 
-    const result = await preference.create({
-      body: {
-        items: [
-          {
-            id: '123',
-            title: body.title, // Ex: "Design de Sobrancelha"
-            unit_price: Number(body.price), // Ex: 45.00
-            quantity: 1,
-          },
-        ],
-        // Para onde o usuário vai depois de pagar?
-        back_urls: {
-            success: 'https://seusite.vercel.app/sucesso', 
-            failure: 'https://seusite.vercel.app/',
-            pending: 'https://seusite.vercel.app/'
-        },
-        auto_return: 'approved',
+    // ...resto do código...
+
+const result = await preference.create({
+  body: {
+    items: [
+      {
+        id: '123',
+        title: body.title,
+        unit_price: Number(body.price),
+        quantity: 1,
       },
-    });
+    ],
+    // AQUI ESTÁ A CORREÇÃO:
+    back_urls: {
+      success: 'https://teste-drab-rho-60.vercel.app/sucesso', // Sua página de sucesso
+      failure: 'https://teste-drab-rho-60.vercel.app/',        // Voltar ao início se der erro
+      pending: 'https://teste-drab-rho-60.vercel.app/',        // Voltar ao início se ficar pendente
+    },
+    auto_return: 'approved',
+  },
+});
+
+// ...resto do código...
 
     // Retorna o link de pagamento para o frontend
     return NextResponse.json({ url: result.init_point });
