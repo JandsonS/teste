@@ -3,7 +3,7 @@ import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 // ATENÇÃO: Nunca coloque seu Access Token real aqui no código se for subir pro GitHub público!
 // O ideal é usar variáveis de ambiente (.env), mas para testar agora, vamos colocar direto.
-const client = new MercadoPagoConfig({ accessToken: 'APP_USR-4435390e-dae2-40a5-a4e8-4c6f017682d2' });
+const client = new MercadoPagoConfig({ accessToken: 'APP_USR-2631852624760187-011208-2bcdccd1576b285ad2046970b25ac1cb-3127805685' });
 
 export async function POST(request: Request) {
   try {
