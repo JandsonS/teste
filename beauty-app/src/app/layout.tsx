@@ -1,34 +1,35 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google"; 
 import "./globals.css";
+import { SITE_CONFIG } from "@/constants/info"; // Importamos o arquivo mestre
 
 const inter = Inter({ subsets: ["latin"] });
 
-// --- CONFIGURAÇÃO DE SEO E WHATSAPP ---
+// --- CONFIGURAÇÃO DE SEO E WHATSAPP (Agora automática!) ---
 export const metadata: Metadata = {
-  // Título que aparece na aba do navegador
-  title: "Studio de Beleza | Agendamento Online",
+  // Título dinâmico (ex: "Studio X | Agendamento Online")
+  title: `${SITE_CONFIG.name} | Agendamento Online`,
   
-  // Descrição para o Google
-  description: "Agende seu horário para Design de Sobrancelhas, Cílios e Micropigmentação. Atendimento exclusivo e pagamento facilitado.",
+  // Descrição vinda do arquivo de configuração
+  description: SITE_CONFIG.description,
   
-  // URL Base do seu site (NECESSÁRIO para a imagem funcionar)
-  metadataBase: new URL("https://teste-drab-rho-60.vercel.app"),
+  // URL Base (para a imagem funcionar no Zap)
+  metadataBase: new URL(SITE_CONFIG.url),
 
-  // Configuração para Facebook, WhatsApp, LinkedIn, etc.
+  // Configuração para Facebook, WhatsApp, etc.
   openGraph: {
-    title: "Realce sua beleza única ✨",
+    title: `Agende no ${SITE_CONFIG.name} ✨`,
     description: "Clique aqui para ver nossos horários disponíveis e agendar seu procedimento em segundos.",
-    url: "https://teste-drab-rho-60.vercel.app",
-    siteName: "Studio de Beleza",
+    url: SITE_CONFIG.url,
+    siteName: SITE_CONFIG.name,
     locale: "pt_BR",
     type: "website",
     images: [
       {
-        url: "/capa.jpg", // A imagem que você colocou na pasta public
+        url: "/capa.jpg", 
         width: 1200,
         height: 630,
-        alt: "Capa do Studio de Beleza",
+        alt: `Capa do ${SITE_CONFIG.name}`,
       },
     ],
   },
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
   // Configuração para Twitter/X
   twitter: {
     card: "summary_large_image",
-    title: "Studio de Beleza | Agende Agora",
+    title: `${SITE_CONFIG.name} | Agende Agora`,
     description: "Confira nossos serviços e garanta seu horário.",
     images: ["/capa.jpg"],
   },
