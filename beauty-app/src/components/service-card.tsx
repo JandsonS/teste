@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react"; // Adicionei useEffect
-import { format, isSameDay } from "date-fns"; // Adicionei isSameDay
+import { useState, useEffect } from "react";
+import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
+import { SITE_CONFIG } from "@/constants/info"; // <--- 1. IMPORTANTE: Importamos o Mestre
 
 interface ServiceProps {
   title: string;
@@ -14,11 +15,10 @@ interface ServiceProps {
   type?: string;
 }
 
-const HORARIOS_PADRAO = [
-  "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
-];
-
-const DIAS_BLOQUEADOS = [0, 1]; 
+// 2. AQUI ESTÁ O SEGREDO:
+// Em vez de escrever a lista na mão, pegamos do arquivo de configuração.
+const HORARIOS_PADRAO = SITE_CONFIG.horarios;
+const DIAS_BLOQUEADOS = SITE_CONFIG.diasBloqueados; 
 
 export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,11 +26,12 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
   const [time, setTime] = useState("");
   const [clientName, setClientName] = useState("");
   
-  // Novo estado para controlar horários filtrados
   const [horariosDisponiveis, setHorariosDisponiveis] = useState(HORARIOS_PADRAO);
 
   const uniqueId = title.replace(/\s+/g, '-').toLowerCase();
-  const whatsappNumber = "5587991537080"; 
+  
+  // 3. O NÚMERO AGORA É DINÂMICO:
+  const whatsappNumber = SITE_CONFIG.whatsappNumber; 
 
   // --- REGRA DE NEGÓCIO: FILTRO DE HORAS PASSADAS ---
   useEffect(() => {
@@ -40,30 +41,25 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
     }
 
     const hoje = new Date();
-    // Verifica se o dia selecionado é hoje
     if (isSameDay(selectedDate, hoje)) {
       const horaAtual = hoje.getHours();
-      const minutosAtuais = hoje.getMinutes();
-
+      
       const horariosFiltrados = HORARIOS_PADRAO.filter((horario) => {
-        const [horaString, minutoString] = horario.split(":");
+        const [horaString] = horario.split(":");
         const horaDoBotao = parseInt(horaString);
-        
-        // Bloqueia se a hora do botão for menor que a hora atual
-        // Ex: Se são 14:30, bloqueia 14:00 e anteriores
         return horaDoBotao > horaAtual;
       });
       
       setHorariosDisponiveis(horariosFiltrados);
     } else {
-      // Se for data futura, libera todos
       setHorariosDisponiveis(HORARIOS_PADRAO);
     }
-  }, [selectedDate]); // Executa toda vez que a data muda
+  }, [selectedDate]);
 
   const isDayDisabled = (date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    // Verifica se é passado OU se o dia da semana está na lista de bloqueados do info.ts
     return date < today || DIAS_BLOQUEADOS.includes(date.getDay());
   };
 
@@ -77,11 +73,11 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
 
     const message = `*NOVA SOLICITAÇÃO* 🗓️
 _________________________
-👤 *Cliente:* ${clientName}
-✂️ *Serviço:* ${title}
-💵 *Valor:* ${price} (Pagar no Local)
-📅 *Data:* ${dataFormatada}
-⏰ *Horário:* ${time}
+  *Cliente:* ${clientName}
+  *Serviço:* ${title}
+  *Valor:* ${price} (Pagar no Local)
+  *Data:* ${dataFormatada}
+  *Horário:* ${time}
 _________________________
 *Aguardo confirmação!*`;
 
@@ -121,7 +117,7 @@ _________________________
 
   return (
     <>
-      {/* CARD (Sem alterações visuais) */}
+      {/* CARD */}
       <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-1 backdrop-blur-lg transition-all hover:border-pink-500/50 hover:shadow-2xl hover:shadow-pink-500/10">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-pink-500/0 via-pink-500/0 to-pink-500/0 transition-all group-hover:from-pink-500/10 group-hover:via-pink-500/5 group-hover:to-pink-500/0 opacity-0 group-hover:opacity-100 duration-500" />
         
@@ -193,7 +189,7 @@ _________________________
                         selected={selectedDate}
                         onSelect={(date) => {
                           setSelectedDate(date);
-                          setTime(""); // Reseta a hora se trocar o dia para evitar conflitos
+                          setTime(""); 
                         }}
                         locale={ptBR}
                         disabled={isDayDisabled}
@@ -212,7 +208,6 @@ _________________________
                 </div>
               </div>
 
-              {/* HORÁRIOS DINÂMICOS */}
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Horário</label>
                 
