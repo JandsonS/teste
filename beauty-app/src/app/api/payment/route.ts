@@ -1,41 +1,42 @@
 import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { SITE_CONFIG } from '@/constants/info'; // Importamos as configs do site
 
-// ATENÇÃO: Nunca coloque seu Access Token real aqui no código se for subir pro GitHub público!
-// O ideal é usar variáveis de ambiente (.env), mas para testar agora, vamos colocar direto.
-const client = new MercadoPagoConfig({ accessToken: 'APP_USR-2631852624760187-011208-2bcdccd1576b285ad2046970b25ac1cb-3127805685' });
+// 1. SEGURANÇA:
+// Agora ele busca a senha no arquivo .env.local (ou na Vercel)
+// O "!" no final diz ao TypeScript: "Pode confiar, essa variável existe!"
+const client = new MercadoPagoConfig({ 
+  accessToken: process.env.MP_ACCESS_TOKEN! 
+});
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json(); // Recebe os dados do produto (nome, preço)
+    const body = await request.json();
 
     const preference = new Preference(client);
 
-    // ...resto do código...
-
-const result = await preference.create({
-  body: {
-    items: [
-      {
-        id: '123',
-        title: body.title,
-        unit_price: Number(body.price),
-        quantity: 1,
+    const result = await preference.create({
+      body: {
+        items: [
+          {
+            id: '123', // ID genérico ou dinâmico
+            title: body.title,
+            unit_price: Number(body.price),
+            quantity: 1,
+          },
+        ],
+        // 2. FLEXIBILIDADE:
+        // Usamos a URL do arquivo info.ts. 
+        // Se você mudar o site de domínio, muda aqui sozinho.
+        back_urls: {
+          success: `${SITE_CONFIG.url}/sucesso`,
+          failure: `${SITE_CONFIG.url}/`,
+          pending: `${SITE_CONFIG.url}/`,
+        },
+        auto_return: 'approved',
       },
-    ],
-    // AQUI ESTÁ A CORREÇÃO:
-    back_urls: {
-      success: 'https://teste-drab-rho-60.vercel.app/sucesso', // Sua página de sucesso
-      failure: 'https://teste-drab-rho-60.vercel.app/',        // Voltar ao início se der erro
-      pending: 'https://teste-drab-rho-60.vercel.app/',        // Voltar ao início se ficar pendente
-    },
-    auto_return: 'approved',
-  },
-});
+    });
 
-// ...resto do código...
-
-    // Retorna o link de pagamento para o frontend
     return NextResponse.json({ url: result.init_point });
     
   } catch (error) {
