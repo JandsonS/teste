@@ -1,89 +1,32 @@
-import { ServiceCard } from "@/components/service-card"
-import { Sparkles, CalendarHeart } from "lucide-react"
-
-// Adicione isso no topo do componente
-const handleBuy = async () => {
-  const response = await fetch('/api/payment', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      title: "Design de Sobrancelha",
-      price: 1.00
-    }),
-  });
-
-  const data = await response.json();
-  
-  // Redireciona o usuário para o checkout do Mercado Pago
-  if (data.url) {
-    window.location.href = data.url;
-  }
-};
-
-// No seu botão:
-// <button onClick={handleBuy}>Agendar e Pagar</button>
+import { ServiceCard } from "@/components/service-card";
+import { SERVICES } from "@/constants/services"; // Importa nossa lista
 
 export default function Home() {
-  // Dados com imagens funcionais
-  const services = [
-    {
-      title: "Design de Sobrancelha",
-      price: "R$ 1,00",
-      duration: "45 min",
-      type: "presencial" as const,
-      // Usando imagens do Placehold.co que nunca quebram, ou links estáveis
-      imageUrl: "https://images.unsplash.com/photo-1615526675159-e248c3021d3f?w=800&auto=format&fit=crop&q=60"
-    },
-    {
-      title: "Alongamento de Cílios",
-      price: "R$ 1,00",
-      duration: "100 min",
-      type: "presencial" as const,
-      imageUrl: "https://www.maybelline.com.br/-/media/project/loreal/brand-sites/mny/americas/br/artigos/2024/olhos/categoria-pai/volume-brasileiro/extensao-cilios.jpg?rev=dd3d34832430435c8e4fa468d6ebedf1&cx=0.49&cy=0.39&cw=650&ch=650&hash=7042D72335BE45CC570658DF20F77784"
-    },
-    
-    {
-      title: "Limpeza de Pele",
-      price: "R$ 1,00",
-      duration: "50 min",
-      type: "presencial" as const,
-      imageUrl: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800&auto=format&fit=crop&q=60"
-    }
-  ]
-
   return (
-    <main className="min-h-screen bg-gray-50 pb-20">
-      {/* Header Bonito e Largo */}
-      <div className="bg-gradient-to-r from-rose-900 to-rose-800 text-white py-16 px-6 shadow-xl mb-10">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2 text-rose-300 font-semibold uppercase tracking-wider text-sm">
-              <Sparkles className="w-4 h-4" /> Realce sua beleza
-            </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-4">Studio Teste</h1>
-            <p className="text-rose-100 text-lg max-w-lg">
-              Agende seus procedimentos favoritos em segundos e receba atendimento exclusivo.
-            </p>
-          </div>
-          <div className="hidden md:block bg-white/10 p-4 rounded-full">
-            <CalendarHeart className="w-16 h-16 text-rose-200" />
-          </div>
-        </div>
+    <main className="min-h-screen pb-20">
+      {/* Cabeçalho / Hero Section */}
+      <div className="relative pt-20 pb-16 text-center px-4 overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-pink-600/20 blur-[100px] -z-10 rounded-full"></div>
+        
+        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4 bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent">
+          Realce sua <span className="text-pink-500">beleza única</span>
+        </h1>
+        <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
+          Procedimentos exclusivos e atendimento personalizado. Escolha seu serviço abaixo e agende em segundos.
+        </p>
       </div>
 
-      {/* Grid Responsivo de Serviços */}
-      <div className="max-w-6xl mx-auto px-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 border-l-4 border-rose-600 pl-4">
-          Nossos Serviços
+      {/* Grade de Serviços Automática */}
+      <section className="container mx-auto px-4 max-w-5xl">
+        <h2 className="text-2xl font-bold mb-8 border-l-4 border-pink-500 pl-4 flex items-center gap-2">
+          Nossos Procedimentos
         </h2>
-
-        {/* A MÁGICA DA RESPONSIVIDADE ESTÁ AQUI EMBAIXO: grid-cols-1 (celular) até grid-cols-3 (PC) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {services.map((service, index) => (
+        
+        {/* Aqui acontece a mágica: O Map cria um card para cada item da lista */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {SERVICES.map((service) => (
             <ServiceCard 
-              key={index}
+              key={service.id}
               title={service.title}
               price={service.price}
               duration={service.duration}
@@ -92,12 +35,7 @@ export default function Home() {
             />
           ))}
         </div>
-      </div>
-      
-      {/* Footer */}
-      <div className="text-center text-gray-400 text-sm mt-20 border-t py-8">
-        © 2026 Studio App Exemplo - Feito Por Eng. Software José Jandson
-      </div>
+      </section>
     </main>
-  )
+  );
 }
