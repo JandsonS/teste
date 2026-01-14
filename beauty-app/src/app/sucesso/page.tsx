@@ -1,79 +1,54 @@
-"use client";
+import { ServiceCard } from "@/components/service-card";
+import { SERVICES } from "@/constants/services";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
-
-// 1. Criamos um componente interno só para o conteúdo que precisa da URL
-function ConteudoSucesso() {
-  const searchParams = useSearchParams();
-  const paymentId = searchParams.get("payment_id");
-  const [whatsappLink, setWhatsappLink] = useState("#");
-
-  const whatsappNumber = "5587991537080"; // SEU NÚMERO AQUI
-
-
-  useEffect(() => {
-    const savedData = localStorage.getItem("agendamentoTemp");
-    let message = "";
-    
-    if (savedData) {
-      const { service, date, time, client } = JSON.parse(savedData);
-      
-      // MENSAGEM ORGANIZADA (Com Status PAGO)
-      message = `*AGENDAMENTO CONFIRMADO* ✅
-_________________________
-
-👤 *Cliente:* ${client}
-✂️ *Serviço:* ${service}
-✅ *Status:* PAGO (ID: ${paymentId || 'N/A'})
-
-📅 *Data:* ${date}
-⏰ *Horário:* ${time}
-_________________________
-*Podemos confirmar este horário?*`;
-
-    } else {
-      // Caso genérico (se perder os dados do navegador)
-      message = `*PAGAMENTO RECEBIDO* ✅
-_________________________
-ID do Pagamento: ${paymentId || 'N/A'}
-
-Olá! Fiz o pagamento pelo site e gostaria de confirmar o horário.`;
-    }
-
-    setWhatsappLink(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`);
-  }, [paymentId]);
-
+export default function Home() {
   return (
-    // ... (Mantenha o HTML visual igual ao anterior) ...
-    <div className="bg-zinc-900 p-8 rounded-2xl border border-green-500/30 max-w-md w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
-       {/* ... resto do HTML ... */}
-      <h1 className="text-2xl font-bold text-green-400 mb-2">Tudo Certo!</h1>
-      <p className="text-zinc-400 mb-8 leading-relaxed">
-        Seu pagamento foi aprovado! Clique abaixo para enviar o comprovante oficial ao profissional.
-      </p>
+    <main className="min-h-screen pb-20">
+      {/* Cabeçalho / Hero Section */}
+      <div className="relative pt-16 pb-16 text-center px-4 overflow-hidden flex flex-col items-center">
+        
+        {/* Efeito de luz de fundo */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-pink-600/20 blur-[100px] -z-10 rounded-full"></div>
+        
+        {/* --- LOGO OFICIAL AQUI --- */}
+        <div className="mb-8 relative w-48 h-48 md:w-64 md:h-64 animate-in fade-in zoom-in duration-1000">
+           {/* Se a imagem não aparecer de primeira, verifique se o nome é logo.png na pasta public */}
+           <img 
+             src="/logo.png" 
+             alt="Logo Studio" 
+             className="object-contain w-full h-full drop-shadow-2xl"
+           />
+        </div>
 
-      <a 
-        href={whatsappLink}
-        target="_blank"
-        className="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-green-500/20 hover:-translate-y-1"
-      >
-        Finalizar no WhatsApp
-      </a>
-      {/* ... */}
-    </div>
-  );
-}
+        {/* Título (Se o logo já tiver nome, você pode remover este H1 se quiser) */}
+        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4 bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent">
+          Realce sua <span className="text-pink-500">beleza única</span>
+        </h1>
+        
+        <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
+          Procedimentos exclusivos e atendimento personalizado. Escolha seu serviço abaixo e agende em segundos.
+        </p>
+      </div>
 
-// 2. O componente principal apenas "segura" o conteúdo com Suspense
-export default function SucessoPage() {
-  return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center">
-      <Suspense fallback={<p className="text-zinc-500">Carregando confirmação...</p>}>
-        <ConteudoSucesso />
-      </Suspense>
-    </div>
+      {/* Grade de Serviços Automática */}
+      <section className="container mx-auto px-4 max-w-5xl">
+        <h2 className="text-2xl font-bold mb-8 border-l-4 border-pink-500 pl-4 flex items-center gap-2">
+          Nossos Procedimentos
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {SERVICES.map((service) => (
+            <ServiceCard 
+              key={service.id}
+              title={service.title}
+              price={service.price}
+              duration={service.duration}
+              type={service.type}
+              imageUrl={service.imageUrl}
+            />
+          ))}
+        </div>
+      </section>
+    </main>
   );
-  
 }
