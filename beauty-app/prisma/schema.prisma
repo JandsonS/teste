@@ -1,13 +1,3 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL_UNPOOLED")
-}
-
 model Agendamento {
   id        String   @id @default(cuid())
   cliente   String
@@ -16,7 +6,6 @@ model Agendamento {
   horario   String
   status    String   @default("PENDENTE")
   valor     Float
-  paymentId String?
   createdAt DateTime @default(now())
 
   @@unique([data, horario])
