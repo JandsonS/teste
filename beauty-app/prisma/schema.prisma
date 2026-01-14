@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  // A URL agora é gerenciada pelo arquivo prisma.config.ts
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model Agendamento {
@@ -18,6 +19,5 @@ model Agendamento {
   paymentId String?
   createdAt DateTime @default(now())
 
-  // A regra que impede duplicidade de horário
   @@unique([data, horario])
 }
