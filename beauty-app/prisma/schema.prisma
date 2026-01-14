@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // A URL agora é gerenciada pelo arquivo prisma.config.ts
+}
+
+model Agendamento {
+  id        String   @id @default(cuid())
+  cliente   String
+  servico   String
+  data      String
+  horario   String
+  status    String   @default("PENDENTE")
+  valor     Float
+  paymentId String?
+  createdAt DateTime @default(now())
+
+  // A regra que impede duplicidade de horário
+  @@unique([data, horario])
+}
