@@ -16,7 +16,7 @@ export const SERVICES = [
     price: "R$ 1,00",
     duration: "120 min",
     type: "Presencial",
-    imageUrl: "https://images.unsplash.com/photo-1588066692676-72e3597f978e?q=80&w=600&auto=format&fit=crop"
+    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTnHI59_8FXw1fAO0FKmcsRH2SLv7d-RwpD_g&s"
   },
   {
     id: 3,
@@ -24,7 +24,7 @@ export const SERVICES = [
     price: "R$ 1,00",
     duration: "60 min",
     type: "Presencial",
-    imageUrl: "https://images.unsplash.com/photo-1587753510587-c4f8952824d7?q=80&w=600&auto=format&fit=crop"
+    imageUrl: "https://images.tcdn.com.br/img/img_prod/444280/pincel_de_silicone_para_lash_lifting_master_10_un_14898_3_5ed60ff578e17a2cbf09b4ca5db86f53.jpg"
   },
   {
     id: 4,
@@ -32,6 +32,6 @@ export const SERVICES = [
     price: "R$ 1,00",
     duration: "60 min",
     type: "Presencial",
-    imageUrl: "https://images.unsplash.com/photo-1629425733761-caae3b5f2e50?q=80&w=600&auto=format&fit=crop"
+    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTZDWuqWQ7HRR7TDjat_XuCOyd3sGQF0BOFBg&s"
   }
 ];
