@@ -15,16 +15,13 @@ const client = new MercadoPagoConfig({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, price, date, time, clientName } = body;
+    const { title, price, date, time, clientName, method } = body; // Adicionamos 'method'
 
-    console.log("Verificando regras para:", { clientName, date, time });
+    console.log(`Processando agendamento (${method || 'ONLINE'}):`, { clientName, date, time });
 
-    // --- REGRA 1: O HORÁRIO JÁ ESTÁ OCUPADO? (Proteção de Vaga) ---
+    // 1. O VAR: HORÁRIO OCUPADO? 🛑
     const horarioOcupado = await prisma.agendamento.findFirst({
-      where: {
-        data: date,
-        horario: time
-      }
+      where: { data: date, horario: time }
     });
 
     if (horarioOcupado) {
@@ -34,28 +31,36 @@ export async function POST(request: Request) {
       );
     }
 
-    // --- REGRA 2: O CLIENTE JÁ MARCOU ESSE SERVIÇO HOJE? (Proteção de Spam/Erro) ---
-    // Verifica se já existe um agendamento com: Mesmo Nome + Mesma Data + Mesmo Serviço
+    // 2. O VAR: DUPLICIDADE DE CLIENTE? 🛑
     const duplicidadeCliente = await prisma.agendamento.findFirst({
-      where: {
-        cliente: clientName, // Mesmo nome
-        data: date,          // Mesmo dia
-        servico: title       // Mesmo serviço
-        // NOTA: Não filtramos o horário aqui, pois queremos bloquear em QUALQUER horário do dia
-      }
+      where: { cliente: clientName, data: date, servico: title }
     });
 
     if (duplicidadeCliente) {
-      // Se achou, devolve erro avisando para entrar em contato
       return NextResponse.json(
-        { error: `Você já tem um agendamento de ${title} para este dia (${duplicidadeCliente.horario}). Para alterar, entre em contato pelo WhatsApp.` }, 
+        { error: `Você já tem um agendamento de ${title} hoje às ${duplicidadeCliente.horario}. Fale no WhatsApp para mudar.` }, 
         { status: 409 } 
       );
     }
 
-    // --- SE PASSOU NAS DUAS REGRAS, SEGUE O BAILE ---
-    
-    // 1. Salva no banco (Status PENDENTE)
+    // 3. SE FOR "PAGAR NO LOCAL" (APENAS RESERVA) 📝
+    if (method === 'LOCAL') {
+      await prisma.agendamento.create({
+        data: {
+          cliente: clientName,
+          servico: title,
+          data: date,
+          horario: time,
+          valor: Number(price),
+          status: "AGENDADO_LOCAL", // Status diferente para você saber que vai pagar lá
+        }
+      });
+      
+      // Retorna sucesso sem link de pagamento
+      return NextResponse.json({ success: true });
+    }
+
+    // 4. SE FOR ONLINE (GERA MERCADO PAGO) 💳
     const agendamento = await prisma.agendamento.create({
       data: {
         cliente: clientName,
@@ -67,7 +72,6 @@ export async function POST(request: Request) {
       }
     });
 
-    // 2. Cria preferência no Mercado Pago
     const preference = new Preference(client);
     const result = await preference.create({
       body: {

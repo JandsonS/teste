@@ -52,20 +52,57 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
     return date < today || DIAS_BLOQUEADOS.includes(date.getDay());
   };
 
-  const handlePagarNoLocal = () => {
+  // --- NOVA FUNÇÃO INTELIGENTE DE PAGAMENTO NO LOCAL ---
+  const handlePagarNoLocal = async () => {
     if (!selectedDate || !time || !clientName) {
       alert("Preencha todos os dados: Nome, Data e Horário.");
       return;
     }
+
+    setIsLoading(true);
     const dataFormatada = format(selectedDate, "dd/MM/yyyy", { locale: ptBR });
-    const message = `*NOVA SOLICITAÇÃO (Pagar no Local)* 🗓️\n\n👤 *Cliente:* ${clientName}\n✂️ *Serviço:* ${title}\n📅 *Data:* ${dataFormatada}\n⏰ *Horário:* ${time}\n\n*Aguardo confirmação!*`;
-    const link = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-    window.open(link, "_blank");
-    setIsModalOpen(false);
+    const numericPrice = parseFloat(price.replace("R$", "").replace(".", "").replace(",", ".").trim());
+
+    try {
+      // 1. TENTA RESERVAR A VAGA NO BANCO PRIMEIRO
+      const response = await fetch('/api/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title, 
+          price: numericPrice,
+          date: dataFormatada,
+          time,
+          clientName,
+          method: 'LOCAL' // Avisa a API que é local
+        }),
+      });
+
+      const data = await response.json();
+
+      // 2. SE A VAGA ESTIVER OCUPADA OU DUPLICADA
+      if (!response.ok) {
+        alert(data.error || "Ocorreu um erro ao agendar.");
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. SUCESSO: ABRE O WHATSAPP
+      const message = `*SOLICITAÇÃO DE AGENDAMENTO* ✅\n(Vaga reservada no site)\n\n👤 *Cliente:* ${clientName}\n✂️ *Serviço:* ${title}\n📅 *Data:* ${dataFormatada}\n⏰ *Horário:* ${time}\n💰 *Valor:* ${price}\n\n*Vou pagar no local!*`;
+      
+      const link = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+      window.open(link, "_blank");
+      setIsModalOpen(false);
+      setIsLoading(false);
+
+    } catch (error) {
+      console.error("Erro:", error);
+      alert("Erro de conexão. Tente novamente.");
+      setIsLoading(false);
+    }
   };
 
   const handlePagarOnline = async () => {
-    // 1. Validação Básica
     if (!selectedDate || !time || !clientName) {
       alert("Por favor, preencha seu Nome, Data e Horário.");
       return;
@@ -77,32 +114,27 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
     const numericPrice = parseFloat(price.replace("R$", "").replace(".", "").replace(",", ".").trim());
 
     try {
-      console.log("Enviando solicitação para API...");
-      
       const response = await fetch('/api/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          title: title, 
+          title, 
           price: numericPrice,
           date: dataFormatada,
-          time: time,
-          clientName: clientName
+          time,
+          clientName
+          // method vazio = ONLINE
         }),
       });
 
       const data = await response.json();
 
-      // 2. AQUI ESTÁ A BARREIRA FINAL 🚧
-      // Se a resposta NÃO for OK (ex: 409 Conflito), paramos tudo.
       if (!response.ok) {
-        console.error("Erro retornado pela API:", data);
-        alert(data.error || "Ocorreu um erro ao processar."); // Mostra o alerta "Horário Ocupado"
-        setIsLoading(false); // Destrava o botão
-        return; // IMPORTANTE: Encerra a função aqui. Não deixa descer para o redirect.
+        alert(data.error || "Ocorreu um erro ao processar.");
+        setIsLoading(false);
+        return;
       }
 
-      // 3. Sucesso: Vai para o pagamento
       if (data.url) {
         window.location.href = data.url;
       } else {
@@ -197,7 +229,13 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
             </div>
             <div className="p-6 pt-4 border-t border-zinc-800 bg-zinc-900/95">
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={handlePagarNoLocal} disabled={isLoading} className="w-full py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-800 font-medium text-sm">Pagar no Local</button>
+                <button 
+                  onClick={handlePagarNoLocal} 
+                  disabled={isLoading || !selectedDate || !time || !clientName} 
+                  className="w-full py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-800 font-medium text-sm disabled:opacity-50"
+                >
+                  {isLoading ? "Verificando..." : "Pagar no Local"}
+                </button>
                 <button 
                   onClick={handlePagarOnline} 
                   disabled={!selectedDate || !time || !clientName || isLoading}
