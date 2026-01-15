@@ -47,7 +47,6 @@ export async function POST(request: Request) {
     });
 
     if (agendamentoPendente) {
-      // 👇 AQUI ESTÁ A MENSAGEM ATUALIZADA COM O WHATSAPP
       return NextResponse.json(
         { error: `Você já possui um agendamento ativo para o dia ${agendamentoPendente.data} às ${agendamentoPendente.horario}. Caso precise cancelar ou alterar, entre em contato com o estabelecimento via WhatsApp: ${SITE_CONFIG.whatsappNumber}` }, 
         { status: 409 } 
@@ -99,6 +98,9 @@ export async function POST(request: Request) {
         },
         auto_return: 'approved',
         external_reference: agendamento.id,
+        
+        // 👇 AQUI ESTÁ A ÚNICA MUDANÇA (WEBHOOK) 👇
+        notification_url: `${SITE_CONFIG.url}/api/webhook`,
       },
     });
 

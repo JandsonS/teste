@@ -6,16 +6,15 @@ const prisma = globalForPrisma.prisma || new PrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
+// Note que aqui é GET (Buscar), e não POST (Enviar)
 export async function GET() {
   try {
-    // Busca todos os agendamentos
     const agendamentos = await prisma.agendamento.findMany({
       orderBy: [
-        { data: 'desc' }, // Organiza por data (mais novos primeiro)
-        { horario: 'asc' } // Dentro do dia, organiza por horário
+        { data: 'desc' }, // Mais recentes primeiro
+        { horario: 'asc' }
       ]
     });
-
     return NextResponse.json(agendamentos);
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao buscar dados' }, { status: 500 });
