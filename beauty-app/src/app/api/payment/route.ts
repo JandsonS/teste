@@ -17,10 +17,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { title, price, date, time, clientName } = body;
 
-    console.log("Verificando disponibilidade:", { date, time });
+    console.log("Verificando regras para:", { clientName, date, time });
 
-    // 1. O VAR (VERIFICAÇÃO DE SEGURANÇA) 🕵️‍♂️
-    // Antes de qualquer coisa, pergunta pro banco: "Já tem alguém nesse horário?"
+    // --- REGRA 1: O HORÁRIO JÁ ESTÁ OCUPADO? (Proteção de Vaga) ---
     const horarioOcupado = await prisma.agendamento.findFirst({
       where: {
         data: date,
@@ -28,16 +27,35 @@ export async function POST(request: Request) {
       }
     });
 
-    // Se o VAR pegou impedimento:
     if (horarioOcupado) {
-      console.log("BLOQUEIO: Horário já reservado.");
       return NextResponse.json(
-        { error: 'Ops! Esse horário já está reservado. Por favor, escolha um horário diferente' }, 
-        { status: 409 } // 409 = Conflito
+        { error: 'Esse horário já está reservado. Por favor, escolha outro.' }, 
+        { status: 409 } 
       );
     }
 
-    // 2. CAMINHO LIVRE -> SALVA NO BANCO
+    // --- REGRA 2: O CLIENTE JÁ MARCOU ESSE SERVIÇO HOJE? (Proteção de Spam/Erro) ---
+    // Verifica se já existe um agendamento com: Mesmo Nome + Mesma Data + Mesmo Serviço
+    const duplicidadeCliente = await prisma.agendamento.findFirst({
+      where: {
+        cliente: clientName, // Mesmo nome
+        data: date,          // Mesmo dia
+        servico: title       // Mesmo serviço
+        // NOTA: Não filtramos o horário aqui, pois queremos bloquear em QUALQUER horário do dia
+      }
+    });
+
+    if (duplicidadeCliente) {
+      // Se achou, devolve erro avisando para entrar em contato
+      return NextResponse.json(
+        { error: `Você já tem um agendamento de ${title} para este dia (${duplicidadeCliente.horario}). Para alterar, entre em contato pelo WhatsApp.` }, 
+        { status: 409 } 
+      );
+    }
+
+    // --- SE PASSOU NAS DUAS REGRAS, SEGUE O BAILE ---
+    
+    // 1. Salva no banco (Status PENDENTE)
     const agendamento = await prisma.agendamento.create({
       data: {
         cliente: clientName,
@@ -49,7 +67,7 @@ export async function POST(request: Request) {
       }
     });
 
-    // 3. GERA O LINK DE PAGAMENTO
+    // 2. Cria preferência no Mercado Pago
     const preference = new Preference(client);
     const result = await preference.create({
       body: {
@@ -74,7 +92,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: result.init_point });
     
   } catch (error: any) {
-    console.error("ERRO CRÍTICO:", error);
-    return NextResponse.json({ error: 'Erro interno no servidor.' }, { status: 500 });
+    console.error("ERRO NO SERVIDOR:", error);
+    return NextResponse.json({ error: 'Erro interno ao processar agendamento.' }, { status: 500 });
   }
 }
