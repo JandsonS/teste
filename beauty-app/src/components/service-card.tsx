@@ -28,7 +28,6 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
   const [horariosDisponiveis, setHorariosDisponiveis] = useState(HORARIOS_PADRAO);
   const whatsappNumber = SITE_CONFIG.whatsappNumber; 
 
-  // Filtra horários passados se for hoje
   useEffect(() => {
     if (!selectedDate) {
       setHorariosDisponiveis(HORARIOS_PADRAO);
@@ -66,6 +65,7 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
   };
 
   const handlePagarOnline = async () => {
+    // 1. Validação Básica
     if (!selectedDate || !time || !clientName) {
       alert("Por favor, preencha seu Nome, Data e Horário.");
       return;
@@ -74,32 +74,35 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
     setIsLoading(true);
 
     const dataFormatada = format(selectedDate, "dd/MM/yyyy", { locale: ptBR });
-    // Remove o R$ e converte para número (ex: "R$ 50,00" vira 50.00)
     const numericPrice = parseFloat(price.replace("R$", "").replace(".", "").replace(",", ".").trim());
 
     try {
-      // AQUI ESTAVA FALTANDO DADOS ANTES! AGORA VAI COMPLETO:
+      console.log("Enviando solicitação para API...");
+      
       const response = await fetch('/api/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           title: title, 
           price: numericPrice,
-          date: dataFormatada,    // Envia a Data
-          time: time,             // Envia o Horário
-          clientName: clientName  // Envia o Nome
+          date: dataFormatada,
+          time: time,
+          clientName: clientName
         }),
       });
 
       const data = await response.json();
 
+      // 2. AQUI ESTÁ A BARREIRA FINAL 🚧
+      // Se a resposta NÃO for OK (ex: 409 Conflito), paramos tudo.
       if (!response.ok) {
-        // Mostra o erro que o Backend mandou (ex: "Horário já reservado")
-        alert(data.error || "Erro ao processar.");
-        setIsLoading(false);
-        return;
+        console.error("Erro retornado pela API:", data);
+        alert(data.error || "Ocorreu um erro ao processar."); // Mostra o alerta "Horário Ocupado"
+        setIsLoading(false); // Destrava o botão
+        return; // IMPORTANTE: Encerra a função aqui. Não deixa descer para o redirect.
       }
 
+      // 3. Sucesso: Vai para o pagamento
       if (data.url) {
         window.location.href = data.url;
       } else {
@@ -108,8 +111,8 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
       }
 
     } catch (error) {
-      console.error(error);
-      alert("Erro de conexão. Tente novamente.");
+      console.error("Erro de rede:", error);
+      alert("Erro de conexão. Verifique sua internet.");
       setIsLoading(false);
     }
   };
@@ -154,8 +157,6 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
                 <p className="text-zinc-400 text-sm">Preencha os dados abaixo.</p>
             </div>
             <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
-              
-              {/* CAMPO NOME */}
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Seu Nome</label>
                 <input 
@@ -166,8 +167,6 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
                   placeholder="Ex: Maria Silva" 
                 />
               </div>
-
-              {/* CAMPO DATA */}
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Data</label>
                 <div className="mb-3 p-2 bg-zinc-800 rounded border border-zinc-700 text-center text-pink-300 font-medium">
@@ -182,8 +181,6 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
                     />
                 </div>
               </div>
-
-              {/* CAMPO HORÁRIO */}
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Horário</label>
                 {!selectedDate ? <p className="text-sm text-zinc-500 italic">Selecione uma data.</p> : 
@@ -198,8 +195,6 @@ export function ServiceCard({ title, price, duration, imageUrl, type }: ServiceP
                 )}
               </div>
             </div>
-
-            {/* BOTÕES */}
             <div className="p-6 pt-4 border-t border-zinc-800 bg-zinc-900/95">
               <div className="grid grid-cols-2 gap-3">
                 <button onClick={handlePagarNoLocal} disabled={isLoading} className="w-full py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-800 font-medium text-sm">Pagar no Local</button>
