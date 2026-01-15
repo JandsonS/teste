@@ -15,11 +15,11 @@ const client = new MercadoPagoConfig({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, price, date, time, clientName, method } = body; // Adicionamos 'method'
+    const { title, price, date, time, clientName, method } = body;
 
-    console.log(`Processando agendamento (${method || 'ONLINE'}):`, { clientName, date, time });
+    console.log(`Verificando agendamento (${method || 'ONLINE'}):`, { clientName, date, time });
 
-    // 1. O VAR: HORÁRIO OCUPADO? 🛑
+    // 1. O VAR: HORÁRIO EXATO OCUPADO? 🛑
     const horarioOcupado = await prisma.agendamento.findFirst({
       where: { data: date, horario: time }
     });
@@ -31,14 +31,29 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. O VAR: DUPLICIDADE DE CLIENTE? 🛑
-    const duplicidadeCliente = await prisma.agendamento.findFirst({
-      where: { cliente: clientName, data: date, servico: title }
+    // 2. O VAR: CLIENTE JÁ TEM AGENDAMENTO FUTURO? 🛑
+    // Essa é a regra nova: Busca TODOS os agendamentos desse nome
+    const historicoCliente = await prisma.agendamento.findMany({
+      where: { cliente: clientName }
     });
 
-    if (duplicidadeCliente) {
+    // Vamos verificar se existe algum agendamento ATIVO de hoje em diante
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0); // Zera a hora para comparar apenas a data
+
+    const agendamentoPendente = historicoCliente.find((item) => {
+      // Converte a data string "dd/MM/yyyy" para Objeto Date do Javascript
+      const [dia, mes, ano] = item.data.split('/').map(Number);
+      const dataItem = new Date(ano, mes - 1, dia);
+
+      // Se a data do agendamento for HOJE ou FUTURO, e não estiver cancelado
+      // Bloqueia!
+      return dataItem >= hoje && item.status !== 'CANCELADO';
+    });
+
+    if (agendamentoPendente) {
       return NextResponse.json(
-        { error: `Você já tem um agendamento de ${title} hoje às ${duplicidadeCliente.horario}. Fale no WhatsApp para mudar.` }, 
+        { error: `Você já possui um agendamento ativo para o dia ${agendamentoPendente.data} às ${agendamentoPendente.horario}. Caso precise cancelar ou alterar, entre em contato com o estabelecimento.` }, 
         { status: 409 } 
       );
     }
@@ -52,11 +67,9 @@ export async function POST(request: Request) {
           data: date,
           horario: time,
           valor: Number(price),
-          status: "AGENDADO_LOCAL", // Status diferente para você saber que vai pagar lá
+          status: "AGENDADO_LOCAL", 
         }
       });
-      
-      // Retorna sucesso sem link de pagamento
       return NextResponse.json({ success: true });
     }
 
