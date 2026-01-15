@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     if (horarioOcupado) {
       console.log("BLOQUEIO: Horário já reservado.");
       return NextResponse.json(
-        { error: 'Ops! Esse horário já está reservado. Por favor, escolha um horário diferente.' }, 
+        { error: 'Ops! Esse horário já está reservado. Por favor, escolha um horário diferente' }, 
         { status: 409 } // 409 = Conflito
       );
     }
