@@ -32,28 +32,24 @@ export async function POST(request: Request) {
     }
 
     // 2. O VAR: CLIENTE JÁ TEM AGENDAMENTO FUTURO? 🛑
-    // Essa é a regra nova: Busca TODOS os agendamentos desse nome
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: clientName }
     });
 
-    // Vamos verificar se existe algum agendamento ATIVO de hoje em diante
     const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0); // Zera a hora para comparar apenas a data
+    hoje.setHours(0, 0, 0, 0); 
 
     const agendamentoPendente = historicoCliente.find((item) => {
-      // Converte a data string "dd/MM/yyyy" para Objeto Date do Javascript
       const [dia, mes, ano] = item.data.split('/').map(Number);
       const dataItem = new Date(ano, mes - 1, dia);
-
-      // Se a data do agendamento for HOJE ou FUTURO, e não estiver cancelado
-      // Bloqueia!
+      // Busca agendamentos ativos de HOJE em diante
       return dataItem >= hoje && item.status !== 'CANCELADO';
     });
 
     if (agendamentoPendente) {
+      // 👇 AQUI ESTÁ A MENSAGEM ATUALIZADA COM O WHATSAPP
       return NextResponse.json(
-        { error: `Você já possui um agendamento ativo para o dia ${agendamentoPendente.data} às ${agendamentoPendente.horario}. Caso precise cancelar ou alterar, entre em contato com o estabelecimento.` }, 
+        { error: `Você já possui um agendamento ativo para o dia ${agendamentoPendente.data} às ${agendamentoPendente.horario}. Caso precise cancelar ou alterar, entre em contato com o estabelecimento via WhatsApp: ${SITE_CONFIG.whatsappNumber}` }, 
         { status: 409 } 
       );
     }
