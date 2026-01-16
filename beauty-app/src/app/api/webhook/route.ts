@@ -13,23 +13,35 @@ const client = new MercadoPagoConfig({
 
 export async function POST(request: Request) {
   try {
-    // 1. O Mercado Pago envia os dados na URL ou no Corpo
-    const url = new URL(request.url);
-    const topic = url.searchParams.get("topic") || url.searchParams.get("type");
-    const id = url.searchParams.get("id") || url.searchParams.get("data.id");
+    // 1. Ler o CORPO da notificação (JSON), que é onde o MP manda os dados hoje em dia
+    const body = await request.json();
+    
+    // Log para você ver no painel da Vercel o que está chegando (ajuda muito a debugar)
+    console.log("🔔 Webhook recebeu:", JSON.stringify(body));
 
-    // Nós só nos importamos se for notificação de PAGAMENTO
-    if (topic === "payment" && id) {
+    // O Mercado Pago manda o ID de formas diferentes dependendo da versão.
+    // Aqui pegamos das duas formas possíveis para garantir.
+    const action = body.action;
+    const type = body.type;
+    let id = body.data?.id || body.id; // Tenta pegar de data.id ou id direto
+
+    // Só prosseguimos se for um aviso de PAGAMENTO (payment)
+    if (action === "payment.created" || action === "payment.updated" || type === "payment") {
       
-      // 2. SEGURANÇA MÁXIMA: Perguntamos ao Mercado Pago se esse ID é real
-      // (Isso evita que hackers tentem forjar um pagamento)
+      if (!id) {
+         console.error("❌ ID do pagamento não encontrado no corpo do webhook.");
+         return NextResponse.json({ received: true }, { status: 200 });
+      }
+
+      // 2. SEGURANÇA: Vamos no Mercado Pago confirmar se esse ID existe e o status atual
       const payment = new Payment(client);
       const paymentInfo = await payment.get({ id: id });
 
-      // 3. Se o status for APROVADO, atualizamos no banco
+      console.log(`🔎 Verificando pagamento ${id}. Status atual: ${paymentInfo.status}`);
+
+      // 3. Se estiver APROVADO, atualizamos o banco
       if (paymentInfo.status === "approved") {
         
-        // O "external_reference" é o ID do agendamento que enviamos antes
         const agendamentoId = paymentInfo.external_reference;
 
         if (agendamentoId) {
@@ -37,10 +49,12 @@ export async function POST(request: Request) {
             where: { id: agendamentoId },
             data: { 
               status: "PAGO",
-              paymentId: id // Guardamos o ID do comprovante do MP
+              paymentId: String(id) 
             },
           });
-          console.log(`✅ Agendamento ${agendamentoId} atualizado para PAGO!`);
+          console.log(`✅ SUCESSO! Agendamento ${agendamentoId} confirmado.`);
+        } else {
+            console.warn("⚠️ Pagamento aprovado sem external_reference (agendamentoId).");
         }
       }
     }
@@ -48,8 +62,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true }, { status: 200 });
 
   } catch (error) {
-    console.error("Erro no Webhook:", error);
-    // Retornamos 200 mesmo com erro para o Mercado Pago não ficar tentando reenviar infinitamente
+    console.error("❌ Erro no Webhook:", error);
+    // Retornamos 200 para o Mercado Pago não achar que o servidor caiu
     return NextResponse.json({ received: true }, { status: 200 });
   }
 }
