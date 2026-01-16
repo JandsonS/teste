@@ -1,5 +1,4 @@
 "use client";
-
 import { Check, MessageCircle, Home } from "lucide-react";
 import { SITE_CONFIG } from "@/constants/info";
 
