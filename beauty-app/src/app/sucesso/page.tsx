@@ -1,30 +1,27 @@
 "use client";
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react'; // <--- ADICIONEI Suspense AQUI
 import { Check, MessageCircle, Home, Loader2, XCircle } from "lucide-react";
 import { SITE_CONFIG } from "@/constants/info";
 
-export default function Sucesso() {
+// 1. CRIAMOS UM COMPONENTE INTERNO SÓ PARA O CONTEÚDO (Isso isola o erro)
+function SucessoContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const id = searchParams.get('id');
 
-  // Estados da verificação
   const [status, setStatus] = useState("VERIFICANDO"); 
   const [dados, setDados] = useState<any>(null);
 
-  // Função que vai no servidor perguntar: "E aí, já pagou?"
   const checkStatus = async () => {
     if (!id) return;
-
     try {
       const res = await fetch('/api/status', {
         method: 'POST',
         body: JSON.stringify({ id }),
       });
       const data = await res.json();
-
       if (data.status) {
         setDados(data);
         setStatus(data.status);
@@ -35,28 +32,21 @@ export default function Sucesso() {
   };
 
   useEffect(() => {
-    // Se não tiver ID na URL, volta pra home
     if (!id) {
-      router.push('/'); 
-      return;
+      // Pequeno delay para garantir que o router esteja pronto
+      const timeout = setTimeout(() => router.push('/'), 100);
+      return () => clearTimeout(timeout);
     }
 
-    // 1. Verifica agora mesmo
     checkStatus();
-
-    // 2. Cria um "timer" para verificar a cada 3 segundos
     const intervalo = setInterval(checkStatus, 3000);
-
-    // Limpa o timer quando sair da página
     return () => clearInterval(intervalo);
   }, [id, router]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 text-center selection:bg-pink-500/30">
         
-        {/* ==========================================================
-            CENÁRIO 1: SUCESSO / PAGO ✅ (Seu Layout Original)
-           ========================================================== */}
+        {/* CENÁRIO 1: SUCESSO / PAGO ✅ */}
         {(status === 'PAGO' || status === 'AGENDADO_LOCAL') && (
           <div className="animate-fade-in-up flex flex-col items-center">
             <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mb-6 border border-green-500/20 shadow-[0_0_30px_rgba(34,197,94,0.2)]">
@@ -82,7 +72,6 @@ export default function Sucesso() {
             </p>
 
             <div className="flex flex-col gap-3 w-full max-w-xs">
-                {/* Botão WhatsApp */}
                 <a 
                     href={`https://wa.me/${SITE_CONFIG.whatsappNumber}?text=Olá, meu agendamento foi confirmado! Nome: ${dados?.cliente}, Dia: ${dados?.data} às ${dados?.horario}.`}
                     target="_blank"
@@ -93,7 +82,6 @@ export default function Sucesso() {
                     Enviar Comprovante
                 </a>
 
-                {/* Botão Voltar */}
                 <a 
                     href="/"
                     className="bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border border-zinc-700"
@@ -105,9 +93,7 @@ export default function Sucesso() {
           </div>
         )}
 
-        {/* ==========================================================
-            CENÁRIO 2: CARREGANDO / VERIFICANDO ⏳ (Amarelo)
-           ========================================================== */}
+        {/* CENÁRIO 2: CARREGANDO / VERIFICANDO ⏳ */}
         {(status === 'PENDENTE' || status === 'VERIFICANDO') && (
             <div className="flex flex-col items-center animate-pulse">
                 <div className="w-24 h-24 bg-yellow-500/10 rounded-full flex items-center justify-center mb-6 border border-yellow-500/20">
@@ -123,9 +109,7 @@ export default function Sucesso() {
             </div>
         )}
 
-        {/* ==========================================================
-            CENÁRIO 3: CANCELADO / ERRO ❌ (Vermelho)
-           ========================================================== */}
+        {/* CENÁRIO 3: CANCELADO / ERRO ❌ */}
         {status === 'CANCELADO' && (
             <div className="flex flex-col items-center">
                 <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mb-6 border border-red-500/20">
@@ -149,5 +133,14 @@ export default function Sucesso() {
             © {SITE_CONFIG.name}
         </div>
     </div>
+  );
+}
+
+// 2. A PÁGINA PRINCIPAL AGORA SÓ ENVOLVE O CONTEÚDO COM O SUSPENSE
+export default function SucessoPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center text-white">Carregando...</div>}>
+      <SucessoContent />
+    </Suspense>
   );
 }
