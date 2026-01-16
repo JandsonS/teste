@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         if (tempoDecorrido < 10) {
           // Tem alguém tentando pagar AGORA. Bloqueia.
           return NextResponse.json(
-            { error: 'Horário em processo de pagamento por outro cliente. Tente em 10 min.' }, 
+            { error: 'Horário em processo de pagamento por outro cliente. Tente em 10 minutos ou escolha outro horário.' }, 
             { status: 409 }
           );
         } else {
