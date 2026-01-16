@@ -19,5 +19,5 @@ model Agendamento {
   paymentId String?
   createdAt DateTime @default(now())
 
-  @@unique([data, horario])
+  
 }
