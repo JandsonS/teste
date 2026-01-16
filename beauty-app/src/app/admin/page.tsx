@@ -48,7 +48,7 @@ export default function AdminPage() {
     if(!confirm("Tem certeza que deseja cancelar e liberar este horário?")) return;
     
     try {
-      await fetch('/api/admin/delete', {
+      await fetch('/api/admi/', {
         method: 'POST',
         body: JSON.stringify({ id })
       });
