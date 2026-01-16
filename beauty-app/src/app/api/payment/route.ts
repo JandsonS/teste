@@ -19,41 +19,64 @@ export async function POST(request: Request) {
 
     console.log(`Verificando agendamento (${method || 'ONLINE'}):`, { clientName, date, time });
 
-    // 1. O VAR: HORÁRIO EXATO OCUPADO? 🛑
-    const horarioOcupado = await prisma.agendamento.findFirst({
+    // 1. O VAR INTELIGENTE: Verifica se o horário está REALMENTE ocupado 🧠
+    const agendamentoExistente = await prisma.agendamento.findFirst({
       where: { data: date, horario: time }
     });
 
-    if (horarioOcupado) {
+    let horarioLivre = true;
+
+    if (agendamentoExistente) {
+      // Se já estiver PAGO ou for NO LOCAL, está ocupado pra sempre
+      if (agendamentoExistente.status === 'PAGO' || agendamentoExistente.status === 'AGENDADO_LOCAL') {
+        horarioLivre = false;
+      } 
+      // Se estiver PENDENTE, aplicamos a Regra de Tolerância (20 minutos) ⏳
+      else if (agendamentoExistente.status === 'PENDENTE') {
+        const dataCriacao = new Date(agendamentoExistente.createdAt);
+        const agora = new Date();
+        const diferencaEmMinutos = (agora.getTime() - dataCriacao.getTime()) / 1000 / 60;
+
+        if (diferencaEmMinutos < 20) {
+          // Se foi criado a menos de 20 min, ainda está reservado para ele tentar pagar
+          horarioLivre = false;
+        } else {
+          // Se passou de 20 min e não pagou, consideramos LIVRE (e vamos deletar o velho depois)
+          console.log("Horário pendente expirado. Liberando para novo cliente...");
+          await prisma.agendamento.delete({ where: { id: agendamentoExistente.id } });
+          horarioLivre = true;
+        }
+      }
+    }
+
+    if (!horarioLivre) {
       return NextResponse.json(
-        { error: 'Esse horário já está reservado. Por favor, escolha outro.' }, 
+        { error: 'Esse horário já está reservado (ou em processo de pagamento).' }, 
         { status: 409 } 
       );
     }
 
-    // 2. O VAR: CLIENTE JÁ TEM AGENDAMENTO FUTURO? 🛑
+    // 2. O RESTO DO CÓDIGO CONTINUA IGUAL (Verificação de cliente duplicado, etc...)
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: clientName }
     });
-
+    // ... (Lógica de cliente duplicado mantida) ...
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0); 
-
     const agendamentoPendente = historicoCliente.find((item) => {
       const [dia, mes, ano] = item.data.split('/').map(Number);
       const dataItem = new Date(ano, mes - 1, dia);
-      // Busca agendamentos ativos de HOJE em diante
-      return dataItem >= hoje && item.status !== 'CANCELADO';
+      return dataItem >= hoje && item.status !== 'CANCELADO' && item.status !== 'PENDENTE'; // Ignora pendentes na validação de duplicação pra não travar o próprio cliente
     });
 
     if (agendamentoPendente) {
-      return NextResponse.json(
-        { error: `Você já possui um agendamento ativo para o dia ${agendamentoPendente.data} às ${agendamentoPendente.horario}. Caso precise cancelar ou alterar, entre em contato com o estabelecimento via WhatsApp: ${SITE_CONFIG.whatsappNumber}` }, 
-        { status: 409 } 
-      );
+        return NextResponse.json(
+          { error: `Você já possui um agendamento confirmado para o dia ${agendamentoPendente.data}.` }, 
+          { status: 409 } 
+        );
     }
 
-    // 3. SE FOR "PAGAR NO LOCAL" (APENAS RESERVA) 📝
+    // 3. CRIAÇÃO (LOCAL ou ONLINE)
     if (method === 'LOCAL') {
       await prisma.agendamento.create({
         data: {
@@ -68,7 +91,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // 4. SE FOR ONLINE (GERA MERCADO PAGO) 💳
+    // ONLINE
     const agendamento = await prisma.agendamento.create({
       data: {
         cliente: clientName,
@@ -98,8 +121,6 @@ export async function POST(request: Request) {
         },
         auto_return: 'approved',
         external_reference: agendamento.id,
-        
-        // 👇 AQUI ESTÁ A ÚNICA MUDANÇA (WEBHOOK) 👇
         notification_url: `${SITE_CONFIG.url}/api/webhook`,
       },
     });
@@ -108,6 +129,6 @@ export async function POST(request: Request) {
     
   } catch (error: any) {
     console.error("ERRO NO SERVIDOR:", error);
-    return NextResponse.json({ error: 'Erro interno ao processar agendamento.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
 }
