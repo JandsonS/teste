@@ -17,8 +17,8 @@ export default function Sucesso() {
         </h1>
         
         <p className="text-zinc-400 max-w-md mb-10 leading-relaxed">
-            Tudo certo! Seu horário já está reservado no nosso sistema.
-            <br/>Se precisar alterar, entre em contato.
+            Tudo certo! Seu horário já está reservado no nosso sistema. Envie o comprovante de agendamento via Whatsapp para confirmarmos tudo por lá.
+            <br/>Se precisar alterar ou cancelar seu horário, entre em contato via Whatsapp.
         </p>
 
         <div className="flex flex-col gap-3 w-full max-w-xs">
