@@ -7,7 +7,7 @@ export default function Sucesso() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 text-center selection:bg-pink-500/30">
         
-        {/* Ícone de Sucesso Animado */}
+        {/* Ícone de Sucesso */}
         <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mb-6 border border-green-500/20 shadow-[0_0_30px_rgba(34,197,94,0.2)]">
             <Check className="text-green-500 w-10 h-10" />
         </div>
