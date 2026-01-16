@@ -1,54 +1,51 @@
-import { ServiceCard } from "@/components/service-card";
-import { SERVICES } from "@/constants/services";
+"use client";
 
-export default function Home() {
+import { Check, MessageCircle, Home } from "lucide-react";
+import { SITE_CONFIG } from "@/constants/info";
+
+export default function Sucesso() {
   return (
-    <main className="min-h-screen pb-20">
-      {/* Cabeçalho / Hero Section */}
-      <div className="relative pt-16 pb-16 text-center px-4 overflow-hidden flex flex-col items-center">
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 text-center selection:bg-pink-500/30">
         
-        {/* Efeito de luz de fundo */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-pink-600/20 blur-[100px] -z-10 rounded-full"></div>
-        
-        {/* --- LOGO OFICIAL AQUI --- */}
-        <div className="mb-8 relative w-48 h-48 md:w-64 md:h-64 animate-in fade-in zoom-in duration-1000">
-           {/* Se a imagem não aparecer de primeira, verifique se o nome é logo.png na pasta public */}
-           <img 
-             src="/logo.png" 
-             alt="Logo Studio" 
-             className="object-contain w-full h-full drop-shadow-2xl"
-           />
+        {/* Ícone de Sucesso Animado */}
+        <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mb-6 border border-green-500/20 shadow-[0_0_30px_rgba(34,197,94,0.2)]">
+            <Check className="text-green-500 w-10 h-10" />
         </div>
 
-        {/* Título (Se o logo já tiver nome, você pode remover este H1 se quiser) */}
-        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4 bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent">
-          Realce sua <span className="text-pink-500">beleza única</span>
+        <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
+            Agendamento Confirmado!
         </h1>
         
-        <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
-          Procedimentos exclusivos e atendimento personalizado. Escolha seu serviço abaixo e agende em segundos.
+        <p className="text-zinc-400 max-w-md mb-10 leading-relaxed">
+            Tudo certo! Seu horário já está reservado no nosso sistema.
+            <br/>Se precisar alterar, entre em contato.
         </p>
-      </div>
 
-      {/* Grade de Serviços Automática */}
-      <section className="container mx-auto px-4 max-w-5xl">
-        <h2 className="text-2xl font-bold mb-8 border-l-4 border-pink-500 pl-4 flex items-center gap-2">
-          Nossos Procedimentos
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {SERVICES.map((service) => (
-            <ServiceCard 
-              key={service.id}
-              title={service.title}
-              price={service.price}
-              duration={service.duration}
-              type={service.type}
-              imageUrl={service.imageUrl}
-            />
-          ))}
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+            {/* Botão WhatsApp */}
+            <a 
+                href={`https://wa.me/${SITE_CONFIG.whatsappNumber}?text=Olá, acabei de fazer um agendamento no site!`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-900/20"
+            >
+                <MessageCircle size={20} />
+                Enviar Comprovante
+            </a>
+
+            {/* Botão Voltar */}
+            <a 
+                href="/"
+                className="bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border border-zinc-700"
+            >
+                <Home size={20} />
+                Voltar ao Início
+            </a>
         </div>
-      </section>
-    </main>
+        
+        <div className="mt-12 text-zinc-600 text-sm">
+            © {SITE_CONFIG.name}
+        </div>
+    </div>
   );
 }
