@@ -33,10 +33,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   
   // Estados do Formulário
   const [name, setName] = useState("")
-  const [phone, setPhone] = useState("") // (Se quiser salvar o whats, precisaria adicionar no banco ou no envio)
+  const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(false)
 
-  // Horários (Idealmente viriam do banco para não mostrar ocupados)
   const timeSlots = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:30", "18:00"]
 
   const handleCheckout = async (method: 'ONLINE' | 'LOCAL') => {
@@ -53,7 +52,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         },
         body: JSON.stringify({
           title: serviceName,
-          price: parseFloat(price.replace('R$', '').replace(',', '.').trim()), // Formata o preço R$ 50,00 -> 50.00
+          price: parseFloat(price.replace('R$', '').replace(',', '.').trim()),
           date: format(date, "dd/MM/yyyy"),
           time: selectedTime,
           clientName: name,
@@ -69,18 +68,19 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         return;
       }
 
-      // 2. Redireciona ou Finaliza
-      if (data.url) {
-        // Se for online, vai pro Mercado Pago
-        window.location.href = data.url;
-      } else if (data.success) {
-        // Se for local, finaliza aqui mesmo
+      // 🚨 MUDANÇA CRUCIAL AQUI 🚨
+      // Agora verificamos se veio um paymentId (para o Brick)
+      if (data.paymentId) {
+        // Redireciona para a nossa página interna do Pix com Brick
+        window.location.href = `/pix?paymentId=${data.paymentId}`;
+      } 
+      // Ou se foi sucesso local
+      else if (data.success) {
         toast.success("Agendamento Confirmado! 🎉", {
           description: "Te aguardamos no local e horário combinado.",
           duration: 5000,
         });
         setOpen(false);
-        // Reset
         setTimeout(() => {
           setStep(1); setSelectedTime(null); setName("");
         }, 500);
