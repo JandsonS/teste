@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@mercadopago/sdk-react": "^1.0.7",
     "@neondatabase/serverless": "^1.0.2",
     "date-fns": "^4.1.0",
     "mercadopago": "^2.11.0",
