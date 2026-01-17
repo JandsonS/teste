@@ -16,52 +16,46 @@ export async function POST(request: Request) {
     const { id } = await request.json();
     if (!id) return NextResponse.json({ error: 'ID faltando' }, { status: 400 });
 
-    // 1. Busca no Banco
+    // 1. O Banco diz que já pagou?
     const agendamento = await prisma.agendamento.findUnique({ where: { id: id } });
-    if (!agendamento) return NextResponse.json({ error: 'Agendamento não encontrado no banco' }, { status: 404 });
+    if (!agendamento) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
 
-    // Se já está pago, retorna logo
     if (agendamento.status === 'PAGO' || agendamento.status === 'AGENDADO_LOCAL') {
       return NextResponse.json(agendamento);
     }
 
-    // 2. Se está PENDENTE, vai no Mercado Pago confirmar
+    // 2. Se não, vamos perguntar pro Mercado Pago AGORA (Busca Ativa)
     if (agendamento.status === 'PENDENTE') {
       try {
-        console.log(`🕵️ Verificando MP para ID: ${id}`);
         const payment = new Payment(client);
-        
-        // Busca os últimos 30 pagamentos (aumentei o limite para garantir)
+        // Busca pagamentos recentes que tenham essa referência externa
         const busca = await payment.search({
-          options: { limit: 30, sort: 'date_created', criteria: 'desc' }
+          options: {
+            external_reference: id, 
+            status: 'approved',
+            limit: 1
+          }
         });
 
-        // Procura MANUALMENTE o ID na lista
-        const pagamentoEncontrado = busca.results?.find(p => 
-            p.external_reference === id && p.status === 'approved'
-        );
+        if (busca.results && busca.results.length > 0) {
+          const pagamentoMP = busca.results[0];
+          console.log(`✅ Pagamento Pix encontrado na busca ativa! ID: ${pagamentoMP.id}`);
 
-        if (pagamentoEncontrado) {
-          console.log(`✅ PAGAMENTO ACHADO! Atualizando banco...`);
+          // Atualiza o banco na hora
           const atualizado = await prisma.agendamento.update({
             where: { id: id },
-            data: { status: 'PAGO', paymentId: String(pagamentoEncontrado.id) }
+            data: { status: 'PAGO', paymentId: String(pagamentoMP.id) }
           });
           return NextResponse.json(atualizado);
-        } else {
-            console.log(`⏳ Pagamento ainda não consta na lista recente do MP.`);
         }
-
-      } catch (mpError: any) {
-        console.error("❌ Erro de conexão com Mercado Pago:", mpError);
-        // Não retorna erro 500 para não quebrar a tela do usuário, apenas mantém pendente
+      } catch (mpError) {
+        console.error("Erro busca MP:", mpError);
       }
     }
 
     return NextResponse.json(agendamento);
 
   } catch (error) {
-    console.error("❌ Erro geral na API Status:", error);
-    return NextResponse.json({ error: 'Erro interno no servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
