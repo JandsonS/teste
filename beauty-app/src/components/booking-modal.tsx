@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Calendar } from "@/components/ui/calendar"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -56,7 +56,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         return;
       }
 
-      // VOLTAMOS PARA O PADRÃO: SE TEM URL, REDIRECIONA
+      // ✅ VOLTAMOS AO PADRÃO: REDIRECIONA PARA O LINK
       if (data.url) {
         window.location.href = data.url; 
       } else if (data.success) {
