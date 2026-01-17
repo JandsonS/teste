@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { MercadoPagoConfig, Payment } from 'mercadopago'; // <--- Mudou para Payment
+import { MercadoPagoConfig, Payment } from 'mercadopago'; // <--- IMPORTANTE: Payment
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -14,11 +14,11 @@ const client = new MercadoPagoConfig({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, price, date, time, clientName, method, email } = body; // Adicione email se tiver
+    const { title, price, date, time, clientName, method, email } = body;
 
     console.log(`🔒 Criando pagamento Pix para: ${clientName}`);
 
-    // 1️⃣ VALIDAÇÕES (Mantemos a mesma segurança de antes)
+    // === 1. VALIDAÇÕES (Mantidas iguais para segurança) ===
     const agendamentosNoHorario = await prisma.agendamento.findMany({
       where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Horário já ocupado.' }, { status: 409 });
     }
     
-    // (Lógica de limpeza de pendentes mantida...)
+    // Limpeza de pendentes antigos
     const agora = new Date().getTime();
     for (const item of agendamentosNoHorario) {
       if (item.status === 'PENDENTE') {
@@ -37,19 +37,41 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2️⃣ CRIAÇÃO NO BANCO DE DADOS
-    if (method === 'LOCAL') {
-       // ... (Código Local mantido igual)
-       return NextResponse.json({ success: true });
+    // Validação de cliente duplicado
+    const reservasDoCliente = await prisma.agendamento.findMany({
+        where: { cliente: clientName, data: date, status: { not: 'CANCELADO' } }
+    });
+  
+    const jaTemReserva = reservasDoCliente.find(item => {
+        if (item.status === 'PAGO' || item.status === 'AGENDADO_LOCAL') return true;
+        if (item.status === 'PENDENTE') return (agora - new Date(item.createdAt).getTime()) / 1000 / 60 < 10;
+        return false;
+    });
+  
+    if (jaTemReserva) {
+        return NextResponse.json({ error: 'Você já tem um agendamento hoje.' }, { status: 409 });
     }
 
+    // === 2. CRIAÇÃO DO PAGAMENTO ===
+    
+    // Opção Local
+    if (method === 'LOCAL') {
+      await prisma.agendamento.create({
+        data: {
+          cliente: clientName, servico: title, data: date, horario: time, valor: Number(price), status: "AGENDADO_LOCAL", 
+        }
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    // Opção Pix Online
     const agendamento = await prisma.agendamento.create({
       data: {
         cliente: clientName, servico: title, data: date, horario: time, valor: Number(price), status: "PENDENTE",
       }
     });
 
-    // 3️⃣ CRIAÇÃO DO PAGAMENTO PIX (A Grande Mudança)
+    // CRIAÇÃO DO PIX NO MERCADO PAGO (Para o Brick)
     const payment = new Payment(client);
     
     const result = await payment.create({
@@ -58,15 +80,15 @@ export async function POST(request: Request) {
             description: `${title} - ${date} às ${time}`,
             payment_method_id: 'pix',
             payer: {
-                email: email || 'cliente@email.com', // O MP exige um email, mesmo que fake
+                email: email || 'cliente@email.com', // Email é obrigatório para o Pix do MP
                 first_name: clientName
             },
-            external_reference: agendamento.id, // VITAL: Liga o Pix ao Agendamento
-            notification_url: 'https://teste-drab-rho-60.vercel.app/api/webhook' // Seu Webhook
+            external_reference: agendamento.id, // Liga o Pix ao seu Banco de Dados
+            notification_url: 'https://teste-drab-rho-60.vercel.app/api/webhook' 
         }
     });
 
-    // Retornamos o ID do pagamento para o Frontend exibir o Brick
+    // Retornamos o paymentId para o Frontend abrir o Brick
     return NextResponse.json({ paymentId: result.id });
     
   } catch (error: any) {
