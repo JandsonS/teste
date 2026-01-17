@@ -7,7 +7,6 @@ const prisma = globalForPrisma.prisma || new PrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// Configuração do Mercado Pago (igual no payment)
 const client = new MercadoPagoConfig({ 
   accessToken: process.env.MP_ACCESS_TOKEN! 
 });
@@ -25,51 +24,53 @@ export async function POST(request: Request) {
 
     if (!agendamento) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
 
-    // 2. SE JÁ ESTIVER PAGO, RETORNA LOGO (RÁPIDO) 🚀
+    // 2. Se já estiver PAGO, retorna logo e economiza tempo 🚀
     if (agendamento.status === 'PAGO' || agendamento.status === 'AGENDADO_LOCAL') {
       return NextResponse.json(agendamento);
     }
 
-    // 3. SE ESTIVER PENDENTE, VAMOS BUSCAR NO MERCADO PAGO À FORÇA (VERIFICAÇÃO ATIVA) 🕵️‍♂️
+    // 3. VERIFICAÇÃO "MODO TURBO" (Igual ao Debug) ⚡
+    // Em vez de filtrar, buscamos os últimos 20 pagamentos e procuramos nós mesmos
     if (agendamento.status === 'PENDENTE') {
       try {
-        console.log(`🕵️ Verificando status no MP para agendamento: ${id}`);
+        console.log(`🕵️ Buscando pagamento para a referência: ${id}`);
         const payment = new Payment(client);
         
-        // Buscamos se existe algum pagamento APROVADO com a referência desse agendamento
         const busca = await payment.search({
           options: {
-            external_reference: id,
-            status: 'approved',
-            limit: 1
+            limit: 20, // Trazemos os 20 últimos para garantir
+            sort: 'date_created',
+            criteria: 'desc'
           }
         });
 
-        // SE ACHAMOS UM PAGAMENTO APROVADO NO MERCADO PAGO...
-        if (busca.results && busca.results.length > 0) {
-          const pagamentoMP = busca.results[0];
-          console.log(`✅ Pagamento encontrado no MP! Atualizando banco...`);
+        // 4. Procuramos manualmente na lista (Isso evita bugs de indexação do MP)
+        const pagamentoEncontrado = busca.results?.find(p => 
+            p.external_reference === id && p.status === 'approved'
+        );
 
-          // ...ATUALIZAMOS O BANCO AGORA MESMO!
+        if (pagamentoEncontrado) {
+          console.log(`✅ ACHAMOS! Pagamento ID ${pagamentoEncontrado.id} confirmado.`);
+
+          // Atualiza o banco na hora!
           const agendamentoAtualizado = await prisma.agendamento.update({
             where: { id: id },
             data: { 
               status: 'PAGO',
-              paymentId: String(pagamentoMP.id)
+              paymentId: String(pagamentoEncontrado.id)
             }
           });
 
-          // Retornamos o dado já atualizado para a tela ficar verde
           return NextResponse.json(agendamentoAtualizado);
+        } else {
+            console.log("⏳ Pagamento ainda não encontrado na lista recente.");
         }
 
       } catch (mpError) {
         console.error("Erro ao consultar MP:", mpError);
-        // Se der erro no MP, continuamos retornando o status PENDENTE original
       }
     }
 
-    // Se não achou nada novo, retorna o status atual (PENDENTE)
     return NextResponse.json(agendamento);
 
   } catch (error) {
