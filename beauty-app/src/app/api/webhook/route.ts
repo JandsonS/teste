@@ -14,34 +14,47 @@ const client = new MercadoPagoConfig({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log("🔔 Webhook recebeu:", JSON.stringify(body));
-
-    // 1. TRUQUE PARA O PAINEL: Se for o teste do Mercado Pago (ID 123456), aceita logo!
-    // Sem isso, você não consegue salvar a configuração no painel.
-    if (body.data?.id === "123456" || body.id === "123456" || body.type === "test") {
-        console.log("🧪 Teste do Painel MP recebido com sucesso!");
+    
+    // Aceita o teste do painel para não dar erro
+    if (body.data?.id === "123456" || body.type === "test") {
         return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    // 2. Processamento Real
     const action = body.action;
     const type = body.type;
     let id = body.data?.id || body.id;
 
     if (action === "payment.created" || action === "payment.updated" || type === "payment") {
       if (id) {
-        // Verifica no Mercado Pago se o ID é real
         const payment = new Payment(client);
         const paymentInfo = await payment.get({ id: id });
 
         if (paymentInfo.status === "approved") {
           const agendamentoId = paymentInfo.external_reference;
+          
           if (agendamentoId) {
+            // DESCUBRA O MÉTODO DE PAGAMENTO
+            let statusDetalhado = "PAGO";
+            const metodo = paymentInfo.payment_type_id;
+
+            if (metodo === 'bank_transfer' || metodo === 'pix') {
+                statusDetalhado = "PAGO VIA PIX";
+            } else if (metodo === 'credit_card') {
+                statusDetalhado = "PAGO VIA CARTÃO";
+            } else if (metodo === 'debit_card') {
+                statusDetalhado = "PAGO VIA DÉBITO";
+            } else if (metodo === 'account_money') {
+                statusDetalhado = "PAGO (SALDO MP)";
+            }
+
             await prisma.agendamento.update({
               where: { id: agendamentoId },
-              data: { status: "PAGO", paymentId: String(id) },
+              data: { 
+                  status: statusDetalhado, 
+                  paymentId: String(id) 
+              },
             });
-            console.log(`✅ Agendamento ${agendamentoId} confirmado via Webhook!`);
+            console.log(`✅ ${agendamentoId} atualizado para: ${statusDetalhado}`);
           }
         }
       }
