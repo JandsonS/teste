@@ -16,12 +16,14 @@ export async function POST(request: Request) {
     const body = await request.json();
     console.log("🔔 Webhook recebeu:", JSON.stringify(body));
 
-    // TRUQUE PARA O PAINEL: Se for o teste do Mercado Pago (ID 123456), aceita logo!
+    // 1. TRUQUE PARA O PAINEL: Se for o teste do Mercado Pago (ID 123456), aceita logo!
+    // Sem isso, você não consegue salvar a configuração no painel.
     if (body.data?.id === "123456" || body.id === "123456" || body.type === "test") {
         console.log("🧪 Teste do Painel MP recebido com sucesso!");
         return NextResponse.json({ received: true }, { status: 200 });
     }
 
+    // 2. Processamento Real
     const action = body.action;
     const type = body.type;
     let id = body.data?.id || body.id;
@@ -49,7 +51,6 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error("❌ Erro no Webhook:", error);
-    // Retorna 200 mesmo com erro para não travar o Mercado Pago
     return NextResponse.json({ received: true }, { status: 200 });
   }
 }

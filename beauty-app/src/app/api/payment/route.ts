@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { MercadoPagoConfig, Payment } from 'mercadopago'; // <--- IMPORTANTE: Payment
+import { MercadoPagoConfig, Preference } from 'mercadopago'; // Voltamos para Preference
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -14,30 +14,31 @@ const client = new MercadoPagoConfig({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, price, date, time, clientName, method, email } = body;
+    const { title, price, date, time, clientName, method } = body;
 
-    console.log(`🔒 Criando pagamento Pix (Brick) para: ${clientName}`);
+    // DEFINA SEU SITE AQUI (Importante para o retorno funcionar)
+    const BASE_URL = "https://teste-drab-rho-60.vercel.app";
 
-    // === VALIDAÇÕES (Segurança) ===
+    console.log(`🔒 Processando Link de Pagamento para: ${clientName}`);
+
+    // === VALIDAÇÕES (Mantidas iguais para segurança) ===
     const agendamentosNoHorario = await prisma.agendamento.findMany({
       where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
-
-    if (agendamentosNoHorario.some(a => a.status === 'PAGO' || a.status === 'AGENDADO_LOCAL')) {
-      return NextResponse.json({ error: 'Horário já ocupado.' }, { status: 409 });
-    }
     
-    // Limpa pendentes antigos
+    if (agendamentosNoHorario.some(a => a.status === 'PAGO' || a.status === 'AGENDADO_LOCAL')) {
+        return NextResponse.json({ error: 'Horário ocupado.' }, { status: 409 });
+    }
+
     const agora = new Date().getTime();
     for (const item of agendamentosNoHorario) {
-      if (item.status === 'PENDENTE') {
-        const diff = (agora - new Date(item.createdAt).getTime()) / 1000 / 60;
-        if (diff < 10) return NextResponse.json({ error: 'Horário em pagamento.' }, { status: 409 });
-        await prisma.agendamento.delete({ where: { id: item.id } });
-      }
+        if (item.status === 'PENDENTE' && (agora - new Date(item.createdAt).getTime()) / 1000 / 60 >= 10) {
+            await prisma.agendamento.delete({ where: { id: item.id } });
+        } else if (item.status === 'PENDENTE') {
+            return NextResponse.json({ error: 'Horário em processo de pagamento.' }, { status: 409 });
+        }
     }
 
-    // Verifica duplicidade do cliente
     const reservasDoCliente = await prisma.agendamento.findMany({
         where: { cliente: clientName, data: date, status: { not: 'CANCELADO' } }
     });
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
     }
 
     // === CRIAÇÃO ===
+    
+    // Opção 1: Pagar no Local
     if (method === 'LOCAL') {
       await prisma.agendamento.create({
         data: { cliente: clientName, servico: title, data: date, horario: time, valor: Number(price), status: "AGENDADO_LOCAL" }
@@ -53,33 +56,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // Cria no Banco
+    // Opção 2: Pagamento Online (Link)
     const agendamento = await prisma.agendamento.create({
       data: { cliente: clientName, servico: title, data: date, horario: time, valor: Number(price), status: "PENDENTE" }
     });
 
-    // Cria no Mercado Pago (Payment API)
-    const payment = new Payment(client);
-    
-    const result = await payment.create({
-        body: {
-            transaction_amount: Number(price),
-            description: `${title} - ${date} às ${time}`,
-            payment_method_id: 'pix',
-            payer: {
-                email: email || 'cliente@email.com',
-                first_name: clientName
-            },
-            external_reference: agendamento.id,
-            notification_url: 'https://teste-drab-rho-60.vercel.app/api/webhook' 
-        }
+    const preference = new Preference(client);
+    const result = await preference.create({
+      body: {
+        items: [{
+            id: agendamento.id,
+            title: `${title} - ${date} às ${time}`,
+            unit_price: Number(price),
+            quantity: 1,
+        }],
+        // Configuração de Retorno
+        back_urls: {
+          success: `${BASE_URL}/sucesso?id=${agendamento.id}`,
+          failure: `${BASE_URL}/`,
+          pending: `${BASE_URL}/`,
+        },
+        auto_return: 'approved', // Tenta voltar sozinho
+        binary_mode: true,       // Força aprovação imediata (ajuda no retorno)
+        external_reference: agendamento.id,
+        notification_url: `${BASE_URL}/api/webhook`, // ONDE O MERCADO PAGO VAI AVISAR
+      },
     });
 
-    // Retorna o paymentId para o Brick
-    return NextResponse.json({ paymentId: result.id });
+    return NextResponse.json({ url: result.init_point });
     
   } catch (error: any) {
-    console.error("❌ ERRO SERVER:", error);
+    console.error("❌ ERRO:", error);
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
 }
