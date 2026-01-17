@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
     console.log(`🔒 Processando pagamento para: ${clientName}`);
 
-    // 1. Validações de Horário e Duplicidade
+    // === 1. VALIDAÇÕES ===
     const agendamentosNoHorario = await prisma.agendamento.findMany({
       where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
@@ -30,17 +30,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Horário ocupado.' }, { status: 409 });
     }
 
-    // Limpeza de pendentes antigos (>10 min)
     const agora = new Date().getTime();
     for (const item of agendamentosNoHorario) {
         if (item.status === 'PENDENTE' && (agora - new Date(item.createdAt).getTime()) / 1000 / 60 >= 10) {
             await prisma.agendamento.delete({ where: { id: item.id } });
         } else if (item.status === 'PENDENTE') {
-            return NextResponse.json({ error: 'Horário em pagamento por outra pessoa.' }, { status: 409 });
+            return NextResponse.json({ error: 'Horário em pagamento.' }, { status: 409 });
         }
     }
 
-    // Validação de cliente duplicado
     const reservasDoCliente = await prisma.agendamento.findMany({
         where: { cliente: clientName, data: date, status: { not: 'CANCELADO' } }
     });
@@ -53,7 +51,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Você já tem um agendamento hoje.' }, { status: 409 });
     }
 
-    // 2. Opção Pagamento no Local
+    // === 2. CRIAÇÃO ===
     if (method === 'LOCAL') {
       await prisma.agendamento.create({
         data: { cliente: clientName, servico: title, data: date, horario: time, valor: Number(price), status: "AGENDADO_LOCAL" }
@@ -61,7 +59,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // 3. Opção Pagamento Online (Gera Link)
     const agendamento = await prisma.agendamento.create({
       data: { cliente: clientName, servico: title, data: date, horario: time, valor: Number(price), status: "PENDENTE" }
     });
@@ -75,13 +72,15 @@ export async function POST(request: Request) {
             unit_price: Number(price),
             quantity: 1,
         }],
-        // Redireciona de volta para seu site
+        // 🔥 AQUI ESTÁ O SEGREDO DO RETORNO AUTOMÁTICO 🔥
+        binary_mode: true, // Força aprovação imediata
+        
         back_urls: {
           success: `${BASE_URL}/sucesso?id=${agendamento.id}`,
           failure: `${BASE_URL}/`,
           pending: `${BASE_URL}/`,
         },
-        auto_return: 'approved',
+        auto_return: 'approved', // Redireciona assim que o binary_mode der OK
         external_reference: agendamento.id,
         notification_url: `${BASE_URL}/api/webhook`,
       },
@@ -90,7 +89,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: result.init_point });
     
   } catch (error: any) {
-    console.error("❌ ERRO NO PAGAMENTO:", error);
-    return NextResponse.json({ error: 'Erro interno ao processar pagamento.' }, { status: 500 });
+    console.error("❌ ERRO:", error);
+    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
 }
