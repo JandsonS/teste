@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
-import { MercadoPagoConfig, Payment } from 'mercadopago';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -13,42 +13,84 @@ const client = new MercadoPagoConfig({
 
 export async function POST(request: Request) {
   try {
-    const { id } = await request.json();
-    if (!id) return NextResponse.json({ error: 'ID faltando' }, { status: 400 });
+    const body = await request.json();
+    const { title, price, date, time, clientName, method } = body;
 
-    const agendamento = await prisma.agendamento.findUnique({ where: { id: id } });
-    if (!agendamento) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+    // DEFINA SEU SITE AQUI
+    const BASE_URL = "https://teste-drab-rho-60.vercel.app";
 
-    // Se já pagou, retorna logo
-    if (agendamento.status === 'PAGO') return NextResponse.json(agendamento);
+    console.log(`🔒 Processando pagamento para: ${clientName}`);
 
-    // Se está pendente, BUSCA NO MP (Modo Turbo)
-    if (agendamento.status === 'PENDENTE') {
-      try {
-        const payment = new Payment(client);
-        // Busca os últimos 20 pagamentos da conta
-        const busca = await payment.search({
-          options: { limit: 20, sort: 'date_created', criteria: 'desc' }
-        });
-
-        // Procura MANUALMENTE o nosso ID na lista
-        const achou = busca.results?.find(p => p.external_reference === id && p.status === 'approved');
-
-        if (achou) {
-          console.log("✅ Pagamento encontrado via Busca Ativa!");
-          const atualizado = await prisma.agendamento.update({
-            where: { id: id },
-            data: { status: 'PAGO', paymentId: String(achou.id) }
-          });
-          return NextResponse.json(atualizado);
-        }
-      } catch (e) {
-        console.error("Erro MP:", e);
-      }
+    // 1. Validações de Horário e Duplicidade
+    const agendamentosNoHorario = await prisma.agendamento.findMany({
+      where: { data: date, horario: time, status: { not: 'CANCELADO' } }
+    });
+    
+    if (agendamentosNoHorario.some(a => a.status === 'PAGO' || a.status === 'AGENDADO_LOCAL')) {
+        return NextResponse.json({ error: 'Horário ocupado.' }, { status: 409 });
     }
 
-    return NextResponse.json(agendamento);
-  } catch (error) {
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    // Limpeza de pendentes antigos (>10 min)
+    const agora = new Date().getTime();
+    for (const item of agendamentosNoHorario) {
+        if (item.status === 'PENDENTE' && (agora - new Date(item.createdAt).getTime()) / 1000 / 60 >= 10) {
+            await prisma.agendamento.delete({ where: { id: item.id } });
+        } else if (item.status === 'PENDENTE') {
+            return NextResponse.json({ error: 'Horário em pagamento por outra pessoa.' }, { status: 409 });
+        }
+    }
+
+    // Validação de cliente duplicado
+    const reservasDoCliente = await prisma.agendamento.findMany({
+        where: { cliente: clientName, data: date, status: { not: 'CANCELADO' } }
+    });
+    const jaTemReserva = reservasDoCliente.find(item => {
+        if (item.status === 'PAGO' || item.status === 'AGENDADO_LOCAL') return true;
+        if (item.status === 'PENDENTE') return (agora - new Date(item.createdAt).getTime()) / 1000 / 60 < 10;
+        return false;
+    });
+    if (jaTemReserva) {
+        return NextResponse.json({ error: 'Você já tem um agendamento hoje.' }, { status: 409 });
+    }
+
+    // 2. Opção Pagamento no Local
+    if (method === 'LOCAL') {
+      await prisma.agendamento.create({
+        data: { cliente: clientName, servico: title, data: date, horario: time, valor: Number(price), status: "AGENDADO_LOCAL" }
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    // 3. Opção Pagamento Online (Gera Link)
+    const agendamento = await prisma.agendamento.create({
+      data: { cliente: clientName, servico: title, data: date, horario: time, valor: Number(price), status: "PENDENTE" }
+    });
+
+    const preference = new Preference(client);
+    const result = await preference.create({
+      body: {
+        items: [{
+            id: agendamento.id,
+            title: `${title} - ${date} às ${time}`,
+            unit_price: Number(price),
+            quantity: 1,
+        }],
+        // Redireciona de volta para seu site
+        back_urls: {
+          success: `${BASE_URL}/sucesso?id=${agendamento.id}`,
+          failure: `${BASE_URL}/`,
+          pending: `${BASE_URL}/`,
+        },
+        auto_return: 'approved',
+        external_reference: agendamento.id,
+        notification_url: `${BASE_URL}/api/webhook`,
+      },
+    });
+
+    return NextResponse.json({ url: result.init_point });
+    
+  } catch (error: any) {
+    console.error("❌ ERRO NO PAGAMENTO:", error);
+    return NextResponse.json({ error: 'Erro interno ao processar pagamento.' }, { status: 500 });
   }
 }
