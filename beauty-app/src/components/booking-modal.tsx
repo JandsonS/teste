@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogFooter,
@@ -32,8 +32,19 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  // --- LÓGICA FINANCEIRA ---
-  const numericPrice = price ? parseFloat(price.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) : 0
+  // --- LÓGICA FINANCEIRA CORRIGIDA ---
+  const numericPrice = useMemo(() => {
+    if (!price) return 0;
+    const cleanStr = price.replace('R$', '').trim();
+    
+    // Se tiver vírgula, assume formato BR (1.000,00)
+    if (cleanStr.includes(',')) {
+        return parseFloat(cleanStr.replace(/\./g, '').replace(',', '.'));
+    }
+    // Se não, assume formato numérico simples ou US (1.00)
+    return parseFloat(cleanStr);
+  }, [price]);
+
   const depositValue = numericPrice * 0.20 
   const remainingValue = numericPrice - depositValue 
 
@@ -98,6 +109,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           time: selectedTime,
           clientName: name,
           clientPhone: phone,
+          // MANTÉM COMPATIBILIDADE: Envia o 'price' antigo E os novos campos
+          price: numericPrice, 
           paymentType: paymentType, 
           priceTotal: numericPrice,
           pricePaid: amountToPayNow,
@@ -108,9 +121,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
 
       if (data.error) {
+        // Se o erro vier da API
         toast.error("Atenção", { description: data.error });
         setLoading(false);
-        if (data.error.includes("horário") || data.error.includes("ocupado")) {
+        
+        // Atualiza slots se o erro for de conflito
+        if (data.error.toLowerCase().includes("horário") || data.error.toLowerCase().includes("ocupado")) {
             setBusySlots(prev => [...prev, selectedTime!]);
             setSelectedTime(null);
         }
@@ -127,7 +143,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao processar");
+      toast.error("Erro no Servidor", { description: "Não foi possível conectar ao sistema de pagamento." });
     } finally {
       setLoading(false);
     }
@@ -264,7 +280,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                         {loading ? <Loader2 className="animate-spin text-pink-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-pink-500"></div>}
                     </button>
                     
-                    {/* OPÇÃO 2: SINAL (Texto Atualizado para "Reservar") */}
+                    {/* OPÇÃO 2: SINAL (Reservar) */}
                     <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition group disabled:opacity-50 text-left">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
