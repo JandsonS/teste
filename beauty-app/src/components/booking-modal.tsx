@@ -67,7 +67,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
         toast.error("Horário Indisponível", {
-            description: "Este horário já foi reservado por outro cliente. Por favor, escolha outro.",
+            description: "Este horário já foi reservado por outro cliente. Por favor, escolha outro horário.",
             duration: 3000,
             position: "top-center"
         });
