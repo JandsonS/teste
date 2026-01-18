@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { format } from "date-fns"
+import { format, isValid } from "date-fns" // Importei isValid para segurança extra
 import { ptBR } from "date-fns/locale"
 import { CheckCircle2, CreditCard, MapPin, Loader2, Info } from "lucide-react" 
 import { toast } from "sonner"
@@ -33,7 +33,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  // GRADE DE HORÁRIOS COMPLETA
+  // GRADE DE HORÁRIOS
   const timeSlots = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", 
     "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", 
@@ -42,29 +42,33 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   ]
 
   useEffect(() => {
-    if (date) {
-        const formattedDate = format(date, "dd/MM/yyyy");
-        setLoadingSlots(true);
-        setBusySlots([]); 
-        setSelectedTime(null); 
-
-        fetch(`/api/availability?date=${formattedDate}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.busy) setBusySlots(data.busy);
-            })
-            .catch(err => console.error("Erro ao buscar horários", err))
-            .finally(() => setLoadingSlots(false));
+    // Se a data sumir ou for inválida, limpa tudo e para.
+    if (!date || !isValid(date)) {
+        setBusySlots([]);
+        setSelectedTime(null);
+        return;
     }
+
+    const formattedDate = format(date, "dd/MM/yyyy");
+    setLoadingSlots(true);
+    setBusySlots([]); 
+    setSelectedTime(null); 
+
+    fetch(`/api/availability?date=${formattedDate}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.busy) setBusySlots(data.busy);
+        })
+        .catch(err => console.error("Erro ao buscar horários", err))
+        .finally(() => setLoadingSlots(false));
+    
   }, [date]);
 
-  // --- AQUI ESTÁ A LÓGICA DO CLIQUE E DO AVISO ---
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
-        // Dispara o alerta visual quando clica no bloqueado
         toast.error("Horário Indisponível", {
             description: "Este horário já foi reservado por outro cliente. Por favor, escolha outro.",
-            duration: 4000, // Fica 4 segundos na tela
+            duration: 3000,
             position: "top-center"
         });
         return;
@@ -73,7 +77,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   };
 
   const handleCheckout = async (method: 'ONLINE' | 'LOCAL') => {
+    // Verificação dupla de segurança
     if (!date || !selectedTime || !name) return;
+    
     setLoading(true);
 
     try {
@@ -93,7 +99,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
 
       if (data.error) {
-        // AVISO DE ERRO VINDO DO BACKEND (DUPLICIDADE)
         toast.error("Atenção", { 
             description: data.error,
             duration: 6000,
@@ -115,7 +120,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         if (method === 'LOCAL') {
             toast.success("Solicitação Enviada! 📩", {
                 description: "Aguarde a confirmação via WhatsApp.",
-                duration: 5000,
+                duration: 6000,
             });
         } else {
             toast.success("Vaga Garantida! 🎉", {
@@ -157,6 +162,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 1 && (
             <div className="flex flex-col md:flex-row gap-8">
               
+              {/* CALENDÁRIO */}
               <div className="flex-1 flex justify-center">
                 <div className="border border-zinc-800 rounded-xl p-4 bg-zinc-900 shadow-inner">
                     <style>{`
@@ -180,6 +186,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 </div>
               </div>
               
+              {/* GRADE DE HORÁRIOS */}
               <div className="flex-1">
                 <Label className="mb-4 flex justify-between items-center text-zinc-300 font-bold">
                     <span>2. Escolha o horário</span>
@@ -192,7 +199,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     return (
                         <Button 
                             key={time} 
-                            // O botão continua clicável, mas visualmente "apagado"
                             variant={selectedTime === time ? "default" : "outline"} 
                             className={`
                                 text-xs h-10 font-medium transition-all
@@ -211,10 +217,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     )
                   })}
                 </div>
-                {selectedTime && (
+                
+                {/* 👇 AQUI ESTAVA O ERRO: Adicionei a proteção "date &&" */}
+                {selectedTime && date && (
                     <div className="mt-4 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-pink-400 text-sm flex items-center animate-in fade-in slide-in-from-top-2">
                         <CheckCircle2 className="w-4 h-4 mr-2"/>
-                        Confirmando: <strong>{format(date!, "dd/MM", { locale: ptBR })} às {selectedTime}</strong>
+                        Confirmando: <strong>{format(date, "dd/MM", { locale: ptBR })} às {selectedTime}</strong>
                     </div>
                 )}
               </div>
