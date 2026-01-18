@@ -23,55 +23,40 @@ export async function POST(request: Request) {
 
     const agora = new Date().getTime();
 
-    // =====================================================================
-    // 1️⃣ FASE 1: CLIENTE (Mantivemos a regra detalhada do WhatsApp aqui)
-    // =====================================================================
-    
+    // === FASE 1: CLIENTE ===
     const historicoCliente = await prisma.agendamento.findMany({
-      where: { 
-        cliente: nomeClienteLimpo, 
-        status: { not: 'CANCELADO' } 
-      }
+      where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } }
     });
 
     for (const reserva of historicoCliente) {
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
-        if (tempoDecorrido >= 10) {
+        // ⏳ MUDANÇA: AGORA É 2 MINUTOS
+        if (tempoDecorrido >= 2) {
           await prisma.agendamento.delete({ where: { id: reserva.id } });
           continue; 
         } else {
           return NextResponse.json({ 
-            error: '⏳ Você já tem um agendamento em processo de pagamento. Finalize-o ou aguarde 10 minutos.' 
+            error: '⏳ Você já tem um pagamento em andamento. Finalize-o ou aguarde 2 minutos.' 
           }, { status: 409 });
         }
       }
 
       if (reserva.status.includes('PAGO') || reserva.status === 'PAGAR NO LOCAL') {
         return NextResponse.json({ 
-          error: `🚫 Você já possui um agendamento ativo de "${reserva.servico}" para o dia ${reserva.data} às ${reserva.horario}. 
-          
-          Não é permitido criar duplicatas. Caso necessite mudar o serviço ou cancelar, entre em contato via WhatsApp.` 
+          error: `🚫 Você já possui um agendamento ativo de "${reserva.servico}" para o dia ${reserva.data} às ${reserva.horario}. Não é permitido criar duplicatas.` 
         }, { status: 409 });
       }
     }
 
-    // =====================================================================
-    // 2️⃣ FASE 2: HORÁRIO (Aqui mudamos a mensagem 👇)
-    // =====================================================================
-
+    // === FASE 2: HORÁRIO ===
     const vagaOcupada = await prisma.agendamento.findMany({
-      where: { 
-        data: date, 
-        horario: time, 
-        status: { not: 'CANCELADO' } 
-      }
+      where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
 
     for (const vaga of vagaOcupada) {
       if (vaga.status.includes('PAGO') || vaga.status === 'PAGAR NO LOCAL') {
-        // MENSAGEM NOVA MAIS FORMAL:
         return NextResponse.json({ 
             error: '❌ Este horário já foi reservado por outro cliente. Por favor, escolha outro horário disponível.' 
         }, { status: 409 });
@@ -79,41 +64,25 @@ export async function POST(request: Request) {
 
       if (vaga.status === 'PENDENTE') {
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60;
-        if (diff < 10) {
-          return NextResponse.json({ error: '⏳ Este horário está sendo reservado por outra pessoa no momento. Tente novamente em 10 minutos.' }, { status: 409 });
+        // ⏳ MUDANÇA: AGORA É 2 MINUTOS
+        if (diff < 2) {
+          return NextResponse.json({ error: '⏳ Este horário está sendo reservado agora. Tente em 2 minutos.' }, { status: 409 });
         } else {
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
       }
     }
 
-    // =====================================================================
-    // 3️⃣ SUCESSO
-    // =====================================================================
-    
+    // === SUCESSO ===
     if (method === 'LOCAL') {
       await prisma.agendamento.create({
-        data: { 
-          cliente: nomeClienteLimpo, 
-          servico: title, 
-          data: date, 
-          horario: time, 
-          valor: Number(price), 
-          status: "PAGAR NO LOCAL" 
-        }
+        data: { cliente: nomeClienteLimpo, servico: title, data: date, horario: time, valor: Number(price), status: "PAGAR NO LOCAL" }
       });
       return NextResponse.json({ success: true });
     }
 
     const agendamento = await prisma.agendamento.create({
-      data: { 
-        cliente: nomeClienteLimpo, 
-        servico: title, 
-        data: date, 
-        horario: time, 
-        valor: Number(price), 
-        status: "PENDENTE" 
-      }
+      data: { cliente: nomeClienteLimpo, servico: title, data: date, horario: time, valor: Number(price), status: "PENDENTE" }
     });
 
     const preference = new Preference(client);
@@ -140,7 +109,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: result.init_point });
     
   } catch (error: any) {
-    console.error("❌ ERRO NO SISTEMA:", error);
-    return NextResponse.json({ error: 'Erro interno no servidor.' }, { status: 500 });
+    console.error("❌ ERRO:", error);
+    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
 }

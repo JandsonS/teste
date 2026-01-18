@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react" // Adicionado useEffect
 import { Calendar } from "@/components/ui/calendar"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CheckCircle2, CreditCard, MapPin, Loader2 } from "lucide-react"
+import { CheckCircle2, CreditCard, MapPin, Loader2, Ban } from "lucide-react"
 import { toast } from "sonner"
 
 interface BookingModalProps {
@@ -27,8 +27,32 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(false)
+  
+  // Lista de horários ocupados que vem da API
+  const [busySlots, setBusySlots] = useState<string[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
 
-  const timeSlots = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:30", "18:00"]
+  const timeSlots = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"]
+
+  // EFEITO: Sempre que mudar a data, busca os horários ocupados
+  useEffect(() => {
+    if (date) {
+        const formattedDate = format(date, "dd/MM/yyyy");
+        setLoadingSlots(true);
+        setBusySlots([]); // Limpa antes de buscar
+        setSelectedTime(null); // Desmarca o horário se mudar o dia
+
+        fetch(`/api/availability?date=${formattedDate}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.busy) {
+                    setBusySlots(data.busy);
+                }
+            })
+            .catch(err => console.error("Erro ao buscar horários", err))
+            .finally(() => setLoadingSlots(false));
+    }
+  }, [date]);
 
   const handleCheckout = async (method: 'ONLINE' | 'LOCAL') => {
     if (!date || !selectedTime || !name) return;
@@ -51,12 +75,16 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
 
       if (data.error) {
-        toast.error("Ops!", { description: data.error });
+        toast.error("Atenção", { description: data.error });
         setLoading(false);
+        // Se der erro de horário ocupado, atualiza a lista para bloquear o botão na hora
+        if (data.error.includes("horário")) {
+            setBusySlots(prev => [...prev, selectedTime]);
+            setSelectedTime(null);
+        }
         return;
       }
 
-      // ✅ VOLTAMOS AO PADRÃO: REDIRECIONA PARA O LINK
       if (data.url) {
         window.location.href = data.url; 
       } else if (data.success) {
@@ -91,11 +119,29 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 </div>
               </div>
               <div className="flex-1">
-                <Label className="mb-3 block text-zinc-300">2. Escolha o horário</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {timeSlots.map((time) => (
-                    <Button key={time} variant={selectedTime === time ? "default" : "outline"} className={selectedTime === time ? "bg-pink-600 hover:bg-pink-700 border-none" : "bg-transparent border-zinc-700 hover:bg-zinc-800 text-zinc-300"} onClick={() => setSelectedTime(time)}>{time}</Button>
-                  ))}
+                <Label className="mb-3 flex justify-between items-center text-zinc-300">
+                    <span>2. Escolha o horário</span>
+                    {loadingSlots && <Loader2 className="animate-spin w-4 h-4 text-pink-500"/>}
+                </Label>
+                
+                <div className="grid grid-cols-4 gap-2">
+                  {timeSlots.map((time) => {
+                    const isBusy = busySlots.includes(time);
+                    return (
+                        <Button 
+                            key={time} 
+                            disabled={isBusy} // BLOQUEIA SE ESTIVER OCUPADO
+                            variant={selectedTime === time ? "default" : "outline"} 
+                            className={`
+                                ${selectedTime === time ? "bg-pink-600 hover:bg-pink-700 border-none" : "bg-transparent border-zinc-700 hover:bg-zinc-800 text-zinc-300"}
+                                ${isBusy ? "opacity-30 cursor-not-allowed decoration-slice line-through bg-zinc-900" : ""}
+                            `} 
+                            onClick={() => !isBusy && setSelectedTime(time)}
+                        >
+                            {time}
+                        </Button>
+                    )
+                  })}
                 </div>
                 {selectedTime && (<div className="mt-6 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-pink-400 text-sm flex items-center"><CheckCircle2 className="w-4 h-4 mr-2"/>Selecionado: <strong>{format(date!, "dd/MM", { locale: ptBR })} às {selectedTime}</strong></div>)}
               </div>
