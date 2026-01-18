@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-// ⚠️ TROQUEI OS ÍCONES PARA EVITAR ERRO DE BUILD
 import { CheckCircle2, CreditCard, MapPin, Loader2, Info } from "lucide-react" 
 import { toast } from "sonner"
 
@@ -21,6 +20,9 @@ interface BookingModalProps {
 }
 
 export function BookingModal({ serviceName, price, children }: BookingModalProps) {
+  // Log para confirmar que carregou o arquivo certo
+  console.log("🟢 CARREGOU BOOKING-MODAL OFICIAL");
+
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [step, setStep] = useState(1)
@@ -41,15 +43,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         setBusySlots([]); 
         setSelectedTime(null); 
 
-        // Console log para você debugar se precisar
-        console.log("Buscando horários para:", formattedDate);
-
         fetch(`/api/availability?date=${formattedDate}`)
             .then(res => res.json())
             .then(data => {
-                if (data.busy) {
-                    setBusySlots(data.busy);
-                }
+                if (data.busy) setBusySlots(data.busy);
             })
             .catch(err => console.error("Erro ao buscar horários", err))
             .finally(() => setLoadingSlots(false));
@@ -79,9 +76,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       if (data.error) {
         toast.error("Atenção", { description: data.error });
         setLoading(false);
-        // Atualiza visualmente na hora se der erro de ocupado
         if (data.error.includes("horário") || data.error.includes("ocupado")) {
-            setBusySlots(prev => [...prev, selectedTime]);
+            setBusySlots(prev => [...prev, selectedTime!]);
             setSelectedTime(null);
         }
         return;
@@ -93,14 +89,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         if (method === 'LOCAL') {
             toast.success("Solicitação Enviada! 📩", {
                 description: "Aguarde a confirmação via WhatsApp.",
-                duration: 5000,
+                duration: 6000,
             });
         } else {
             toast.success("Vaga Garantida! 🎉", {
-                description: "Seu horário está confirmado.",
+                description: "Seu agendamento foi confirmado.",
             });
         }
-        
         setOpen(false);
         setTimeout(() => { setStep(1); setSelectedTime(null); setName(""); }, 500);
       }
@@ -135,8 +130,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     <span>2. Escolha o horário</span>
                     {loadingSlots && <Loader2 className="animate-spin w-4 h-4 text-pink-500"/>}
                 </Label>
-                
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1">
                   {timeSlots.map((time) => {
                     const isBusy = busySlots.includes(time);
                     return (
@@ -144,10 +138,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             key={time} 
                             disabled={isBusy} 
                             variant={selectedTime === time ? "default" : "outline"} 
-                            className={`
-                                ${selectedTime === time ? "bg-pink-600 hover:bg-pink-700 border-none" : "bg-transparent border-zinc-700 hover:bg-zinc-800 text-zinc-300"}
-                                ${isBusy ? "opacity-30 cursor-not-allowed line-through bg-zinc-900 border-dashed border-zinc-800 text-zinc-600" : ""}
-                            `} 
+                            className={`text-xs h-9 ${selectedTime === time ? "bg-pink-600 hover:bg-pink-700 border-none" : "bg-transparent border-zinc-700 hover:bg-zinc-800 text-zinc-300"} ${isBusy ? "opacity-30 cursor-not-allowed line-through bg-zinc-900 border-dashed border-zinc-800 text-zinc-600" : ""}`} 
                             onClick={() => !isBusy && setSelectedTime(time)}
                         >
                             {time}
@@ -155,40 +146,30 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     )
                   })}
                 </div>
-                {selectedTime && (<div className="mt-6 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-pink-400 text-sm flex items-center"><CheckCircle2 className="w-4 h-4 mr-2"/>Selecionado: <strong>{format(date!, "dd/MM", { locale: ptBR })} às {selectedTime}</strong></div>)}
+                {selectedTime && (<div className="mt-4 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-pink-400 text-sm flex items-center animate-in fade-in slide-in-from-top-2"><CheckCircle2 className="w-4 h-4 mr-2"/>Selecionado: <strong>{format(date!, "dd/MM", { locale: ptBR })} às {selectedTime}</strong></div>)}
               </div>
             </div>
           )}
           {step === 2 && (
             <div className="space-y-4 py-4 animate-in fade-in slide-in-from-right-4">
-               <div className="space-y-2"><Label className="text-zinc-300">Seu Nome Completo</Label><Input placeholder="Ex: Maria Silva" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500" value={name} onChange={(e) => setName(e.target.value)}/></div>
-               <div className="space-y-2"><Label className="text-zinc-300">Seu WhatsApp</Label><Input placeholder="(11) 99999-9999" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500" value={phone} onChange={(e) => setPhone(e.target.value)}/></div>
+               <div className="space-y-2"><Label className="text-zinc-300">Seu Nome Completo</Label><Input placeholder="Ex: Maria Silva" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" value={name} onChange={(e) => setName(e.target.value)}/></div>
+               <div className="space-y-2"><Label className="text-zinc-300">Seu WhatsApp</Label><Input placeholder="(11) 99999-9999" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" value={phone} onChange={(e) => setPhone(e.target.value)}/></div>
             </div>
           )}
           {step === 3 && (
-            <div className="py-4 space-y-4 animate-in fade-in slide-in-from-right-4">
-                <div className="text-center mb-6"><h3 className="text-lg font-bold text-white">Como deseja finalizar?</h3></div>
-                
+            <div className="py-2 space-y-4 animate-in fade-in slide-in-from-right-4">
+                <div className="text-center mb-4"><h3 className="text-lg font-bold text-white">Como deseja finalizar?</h3></div>
                 <div className="grid grid-cols-1 gap-3">
                     <button onClick={() => handleCheckout('ONLINE')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 transition group disabled:opacity-50 text-left">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/20"><CreditCard size={20} /></div>
-                            <div><p className="font-bold text-white text-sm">Pagar Online (Garantido)</p><p className="text-xs text-pink-200/70">Vaga confirmada na hora.</p></div>
-                        </div>
+                        <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/20"><CreditCard size={20} /></div><div><p className="font-bold text-white text-sm">Pagar Online (Garantido)</p><p className="text-xs text-pink-200/70">Vaga confirmada na hora.</p></div></div>
                         {loading ? <Loader2 className="animate-spin text-pink-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-pink-500"></div>}
                     </button>
-                    
                     <button onClick={() => handleCheckout('LOCAL')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 transition group disabled:opacity-50 text-left">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500"><MapPin size={20} /></div>
-                            <div><p className="font-bold text-white text-sm">Pagar no Local</p><p className="text-xs text-zinc-500">Sujeito a confirmação.</p></div>
-                        </div>
+                        <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500"><MapPin size={20} /></div><div><p className="font-bold text-white text-sm">Pagar no Local</p><p className="text-xs text-zinc-500">Sujeito a confirmação.</p></div></div>
                          {loading ? <Loader2 className="animate-spin text-blue-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-blue-500"></div>}
                     </button>
                 </div>
-
-                {/* --- MENSAGEM NOVA (Correção de ícone) --- */}
-                <div className="mt-6 p-4 bg-zinc-900/80 border border-zinc-800 rounded-lg flex gap-3 items-start">
+                <div className="mt-4 p-4 bg-zinc-900/80 border border-zinc-800 rounded-lg flex gap-3 items-start">
                     <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div className="text-sm text-zinc-400 leading-relaxed">
                         <p className="mb-2"><strong className="text-white">Política de Reservas:</strong></p>
@@ -198,13 +179,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                         </ul>
                     </div>
                 </div>
-
             </div>
           )}
         </div>
         <DialogFooter className="p-6 bg-zinc-900 border-t border-zinc-800">
           {step === 1 && (<Button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold h-12" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>)}
-          {step === 2 && (<div className="flex gap-2 w-full"><Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-800">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !phone} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold">Ir para Pagamento</Button></div>)}
+          {step === 2 && (<div className="flex gap-2 w-full"><Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-800 h-12">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !phone} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12">Ir para Pagamento</Button></div>)}
           {step === 3 && (<div className="w-full"><Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-white mb-2">Voltar</Button></div>)}
         </DialogFooter>
       </DialogContent>
