@@ -16,7 +16,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { title, price, date, time, clientName, method } = body;
     
-    // Normaliza o nome
     const nomeClienteLimpo = clientName.trim();
     const BASE_URL = "https://teste-drab-rho-60.vercel.app";
 
@@ -25,7 +24,7 @@ export async function POST(request: Request) {
     const agora = new Date().getTime();
 
     // =====================================================================
-    // 1️⃣ FASE 1: LIMPEZA E VERIFICAÇÃO DO CLIENTE
+    // 1️⃣ FASE 1: CLIENTE (Mantivemos a regra detalhada do WhatsApp aqui)
     // =====================================================================
     
     const historicoCliente = await prisma.agendamento.findMany({
@@ -36,12 +35,10 @@ export async function POST(request: Request) {
     });
 
     for (const reserva of historicoCliente) {
-      // A) Se ele tem um PENDENTE velho (> 10 min), deletamos
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
         if (tempoDecorrido >= 10) {
-          console.log(`🗑️ Excluindo reserva expirada antiga de ${nomeClienteLimpo}`);
           await prisma.agendamento.delete({ where: { id: reserva.id } });
           continue; 
         } else {
@@ -51,7 +48,6 @@ export async function POST(request: Request) {
         }
       }
 
-      // B) BLOQUEIO DE DUPLICIDADE (MENSAGEM MELHORADA AQUI 👇)
       if (reserva.status.includes('PAGO') || reserva.status === 'PAGAR NO LOCAL') {
         return NextResponse.json({ 
           error: `🚫 Você já possui um agendamento ativo de "${reserva.servico}" para o dia ${reserva.data} às ${reserva.horario}. 
@@ -62,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     // =====================================================================
-    // 2️⃣ FASE 2: VERIFICAÇÃO DO HORÁRIO (Vaga existe?)
+    // 2️⃣ FASE 2: HORÁRIO (Aqui mudamos a mensagem 👇)
     // =====================================================================
 
     const vagaOcupada = await prisma.agendamento.findMany({
@@ -75,13 +71,16 @@ export async function POST(request: Request) {
 
     for (const vaga of vagaOcupada) {
       if (vaga.status.includes('PAGO') || vaga.status === 'PAGAR NO LOCAL') {
-        return NextResponse.json({ error: '❌ Este horário já foi reservado por outro cliente.' }, { status: 409 });
+        // MENSAGEM NOVA MAIS FORMAL:
+        return NextResponse.json({ 
+            error: '❌ Este horário já foi reservado por outro cliente. Por favor, escolha outro horário disponível.' 
+        }, { status: 409 });
       }
 
       if (vaga.status === 'PENDENTE') {
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60;
         if (diff < 10) {
-          return NextResponse.json({ error: '⏳ Horário reservado temporariamente por outra pessoa. Tente em 10 min.' }, { status: 409 });
+          return NextResponse.json({ error: '⏳ Este horário está sendo reservado por outra pessoa no momento. Tente novamente em 10 minutos.' }, { status: 409 });
         } else {
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
@@ -89,7 +88,7 @@ export async function POST(request: Request) {
     }
 
     // =====================================================================
-    // 3️⃣ SUCESSO: CRIAÇÃO
+    // 3️⃣ SUCESSO
     // =====================================================================
     
     if (method === 'LOCAL') {
