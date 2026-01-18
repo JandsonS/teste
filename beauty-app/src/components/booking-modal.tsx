@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-// Adicionei o ícone AlertCircle aqui
-import { CheckCircle2, CreditCard, MapPin, Loader2, AlertCircle } from "lucide-react" 
+// ⚠️ ATENÇÃO: Removi ícones que podem dar erro de versão e deixei os padrões
+import { CheckCircle2, CreditCard, MapPin, Loader2, Info } from "lucide-react" 
 import { toast } from "sonner"
 
 interface BookingModalProps {
@@ -41,10 +41,14 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         setBusySlots([]); 
         setSelectedTime(null); 
 
+        // Adicionei um console.log para você ver se está buscando
+        console.log("Buscando horários para:", formattedDate);
+
         fetch(`/api/availability?date=${formattedDate}`)
             .then(res => res.json())
             .then(data => {
                 if (data.busy) {
+                    console.log("Horários ocupados:", data.busy);
                     setBusySlots(data.busy);
                 }
             })
@@ -76,6 +80,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       if (data.error) {
         toast.error("Atenção", { description: data.error });
         setLoading(false);
+        // Atualiza a lista visualmente na hora se der erro
         if (data.error.includes("horário") || data.error.includes("ocupado")) {
             setBusySlots(prev => [...prev, selectedTime]);
             setSelectedTime(null);
@@ -87,13 +92,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         window.location.href = data.url; 
       } else if (data.success) {
         if (method === 'LOCAL') {
-            toast.success("Solicitação Recebida! 📩", {
-                description: "Aguarde a confirmação final do estabelecimento via WhatsApp.",
-                duration: 6000,
+            toast.success("Solicitação Enviada! 📩", {
+                description: "Aguarde a confirmação via WhatsApp.",
+                duration: 5000,
             });
         } else {
-            toast.success("Agendamento Confirmado! 🎉", {
-                description: "Vaga garantida com sucesso.",
+            toast.success("Vaga Garantida! 🎉", {
+                description: "Seu horário está confirmado.",
             });
         }
         
@@ -142,7 +147,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             variant={selectedTime === time ? "default" : "outline"} 
                             className={`
                                 ${selectedTime === time ? "bg-pink-600 hover:bg-pink-700 border-none" : "bg-transparent border-zinc-700 hover:bg-zinc-800 text-zinc-300"}
-                                ${isBusy ? "opacity-30 cursor-not-allowed line-through bg-zinc-900 border-zinc-800 text-zinc-600" : ""}
+                                ${isBusy ? "opacity-30 cursor-not-allowed line-through bg-zinc-900 border-dashed border-zinc-800 text-zinc-600" : ""}
                             `} 
                             onClick={() => !isBusy && setSelectedTime(time)}
                         >
@@ -166,43 +171,31 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 <div className="text-center mb-6"><h3 className="text-lg font-bold text-white">Como deseja finalizar?</h3></div>
                 
                 <div className="grid grid-cols-1 gap-3">
-                    {/* Botão Online */}
                     <button onClick={() => handleCheckout('ONLINE')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 transition group disabled:opacity-50 text-left">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/20">
-                                <CreditCard size={20} />
-                            </div>
-                            <div>
-                                <p className="font-bold text-white text-sm">Pagar Online (Recomendado)</p>
-                                <p className="text-xs text-pink-200/70">Confirmação automática e vaga garantida.</p>
-                            </div>
+                            <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/20"><CreditCard size={20} /></div>
+                            <div><p className="font-bold text-white text-sm">Pagar Online (Garantido)</p><p className="text-xs text-pink-200/70">Vaga confirmada na hora.</p></div>
                         </div>
                         {loading ? <Loader2 className="animate-spin text-pink-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-pink-500"></div>}
                     </button>
                     
-                    {/* Botão Local */}
                     <button onClick={() => handleCheckout('LOCAL')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 transition group disabled:opacity-50 text-left">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-                                <MapPin size={20} />
-                            </div>
-                            <div>
-                                <p className="font-bold text-white text-sm">Pagar no Local</p>
-                                <p className="text-xs text-zinc-500">Sujeito a análise e confirmação manual.</p>
-                            </div>
+                            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500"><MapPin size={20} /></div>
+                            <div><p className="font-bold text-white text-sm">Pagar no Local</p><p className="text-xs text-zinc-500">Sujeito a confirmação.</p></div>
                         </div>
                          {loading ? <Loader2 className="animate-spin text-blue-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-blue-500"></div>}
                     </button>
                 </div>
 
-                {/* --- AQUI ESTÁ A NOVA MENSAGEM CLARA E PROFISSIONAL --- */}
+                {/* --- MENSAGEM NOVA --- */}
                 <div className="mt-6 p-4 bg-zinc-900/80 border border-zinc-800 rounded-lg flex gap-3 items-start">
-                    <AlertCircle className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                    <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div className="text-sm text-zinc-400 leading-relaxed">
                         <p className="mb-2"><strong className="text-white">Política de Reservas:</strong></p>
                         <ul className="list-disc pl-4 space-y-1">
-                            <li><strong>Pagamento Online:</strong> Sua vaga é garantida imediatamente.</li>
-                            <li><strong>Pagamento no Local:</strong> É uma solicitação. Aguarde a confirmação da nossa equipe via WhatsApp.</li>
+                            <li><strong>Online:</strong> Garante a vaga imediatamente.</li>
+                            <li><strong>No Local:</strong> É apenas uma solicitação. Aguarde contato.</li>
                         </ul>
                     </div>
                 </div>
