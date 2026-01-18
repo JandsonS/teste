@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-// 👇 IMPORTANTE: Importamos o nosso componente seguro agora
+
+// 👇 AQUI ESTÁ O SEGREDO: Importe o arquivo da pasta components
 import { ToasterClient } from "@/components/ToasterClient"; 
 
 const inter = Inter({ subsets: ["latin"] });
@@ -21,7 +22,7 @@ export default function RootLayout({
       <body className={inter.className}>
         {children}
         
-        {/* 👇 O "Carteiro" seguro entra aqui */}
+        {/* 👇 Componente seguro rodando aqui */}
         <ToasterClient />
         
       </body>
