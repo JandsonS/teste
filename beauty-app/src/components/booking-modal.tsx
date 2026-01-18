@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-// ⚠️ ATENÇÃO: Removi ícones que podem dar erro de versão e deixei os padrões
+// ⚠️ TROQUEI OS ÍCONES PARA EVITAR ERRO DE BUILD
 import { CheckCircle2, CreditCard, MapPin, Loader2, Info } from "lucide-react" 
 import { toast } from "sonner"
 
@@ -41,14 +41,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         setBusySlots([]); 
         setSelectedTime(null); 
 
-        // Adicionei um console.log para você ver se está buscando
+        // Console log para você debugar se precisar
         console.log("Buscando horários para:", formattedDate);
 
         fetch(`/api/availability?date=${formattedDate}`)
             .then(res => res.json())
             .then(data => {
                 if (data.busy) {
-                    console.log("Horários ocupados:", data.busy);
                     setBusySlots(data.busy);
                 }
             })
@@ -80,7 +79,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       if (data.error) {
         toast.error("Atenção", { description: data.error });
         setLoading(false);
-        // Atualiza a lista visualmente na hora se der erro
+        // Atualiza visualmente na hora se der erro de ocupado
         if (data.error.includes("horário") || data.error.includes("ocupado")) {
             setBusySlots(prev => [...prev, selectedTime]);
             setSelectedTime(null);
@@ -188,7 +187,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     </button>
                 </div>
 
-                {/* --- MENSAGEM NOVA --- */}
+                {/* --- MENSAGEM NOVA (Correção de ícone) --- */}
                 <div className="mt-6 p-4 bg-zinc-900/80 border border-zinc-800 rounded-lg flex gap-3 items-start">
                     <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div className="text-sm text-zinc-400 leading-relaxed">
