@@ -16,19 +16,18 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { title, price, date, time, clientName, method } = body;
     
-    // Normaliza o nome (remove espaços extras e deixa minusculo para comparação)
+    // Normaliza o nome
     const nomeClienteLimpo = clientName.trim();
     const BASE_URL = "https://teste-drab-rho-60.vercel.app";
 
-    console.log(`🔒 Iniciando validação rigorosa para: ${nomeClienteLimpo}`);
+    console.log(`🔒 Validando vaga para: ${nomeClienteLimpo}`);
 
     const agora = new Date().getTime();
 
     // =====================================================================
-    // 1️⃣ FAZE 1: LIMPEZA E VERIFICAÇÃO DO CLIENTE (O "Pente Fino")
+    // 1️⃣ FASE 1: LIMPEZA E VERIFICAÇÃO DO CLIENTE
     // =====================================================================
     
-    // Busca TODOS os agendamentos desse cliente que não foram cancelados
     const historicoCliente = await prisma.agendamento.findMany({
       where: { 
         cliente: nomeClienteLimpo, 
@@ -37,66 +36,62 @@ export async function POST(request: Request) {
     });
 
     for (const reserva of historicoCliente) {
-      // A) Se ele tem um PENDENTE velho (> 10 min), deletamos agora para não atrapalhar
+      // A) Se ele tem um PENDENTE velho (> 10 min), deletamos
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
         if (tempoDecorrido >= 10) {
           console.log(`🗑️ Excluindo reserva expirada antiga de ${nomeClienteLimpo}`);
           await prisma.agendamento.delete({ where: { id: reserva.id } });
-          continue; // Vai para o próximo item do loop
+          continue; 
         } else {
-          // Se é PENDENTE RECENTE (< 10 min), ele está tentando duplicar ou pagar outro
           return NextResponse.json({ 
             error: '⏳ Você já tem um agendamento em processo de pagamento. Finalize-o ou aguarde 10 minutos.' 
           }, { status: 409 });
         }
       }
 
-      // B) Se ele tem qualquer agendamento CONFIRMADO (Pago ou Local) no futuro
-      // A regra é clara: Só pode ter 1 ativo.
+      // B) BLOQUEIO DE DUPLICIDADE (MENSAGEM MELHORADA AQUI 👇)
       if (reserva.status.includes('PAGO') || reserva.status === 'PAGAR NO LOCAL') {
         return NextResponse.json({ 
-          error: `🚫 Você já possui um agendamento ativo para dia ${reserva.data} às ${reserva.horario}. Não é permitido criar duplicatas.` 
+          error: `🚫 Você já possui um agendamento ativo de "${reserva.servico}" para o dia ${reserva.data} às ${reserva.horario}. 
+          
+          Não é permitido criar duplicatas. Caso necessite mudar o serviço ou cancelar, entre em contato via WhatsApp.` 
         }, { status: 409 });
       }
     }
 
     // =====================================================================
-    // 2️⃣ FAZE 2: VERIFICAÇÃO DO HORÁRIO (A Vaga existe?)
+    // 2️⃣ FASE 2: VERIFICAÇÃO DO HORÁRIO (Vaga existe?)
     // =====================================================================
 
     const vagaOcupada = await prisma.agendamento.findMany({
       where: { 
         data: date, 
         horario: time, 
-        status: { not: 'CANCELADO' } // Ignora os cancelados
+        status: { not: 'CANCELADO' } 
       }
     });
 
     for (const vaga of vagaOcupada) {
-      // Se alguém já pagou ou marcou local, a vaga é dele.
       if (vaga.status.includes('PAGO') || vaga.status === 'PAGAR NO LOCAL') {
         return NextResponse.json({ error: '❌ Este horário já foi reservado por outro cliente.' }, { status: 409 });
       }
 
-      // Se tem alguém pagando agora (Pendente < 10 min)
       if (vaga.status === 'PENDENTE') {
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60;
         if (diff < 10) {
           return NextResponse.json({ error: '⏳ Horário reservado temporariamente por outra pessoa. Tente em 10 min.' }, { status: 409 });
         } else {
-          // Se expirou, deleta para liberar a vaga para o usuário atual
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
       }
     }
 
     // =====================================================================
-    // 3️⃣ SUCESSO: CRIAÇÃO DO AGENDAMENTO
+    // 3️⃣ SUCESSO: CRIAÇÃO
     // =====================================================================
     
-    // Opção 1: Pagar no Local
     if (method === 'LOCAL') {
       await prisma.agendamento.create({
         data: { 
@@ -105,13 +100,12 @@ export async function POST(request: Request) {
           data: date, 
           horario: time, 
           valor: Number(price), 
-          status: "PAGAR NO LOCAL" // Nome profissional para o painel
+          status: "PAGAR NO LOCAL" 
         }
       });
       return NextResponse.json({ success: true });
     }
 
-    // Opção 2: Pagamento Online (Gera Link)
     const agendamento = await prisma.agendamento.create({
       data: { 
         cliente: nomeClienteLimpo, 
