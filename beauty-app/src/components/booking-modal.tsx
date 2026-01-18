@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { format, isValid } from "date-fns" // Importei isValid para segurança extra
+import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { CheckCircle2, CreditCard, MapPin, Loader2, Info } from "lucide-react" 
 import { toast } from "sonner"
@@ -42,7 +42,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   ]
 
   useEffect(() => {
-    // Se a data sumir ou for inválida, limpa tudo e para.
     if (!date || !isValid(date)) {
         setBusySlots([]);
         setSelectedTime(null);
@@ -67,8 +66,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
         toast.error("Horário Indisponível", {
-            description: "Este horário já foi reservado por outro cliente. Por favor, escolha outro horário.",
-            duration: 7000,
+            description: "Este horário já foi reservado. Por favor, escolha outro.",
+            duration: 3000,
             position: "top-center"
         });
         return;
@@ -77,9 +76,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   };
 
   const handleCheckout = async (method: 'ONLINE' | 'LOCAL') => {
-    // Verificação dupla de segurança
     if (!date || !selectedTime || !name) return;
-    
     setLoading(true);
 
     try {
@@ -104,7 +101,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             duration: 6000,
             position: "top-center"
         });
-        
         setLoading(false);
         
         if (data.error.includes("horário") || data.error.includes("ocupado")) {
@@ -118,13 +114,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         window.location.href = data.url; 
       } else if (data.success) {
         if (method === 'LOCAL') {
-            toast.success("Solicitação Enviada! 📩", {
+            toast.success("Solicitação Enviada!", {
                 description: "Aguarde a confirmação via WhatsApp.",
-                duration: 6000,
             });
         } else {
-            toast.success("Vaga Garantida! 🎉", {
-                description: "Seu agendamento foi confirmado.",
+            toast.success("Agendamento Confirmado!", {
+                description: "Seu horário está garantido.",
             });
         }
         setOpen(false);
@@ -140,7 +135,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   };
 
   const calendarStyles = {
-    caption: { color: '#e4e4e7' },
+    caption: { color: '#e4e4e7', textTransform: 'capitalize' }, // Garante letra maiúscula via style inline tbm
     head_cell: { color: '#a1a1aa' },
     day: { color: '#e4e4e7' },
     nav_button: { color: '#ec4899' },
@@ -149,27 +144,38 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden bg-zinc-950 text-white border-zinc-800 rounded-2xl">
+      
+      {/* RESPONSIVIDADE: 
+         - w-[95vw]: No mobile ocupa 95% da largura.
+         - max-h-[90vh]: Altura máxima de 90% da tela para não cortar em celulares pequenos.
+         - overflow-y-auto: Permite rolar se o conteúdo for grande.
+      */}
+      <DialogContent className="w-[95vw] sm:max-w-[650px] max-h-[90vh] overflow-y-auto p-0 bg-zinc-950 text-white border-zinc-800 rounded-2xl scrollbar-hide">
         
-        <div className="bg-gradient-to-r from-pink-600 to-purple-700 p-6 text-white text-center">
-          <DialogTitle className="text-2xl font-bold mb-1">Agendar Horário</DialogTitle>
-          <DialogDescription className="text-pink-100">
+        <div className="bg-gradient-to-r from-pink-600 to-purple-700 p-4 md:p-6 text-white text-center sticky top-0 z-10 shadow-md">
+          <DialogTitle className="text-xl md:text-2xl font-bold mb-1">Agendar Horário</DialogTitle>
+          <DialogDescription className="text-pink-100 text-sm md:text-base">
             {serviceName} • <span className="font-bold text-white">{price}</span>
           </DialogDescription>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {step === 1 && (
-            <div className="flex flex-col md:flex-row gap-8">
+            // Flex-col no mobile (um embaixo do outro) e Flex-row no Desktop (lado a lado)
+            <div className="flex flex-col md:flex-row gap-6 md:gap-8">
               
               {/* CALENDÁRIO */}
               <div className="flex-1 flex justify-center">
-                <div className="border border-zinc-800 rounded-xl p-4 bg-zinc-900 shadow-inner">
+                <div className="border border-zinc-800 rounded-xl p-3 bg-zinc-900 shadow-inner w-full flex justify-center">
                     <style>{`
-                      .rdp { --rdp-cell-size: 40px; --rdp-accent-color: #db2777; --rdp-background-color: #27272a; margin: 0; }
+                      .rdp { --rdp-cell-size: 35px; --rdp-accent-color: #db2777; --rdp-background-color: #27272a; margin: 0; }
+                      /* Regra para Maiúscula no Mês */
+                      .rdp-caption_label { text-transform: capitalize; font-size: 1rem; font-weight: 700; color: white; }
                       .rdp-day_selected:not([disabled]) { background-color: #db2777; color: white; font-weight: bold; }
                       .rdp-day:hover:not([disabled]) { background-color: #3f3f46; border-radius: 8px; }
                       .rdp-button:focus, .rdp-button:active { border: 2px solid #db2777; }
+                      /* Ajuste mobile para células menores */
+                      @media (max-width: 400px) { .rdp { --rdp-cell-size: 30px; } }
                     `}</style>
                     <DayPicker 
                         mode="single"
@@ -188,12 +194,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
               
               {/* GRADE DE HORÁRIOS */}
               <div className="flex-1">
-                <Label className="mb-4 flex justify-between items-center text-zinc-300 font-bold">
+                <Label className="mb-3 flex justify-between items-center text-zinc-300 font-bold text-sm md:text-base">
                     <span>2. Escolha o horário</span>
                     {loadingSlots && <Loader2 className="animate-spin w-4 h-4 text-pink-500"/>}
                 </Label>
                 
-                <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {/* Grid ajustado para mobile: 4 colunas é padrão, mas ajusta o tamanho da fonte */}
+                <div className="grid grid-cols-4 gap-2 max-h-[250px] md:max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                   {timeSlots.map((time) => {
                     const isBusy = busySlots.includes(time);
                     return (
@@ -201,7 +208,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             key={time} 
                             variant={selectedTime === time ? "default" : "outline"} 
                             className={`
-                                text-xs h-10 font-medium transition-all
+                                text-[11px] md:text-xs h-9 md:h-10 font-medium transition-all
                                 ${selectedTime === time 
                                     ? "bg-pink-600 hover:bg-pink-700 border-none scale-105 shadow-lg shadow-pink-900/20" 
                                     : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700"}
@@ -218,11 +225,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                   })}
                 </div>
                 
-                {/* 👇 AQUI ESTAVA O ERRO: Adicionei a proteção "date &&" */}
                 {selectedTime && date && (
-                    <div className="mt-4 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-pink-400 text-sm flex items-center animate-in fade-in slide-in-from-top-2">
-                        <CheckCircle2 className="w-4 h-4 mr-2"/>
-                        Confirmando: <strong>{format(date, "dd/MM", { locale: ptBR })} às {selectedTime}</strong>
+                    <div className="mt-4 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg text-pink-400 text-xs md:text-sm flex items-center animate-in fade-in slide-in-from-top-2">
+                        <CheckCircle2 className="w-4 h-4 mr-2 shrink-0"/>
+                        <span>Confirmando: <strong>{format(date, "dd/MM", { locale: ptBR })} às {selectedTime}</strong></span>
                     </div>
                 )}
               </div>
@@ -231,8 +237,24 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
           {step === 2 && (
             <div className="space-y-4 py-4 animate-in fade-in slide-in-from-right-4">
-               <div className="space-y-2"><Label className="text-zinc-300">Seu Nome Completo</Label><Input placeholder="Ex: Maria Silva" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" value={name} onChange={(e) => setName(e.target.value)}/></div>
-               <div className="space-y-2"><Label className="text-zinc-300">Seu WhatsApp</Label><Input placeholder="(11) 99999-9999" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" value={phone} onChange={(e) => setPhone(e.target.value)}/></div>
+               <div className="space-y-2">
+                 <Label className="text-zinc-300">Seu Nome Completo</Label>
+                 <Input 
+                    placeholder="Ex: Maria Silva" 
+                    className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" 
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)}
+                 />
+               </div>
+               <div className="space-y-2">
+                 <Label className="text-zinc-300">Seu WhatsApp</Label>
+                 <Input 
+                    placeholder="(11) 99999-9999" 
+                    className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" 
+                    value={phone} 
+                    onChange={(e) => setPhone(e.target.value)}
+                 />
+               </div>
             </div>
           )}
 
@@ -241,17 +263,34 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 <div className="text-center mb-4"><h3 className="text-lg font-bold text-white">Como deseja finalizar?</h3></div>
                 <div className="grid grid-cols-1 gap-3">
                     <button onClick={() => handleCheckout('ONLINE')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 transition group disabled:opacity-50 text-left">
-                        <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/20"><CreditCard size={20} /></div><div><p className="font-bold text-white text-sm">Pagar Online (Garantido)</p><p className="text-xs text-pink-200/70">Vaga confirmada na hora.</p></div></div>
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/20 shrink-0">
+                                <CreditCard size={20} />
+                            </div>
+                            <div>
+                                <p className="font-bold text-white text-sm">Pagar Online (Garantido)</p>
+                                <p className="text-xs text-pink-200/70">Vaga confirmada na hora.</p>
+                            </div>
+                        </div>
                         {loading ? <Loader2 className="animate-spin text-pink-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-pink-500"></div>}
                     </button>
+                    
                     <button onClick={() => handleCheckout('LOCAL')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 transition group disabled:opacity-50 text-left">
-                        <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500"><MapPin size={20} /></div><div><p className="font-bold text-white text-sm">Pagar no Local</p><p className="text-xs text-zinc-500">Sujeito a confirmação.</p></div></div>
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                                <MapPin size={20} />
+                            </div>
+                            <div>
+                                <p className="font-bold text-white text-sm">Pagar no Local</p>
+                                <p className="text-xs text-zinc-500">Sujeito a confirmação.</p>
+                            </div>
+                        </div>
                          {loading ? <Loader2 className="animate-spin text-blue-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-blue-500"></div>}
                     </button>
                 </div>
                 <div className="mt-4 p-4 bg-zinc-900/80 border border-zinc-800 rounded-lg flex gap-3 items-start">
                     <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                    <div className="text-sm text-zinc-400 leading-relaxed">
+                    <div className="text-xs md:text-sm text-zinc-400 leading-relaxed">
                         <p className="mb-2"><strong className="text-white">Política de Reservas:</strong></p>
                         <ul className="list-disc pl-4 space-y-1">
                             <li><strong>Online:</strong> Garante a vaga imediatamente.</li>
@@ -262,10 +301,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             </div>
           )}
         </div>
-        <DialogFooter className="p-6 bg-zinc-900 border-t border-zinc-800">
-          {step === 1 && (<Button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold h-12" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>)}
-          {step === 2 && (<div className="flex gap-2 w-full"><Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-800 h-12">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !phone} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12">Ir para Pagamento</Button></div>)}
-          {step === 3 && (<div className="w-full"><Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-white mb-2">Voltar</Button></div>)}
+        
+        {/* FOOTER FIXO */}
+        <DialogFooter className="p-4 md:p-6 bg-zinc-900 border-t border-zinc-800 flex flex-col sm:flex-row gap-2">
+          {step === 1 && (<Button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>)}
+          {step === 2 && (<div className="flex gap-2 w-full"><Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !phone} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl">Ir para Pagamento</Button></div>)}
+          {step === 3 && (<div className="w-full"><Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-white mb-2 rounded-xl">Voltar</Button></div>)}
         </DialogFooter>
       </DialogContent>
     </Dialog>
