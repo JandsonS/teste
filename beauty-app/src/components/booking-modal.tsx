@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CheckCircle2, CreditCard, MapPin, Loader2, Info, AlertCircle } from "lucide-react" 
+import { CheckCircle2, CreditCard, MapPin, Loader2, Info } from "lucide-react" 
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
@@ -33,7 +33,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  // GRADE DE HORÁRIOS
+  // GRADE DE HORÁRIOS COMPLETA
   const timeSlots = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", 
     "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", 
@@ -58,12 +58,14 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     }
   }, [date]);
 
+  // --- AQUI ESTÁ A LÓGICA DO CLIQUE E DO AVISO ---
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
-        // AVISO VISUAL QUANDO CLICA NO BLOQUEADO
+        // Dispara o alerta visual quando clica no bloqueado
         toast.error("Horário Indisponível", {
             description: "Este horário já foi reservado por outro cliente. Por favor, escolha outro.",
-            duration: 3000,
+            duration: 4000, // Fica 4 segundos na tela
+            position: "top-center"
         });
         return;
     }
@@ -91,15 +93,15 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
 
       if (data.error) {
-        // AQUI GARANTIMOS QUE A MENSAGEM DO BACKEND APAREÇA
-        toast.error("Não foi possível agendar", { 
-            description: data.error, // Mostra o texto explicativo do backend (duplicidade, etc)
-            duration: 5000, // Dura mais tempo para ler
+        // AVISO DE ERRO VINDO DO BACKEND (DUPLICIDADE)
+        toast.error("Atenção", { 
+            description: data.error,
+            duration: 6000,
+            position: "top-center"
         });
         
         setLoading(false);
         
-        // Se o erro for de horário ocupado, atualiza a lista visualmente na hora
         if (data.error.includes("horário") || data.error.includes("ocupado")) {
             setBusySlots(prev => [...prev, selectedTime!]);
             setSelectedTime(null);
@@ -113,7 +115,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         if (method === 'LOCAL') {
             toast.success("Solicitação Enviada! 📩", {
                 description: "Aguarde a confirmação via WhatsApp.",
-                duration: 6000,
+                duration: 5000,
             });
         } else {
             toast.success("Vaga Garantida! 🎉", {
@@ -132,7 +134,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     }
   };
 
-  // ESTILOS DO CALENDÁRIO DARK
   const calendarStyles = {
     caption: { color: '#e4e4e7' },
     head_cell: { color: '#a1a1aa' },
@@ -156,7 +157,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 1 && (
             <div className="flex flex-col md:flex-row gap-8">
               
-              {/* CALENDÁRIO */}
               <div className="flex-1 flex justify-center">
                 <div className="border border-zinc-800 rounded-xl p-4 bg-zinc-900 shadow-inner">
                     <style>{`
@@ -180,7 +180,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 </div>
               </div>
               
-              {/* GRADE DE HORÁRIOS */}
               <div className="flex-1">
                 <Label className="mb-4 flex justify-between items-center text-zinc-300 font-bold">
                     <span>2. Escolha o horário</span>
@@ -193,7 +192,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     return (
                         <Button 
                             key={time} 
-                            // NÃO USAMOS DISABLED AQUI PARA PODER CLICAR E VER A MENSAGEM
+                            // O botão continua clicável, mas visualmente "apagado"
                             variant={selectedTime === time ? "default" : "outline"} 
                             className={`
                                 text-xs h-10 font-medium transition-all
@@ -202,7 +201,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                                     : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700"}
                                 
                                 ${isBusy 
-                                    ? "bg-red-950/10 border-red-900/20 text-zinc-600 line-through decoration-red-500 hover:bg-red-950/20 hover:border-red-800/40 opacity-70" 
+                                    ? "bg-red-950/10 border-red-900/20 text-zinc-600 line-through decoration-red-500 hover:bg-red-950/20 opacity-70" 
                                     : ""}
                             `} 
                             onClick={() => handleTimeClick(time, isBusy)}

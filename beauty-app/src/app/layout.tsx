@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { SITE_CONFIG } from "@/constants/info"; // Importando suas configurações
+// 👇 1. IMPORTANTE: Importar o componente visual do Sonner
+import { Toaster } from "sonner"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  // Título dinâmico
-  title: `${SITE_CONFIG.name} | Agendamento Online`,
-  description: SITE_CONFIG.description,
-  
-  // Ícone Dinâmico (Lê direto da sua configuração de Logo)
-  icons: {
-    icon: SITE_CONFIG.images.logo, 
-  },
+  title: "Barber Shop Agendamentos",
+  description: "Agende seu horário com facilidade.",
 };
 
 export default function RootLayout({
@@ -22,8 +17,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-br">
-      <body className={inter.className}>{children}</body>
+    <html lang="pt-BR">
+      <body className={inter.className}>
+        {children}
+        
+        {/* 👇 2. ADICIONE ISSO AQUI: É o "alto-falante" das mensagens */}
+        <Toaster 
+          richColors 
+          position="top-center" 
+          theme="dark"
+        />
+        
+      </body>
     </html>
   );
 }
