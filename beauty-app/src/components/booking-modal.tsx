@@ -10,9 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CheckCircle2, CreditCard, MapPin, Loader2, Info, ChevronLeft, ChevronRight } from "lucide-react" 
+import { CheckCircle2, CreditCard, MapPin, Loader2, Info, AlertCircle } from "lucide-react" 
 import { toast } from "sonner"
-// Importando DayPicker para customização profunda
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
 
@@ -34,7 +33,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  // === GRADE DE HORÁRIOS COMPLETA (08:00 as 19:00) ===
+  // GRADE DE HORÁRIOS
   const timeSlots = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", 
     "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", 
@@ -49,7 +48,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         setBusySlots([]); 
         setSelectedTime(null); 
 
-        // Busca disponibilidade apenas para a data selecionada
         fetch(`/api/availability?date=${formattedDate}`)
             .then(res => res.json())
             .then(data => {
@@ -59,6 +57,18 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             .finally(() => setLoadingSlots(false));
     }
   }, [date]);
+
+  const handleTimeClick = (time: string, isBusy: boolean) => {
+    if (isBusy) {
+        // AVISO VISUAL QUANDO CLICA NO BLOQUEADO
+        toast.error("Horário Indisponível", {
+            description: "Este horário já foi reservado por outro cliente. Por favor, escolha outro.",
+            duration: 3000,
+        });
+        return;
+    }
+    setSelectedTime(time);
+  };
 
   const handleCheckout = async (method: 'ONLINE' | 'LOCAL') => {
     if (!date || !selectedTime || !name) return;
@@ -81,9 +91,15 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
 
       if (data.error) {
-        toast.error("Atenção", { description: data.error });
+        // AQUI GARANTIMOS QUE A MENSAGEM DO BACKEND APAREÇA
+        toast.error("Não foi possível agendar", { 
+            description: data.error, // Mostra o texto explicativo do backend (duplicidade, etc)
+            duration: 5000, // Dura mais tempo para ler
+        });
+        
         setLoading(false);
-        // Se o erro for de horário ocupado, bloqueia o botão imediatamente
+        
+        // Se o erro for de horário ocupado, atualiza a lista visualmente na hora
         if (data.error.includes("horário") || data.error.includes("ocupado")) {
             setBusySlots(prev => [...prev, selectedTime!]);
             setSelectedTime(null);
@@ -116,12 +132,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     }
   };
 
-  // ESTILOS DO CALENDÁRIO DARK 🎨
+  // ESTILOS DO CALENDÁRIO DARK
   const calendarStyles = {
-    caption: { color: '#e4e4e7' }, // Texto do mês claro
-    head_cell: { color: '#a1a1aa' }, // Dias da semana cinza
-    day: { color: '#e4e4e7' }, // Dias do mês claro
-    nav_button: { color: '#ec4899' }, // Setas rosa
+    caption: { color: '#e4e4e7' },
+    head_cell: { color: '#a1a1aa' },
+    day: { color: '#e4e4e7' },
+    nav_button: { color: '#ec4899' },
   };
 
   return (
@@ -129,7 +145,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden bg-zinc-950 text-white border-zinc-800 rounded-2xl">
         
-        {/* Header */}
         <div className="bg-gradient-to-r from-pink-600 to-purple-700 p-6 text-white text-center">
           <DialogTitle className="text-2xl font-bold mb-1">Agendar Horário</DialogTitle>
           <DialogDescription className="text-pink-100">
@@ -141,7 +156,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 1 && (
             <div className="flex flex-col md:flex-row gap-8">
               
-              {/* --- CALENDÁRIO CUSTOMIZADO (DARK) --- */}
+              {/* CALENDÁRIO */}
               <div className="flex-1 flex justify-center">
                 <div className="border border-zinc-800 rounded-xl p-4 bg-zinc-900 shadow-inner">
                     <style>{`
@@ -165,7 +180,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 </div>
               </div>
               
-              {/* --- GRADE DE HORÁRIOS --- */}
+              {/* GRADE DE HORÁRIOS */}
               <div className="flex-1">
                 <Label className="mb-4 flex justify-between items-center text-zinc-300 font-bold">
                     <span>2. Escolha o horário</span>
@@ -178,18 +193,19 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     return (
                         <Button 
                             key={time} 
-                            disabled={isBusy} 
+                            // NÃO USAMOS DISABLED AQUI PARA PODER CLICAR E VER A MENSAGEM
                             variant={selectedTime === time ? "default" : "outline"} 
                             className={`
                                 text-xs h-10 font-medium transition-all
                                 ${selectedTime === time 
                                     ? "bg-pink-600 hover:bg-pink-700 border-none scale-105 shadow-lg shadow-pink-900/20" 
                                     : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700"}
+                                
                                 ${isBusy 
-                                    ? "opacity-40 cursor-not-allowed decoration-slice line-through bg-black border-none text-zinc-700" 
+                                    ? "bg-red-950/10 border-red-900/20 text-zinc-600 line-through decoration-red-500 hover:bg-red-950/20 hover:border-red-800/40 opacity-70" 
                                     : ""}
                             `} 
-                            onClick={() => !isBusy && setSelectedTime(time)}
+                            onClick={() => handleTimeClick(time, isBusy)}
                         >
                             {time}
                         </Button>
