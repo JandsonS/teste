@@ -44,8 +44,6 @@ export async function POST(request: Request) {
     for (const reserva of historicoCliente) {
       // REGRA DE OURO: SE JÁ TEM AGENDAMENTO CONFIRMADO, BLOQUEIA TUDO.
       if (reserva.status.includes('PAGO') || reserva.status.includes('SINAL') || reserva.status === 'CONFIRMADO') {
-        
-        // MENSAGEM EXPLÍCITA PARA O CLIENTE
         return NextResponse.json({ 
           error: `🚫 Você já possui um agendamento confirmado para "${reserva.servico}" no dia ${reserva.data} às ${reserva.horario}. Para realizar alterações de horário ou adicionar novos serviços, é necessário entrar em contato com o estabelecimento via WhatsApp.` 
         }, { status: 409 });
@@ -108,7 +106,7 @@ export async function POST(request: Request) {
     }
 
     // =================================================================================
-    // FASE 3: CRIAÇÃO DO REGISTRO NO BANCO
+    // FASE 3: CRIAÇÃO DO REGISTRO NO BANCO (AQUI FOI FEITA A ALTERAÇÃO)
     // =================================================================================
     let nomeServicoSalvo = title;
     if (paymentType === 'DEPOSIT') {
@@ -124,7 +122,10 @@ export async function POST(request: Request) {
         data: date, 
         horario: time, 
         valor: Number(pricePaid),
-        status: "PENDENTE" 
+        status: "PENDENTE",
+        
+        // >>> ALTERAÇÃO AQUI: Salvando se é PIX ou CARD <<<
+        metodoPagamento: method 
       }
     });
 
