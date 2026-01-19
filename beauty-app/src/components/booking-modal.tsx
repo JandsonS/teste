@@ -54,25 +54,33 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     "17:00", "17:30", "18:00", "18:30", "19:00"
   ]
 
-  useEffect(() => {
+useEffect(() => {
     if (!date || !isValid(date)) {
         setBusySlots([]);
         setSelectedTime(null);
         return;
     }
+
     const formattedDate = format(date, "dd/MM/yyyy");
     setLoadingSlots(true);
     setBusySlots([]); 
     setSelectedTime(null); 
 
-    fetch(`/api/availability?date=${formattedDate}`)
+    // >>> ALTERAÇÃO AQUI: Enviamos também o nome do serviço <<<
+    const params = new URLSearchParams({
+        date: formattedDate,
+        service: serviceName // Enviando "Corte de Cabelo" ou "Sobrancelha"
+    });
+
+    fetch(`/api/availability?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
             if (data.busy) setBusySlots(data.busy);
         })
         .catch(err => console.error("Erro ao buscar horários", err))
         .finally(() => setLoadingSlots(false));
-  }, [date]);
+    
+  }, [date, serviceName]); // Adicione serviceName na dependência
 
   // === CORREÇÃO DA MENSAGEM VISUAL ===
   const handleTimeClick = (time: string, isBusy: boolean) => {

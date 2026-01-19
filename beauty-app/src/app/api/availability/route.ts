@@ -8,44 +8,73 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const date = searchParams.get('date'); // Ex: 22/01/2026
+  const date = searchParams.get('date');
+  const service = searchParams.get('service'); // O nome do serviço que o cliente quer
 
   if (!date) {
     return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
   }
 
+  // =========================================================
+  // CONFIGURAÇÃO DOS GRUPOS DE PROFISSIONAIS
+  // =========================================================
+  // Aqui definimos quem compete com quem pelo horário.
+  
+  // GRUPO 1: BARBEARIA (Barbeiro João)
+  // Se marcar Corte, bloqueia Barba e Combo (mesma cadeira).
+  const GRUPO_BARBEARIA = [
+    'Corte de Cabelo', 
+    'Barba Completa', 
+    'Combo'
+  ];
+
+  // GRUPO 2: ESTÉTICA (Esteticista Luiza)
+  // Sobrancelha corre em uma raia separada.
+  const GRUPO_ESTETICA = [
+    'Sobrancelha'
+  ];
+
+  // Identifica qual grupo o serviço atual pertence
+  let grupoAtual: string[] = [];
+
+  // Verifica se o serviço solicitado contém palavras-chave dos grupos
+  if (service) {
+      const serviceLower = service.toLowerCase();
+      
+      const isBarbearia = GRUPO_BARBEARIA.some(item => serviceLower.includes(item.toLowerCase()));
+      const isEstetica = GRUPO_ESTETICA.some(item => serviceLower.includes(item.toLowerCase()));
+
+      if (isBarbearia) grupoAtual = GRUPO_BARBEARIA;
+      else if (isEstetica) grupoAtual = GRUPO_ESTETICA;
+      else grupoAtual = GRUPO_BARBEARIA; // Padrão se não achar
+  }
+
   try {
-    const agora = new Date().getTime();
-    
-    // Busca tudo que não está cancelado nesse dia
-    const agendamentos = await prisma.agendamento.findMany({
+    // Busca TODOS os agendamentos do dia
+    const agendamentosDoDia = await prisma.agendamento.findMany({
       where: { 
         data: date,
         status: { not: 'CANCELADO' }
-      }
+      },
+      select: { horario: true, servico: true }
     });
 
-    // Filtra apenas os horários que REALMENTE estão ocupados
-    const horariosOcupados = agendamentos
-      .filter(item => {
-        // 1. Se já pagou ou vai pagar no local -> OCUPADO
-        if (item.status.includes('PAGO') || item.status === 'PAGAR NO LOCAL') {
-          return true;
-        }
-
-        // 2. Se está pendente, verifica se está dentro dos 2 MINUTOS
-        if (item.status === 'PENDENTE') {
-          const minutosPassados = (agora - new Date(item.createdAt).getTime()) / 1000 / 60;
-          return minutosPassados < 2; // Só bloqueia se for recente (< 2 min)
-        }
-
-        return false;
+    // FILTRAGEM INTELIGENTE
+    // Um horário só é "Ocupado" se o agendamento existente for DO MESMO GRUPO.
+    // Ex: Se tem "Sobrancelha" às 14h, isso NÃO bloqueia "Corte" às 14h.
+    
+    const busySlots = agendamentosDoDia
+      .filter(agendamento => {
+        const servicoAgendado = agendamento.servico.toLowerCase();
+        // Verifica se o serviço que já está agendado pertence ao grupo do serviço que eu quero marcar
+        return grupoAtual.some(itemDoGrupo => servicoAgendado.includes(itemDoGrupo.toLowerCase()));
       })
-      .map(item => item.horario); // Retorna só a lista de horas ["09:00", "14:00"]
+      .map(a => a.horario);
 
-    return NextResponse.json({ busy: horariosOcupados });
+    return NextResponse.json({ busy: busySlots });
 
   } catch (error) {
-    return NextResponse.json({ error: 'Erro ao buscar horários' }, { status: 500 });
+    console.error(error);
+    return NextResponse.json({ error: 'Erro ao buscar disponibilidade' }, { status: 500 });
   }
 }

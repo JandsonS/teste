@@ -34,10 +34,7 @@ export async function POST(request: Request) {
     });
 
     for (const reserva of historicoCliente) {
-      // SE JÁ TEM AGENDAMENTO CONFIRMADO (Ex: Já marcou Corte, não pode marcar Combo)
       if (reserva.status.includes('PAGO') || reserva.status.includes('SINAL') || reserva.status === 'CONFIRMADO') {
-        
-        // >>> MENSAGEM ATUALIZADA COM SUA REGRA DE NEGÓCIO <<<
         return NextResponse.json({ 
           error: `🚫 Você já possui um agendamento confirmado de "${reserva.servico}". 
           
@@ -47,15 +44,12 @@ export async function POST(request: Request) {
         }, { status: 409 });
       }
 
-      // Se tem pendência (Tentando pagar)
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
-        // Limpa pendência velha (> 2 min)
         if (tempoDecorrido >= 2) {
           await prisma.agendamento.delete({ where: { id: reserva.id } });
         } 
-        // Bloqueia se tentar criar outra pendência em menos de 2 min
         else if (reserva.data !== date || reserva.horario !== time) {
              return NextResponse.json({ 
                 error: '⏳ Você já tem um pagamento em andamento. Finalize-o antes de iniciar outro.' 
@@ -65,23 +59,46 @@ export async function POST(request: Request) {
     }
 
     // =================================================================================
-    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE DA VAGA (REGRA DOS 2 MINUTOS)
+    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE POR GRUPOS (Barbearia vs Estética)
     // =================================================================================
-    const vagaOcupada = await prisma.agendamento.findMany({
+    
+    // 1. Definição das "Filas" de Atendimento
+    const GRUPO_BARBEARIA = ['Corte', 'Barba', 'Combo'];
+    const GRUPO_ESTETICA = ['Sobrancelha'];
+    
+    // 2. Identifica qual o grupo do serviço que o cliente quer AGORA
+    const tituloLower = title.toLowerCase();
+    let grupoAtual: string[] = [];
+    
+    if (GRUPO_ESTETICA.some(s => tituloLower.includes(s.toLowerCase()))) {
+        grupoAtual = GRUPO_ESTETICA; // É Sobrancelha
+    } else {
+        grupoAtual = GRUPO_BARBEARIA; // É Corte, Barba ou Combo
+    }
+
+    // 3. Busca TUDO que está agendado neste horário
+    const agendamentosNoHorario = await prisma.agendamento.findMany({
       where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
 
+    // 4. Filtra apenas os agendamentos que realmente CONFLITAM
+    // Um "Corte" só briga com outro "Corte/Barba". Não briga com "Sobrancelha".
+    const vagaOcupada = agendamentosNoHorario.filter(vaga => {
+         const vagaServico = vaga.servico.toLowerCase();
+         // Retorna TRUE se o agendamento existente for do MESMO GRUPO
+         return grupoAtual.some(g => vagaServico.includes(g.toLowerCase()));
+    });
+
     for (const vaga of vagaOcupada) {
-      // 1. BLOQUEIO PERMANENTE (Vaga já vendida para alguém)
+      // BLOQUEIO PERMANENTE
       if (vaga.status.includes('PAGO') || vaga.status.includes('SINAL') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ 
-            error: '❌ Este horário já foi reservado. Por favor, escolha outro horário.' 
+            error: '❌ Este horário já foi reservado para este profissional. Por favor, escolha outro.' 
         }, { status: 409 });
       }
 
-      // 2. BLOQUEIO TEMPORÁRIO (Alguém está pagando)
+      // BLOQUEIO TEMPORÁRIO (Corrida de 2 minutos)
       if (vaga.status === 'PENDENTE') {
-        
         if (vaga.cliente.toLowerCase() === nomeClienteLimpo.toLowerCase()) {
             await prisma.agendamento.delete({ where: { id: vaga.id } });
             continue; 
