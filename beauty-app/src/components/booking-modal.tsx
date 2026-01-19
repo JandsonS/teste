@@ -27,10 +27,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD'>('PIX')
-  const [busySlots, setBusySlots] = useState<string[]>([])
+  
+  // Duas listas de bloqueio agora
+  const [busySlots, setBusySlots] = useState<string[]>([]) // Pagos
+  const [lockedSlots, setLockedSlots] = useState<string[]>([]) // Pendentes (< 2min)
+  
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  // --- REGRAS DE VALIDAÇÃO VISUAL ---
   const formatPhone = (value: string) => {
     const onlyNumbers = value.replace(/\D/g, '');
     const limited = onlyNumbers.slice(0, 11);
@@ -61,30 +64,57 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   ]
 
   useEffect(() => {
-    if (!date || !isValid(date)) { setBusySlots([]); setSelectedTime(null); return; }
+    if (!date || !isValid(date)) { 
+        setBusySlots([]); 
+        setLockedSlots([]);
+        setSelectedTime(null); 
+        return; 
+    }
     const formattedDate = format(date, "dd/MM/yyyy");
     setLoadingSlots(true);
     setBusySlots([]); 
+    setLockedSlots([]);
     setSelectedTime(null); 
 
     const params = new URLSearchParams({ date: formattedDate, service: serviceName });
     fetch(`/api/availability?${params.toString()}`)
         .then(res => res.json())
-        .then(data => { if (data.busy) setBusySlots(data.busy); })
+        .then(data => { 
+            // Atualiza as duas listas separadamente
+            if (data.busy) setBusySlots(data.busy);
+            if (data.locked) setLockedSlots(data.locked);
+        })
         .catch(err => console.error("Erro", err))
         .finally(() => setLoadingSlots(false));
   }, [date, serviceName]);
 
-  const handleTimeClick = (time: string, isBusy: boolean) => {
-    if (isBusy) {
-        toast.error("Horário Indisponível", { description: "Este horário já foi reservado." });
+  // FUNÇÃO DE CLIQUE CORRIGIDA
+  const handleTimeClick = (time: string) => {
+    // 1. Verifica se já está PAGO
+    if (busySlots.includes(time)) {
+        toast.error("Horário Indisponível", { 
+            description: "Este horário já foi reservado e confirmado.",
+            duration: 4000
+        });
         return;
     }
+
+    // 2. Verifica se está TRAVADO (Regra dos 2 Minutos)
+    if (lockedSlots.includes(time)) {
+        toast.warning("Aguarde um momento", { 
+            description: "Este horário está sendo reservado por favor escolha outro horário ou aguarde 2 minutos.",
+            duration: 5000,
+            style: { background: '#fefce8', color: '#854d0e', border: '1px solid #fde047' }
+        });
+        return; // <--- IMPEDE DE AVANÇAR
+    }
+
+    // Se estiver livre, seleciona
     setSelectedTime(time);
   };
 
   const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
-    if (!date || !selectedTime || !name || !isPhoneValid) return; // BLOQUEIO DE SEGURANÇA AQUI
+    if (!date || !selectedTime || !name || !isPhoneValid) return; 
     setLoading(true);
 
     try {
@@ -96,7 +126,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           date: format(date, "dd/MM/yyyy"),
           time: selectedTime,
           clientName: name,
-          clientPhone: phone, // ENVIA O TELEFONE
+          clientPhone: phone,
           method: paymentMethod, 
           price: numericPrice, 
           paymentType: paymentType, 
@@ -109,8 +139,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
       if (data.error) {
         toast.error("Atenção", { description: data.error });
+        // Se der erro na hora de pagar (ex: alguém foi mais rápido no milésimo de segundo), atualiza a lista
         if (data.error.toLowerCase().includes("reservado")) {
-            setBusySlots(prev => [...prev, selectedTime!]);
+            setLockedSlots(prev => [...prev, selectedTime!]); // Adiciona à lista de travados visualmente
             setSelectedTime(null);
         }
         return;
@@ -155,7 +186,31 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 <div className="grid grid-cols-4 gap-2 max-h-[250px] md:max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                   {timeSlots.map((time) => {
                     const isBusy = busySlots.includes(time);
-                    return (<Button key={time} variant={selectedTime === time ? "default" : "outline"} className={`text-[11px] md:text-xs h-9 md:h-10 font-medium transition-all ${selectedTime === time ? "bg-pink-600 hover:bg-pink-700 border-none scale-105 shadow-lg shadow-pink-900/20" : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700"} ${isBusy ? "bg-red-950/10 border-red-900/20 text-zinc-600 line-through decoration-red-500 hover:bg-red-950/20 opacity-70" : ""}`} onClick={() => handleTimeClick(time, isBusy)}>{time}</Button>)
+                    const isLocked = lockedSlots.includes(time);
+                    
+                    // Se estiver Pago (busy) OU Travado (locked), marcamos visualmente
+                    const isUnavailable = isBusy || isLocked;
+                    
+                    return (
+                        <Button 
+                            key={time} 
+                            variant={selectedTime === time ? "default" : "outline"} 
+                            className={`
+                                text-[11px] md:text-xs h-9 md:h-10 font-medium transition-all
+                                ${selectedTime === time 
+                                    ? "bg-pink-600 hover:bg-pink-700 border-none scale-105 shadow-lg shadow-pink-900/20" 
+                                    : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700"}
+                                
+                                ${isUnavailable
+                                    ? "bg-red-950/10 border-red-900/20 text-zinc-600 line-through decoration-red-500 hover:bg-red-950/20 opacity-70" 
+                                    : ""}
+                            `} 
+                            // Ao clicar, a função handleTimeClick decide qual mensagem mostrar
+                            onClick={() => handleTimeClick(time)}
+                        >
+                            {time}
+                        </Button>
+                    )
                   })}
                 </div>
               </div>
@@ -167,15 +222,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                <div className="space-y-2"><Label className="text-zinc-300">Seu Nome Completo</Label><Input placeholder="Ex: Maria Silva" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" value={name} onChange={(e) => setName(e.target.value)}/></div>
                <div className="space-y-2">
                  <Label className="text-zinc-300">Seu WhatsApp</Label>
-                 <Input 
-                   type="tel" 
-                   placeholder="(11) 99999-9999" 
-                   className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" 
-                   value={phone} 
-                   onChange={(e) => setPhone(formatPhone(e.target.value))} 
-                   maxLength={15} 
-                 />
-                 {/* FEEDBACK VISUAL DE VALIDAÇÃO */}
+                 <Input type="tel" placeholder="(11) 99999-9999" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} maxLength={15} />
                  {!isPhoneValid && phone.length > 0 && (<p className="text-[10px] text-red-400 animate-pulse">* Digite o número completo com DDD (11 dígitos)</p>)}
                  {isPhoneValid && (<p className="text-[10px] text-emerald-500 flex items-center gap-1"><CheckCircle2 size={10} /> Número válido</p>)}
                </div>
@@ -183,7 +230,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           )}
 
           {step === 3 && (
-            <div className="py-2 space-y-4 animate-in fade-in slide-in-from-right-4">
+             /* Conteúdo do passo 3 (pagamento) igual ao anterior... mantido para brevidade */
+             <div className="py-2 space-y-4 animate-in fade-in slide-in-from-right-4">
                 <div className="text-center mb-4"><h3 className="text-lg font-bold text-white mb-3">Escolha a forma de pagamento</h3><div className="flex gap-3 p-1 bg-zinc-900 rounded-xl border border-zinc-800"><button onClick={() => setPaymentMethod('PIX')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm transition-all ${paymentMethod === 'PIX' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 shadow-lg shadow-emerald-500/10' : 'text-zinc-400 hover:bg-zinc-800'}`}><QrCode size={18} /> PIX</button><button onClick={() => setPaymentMethod('CARD')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm transition-all ${paymentMethod === 'CARD' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/50 shadow-lg shadow-purple-500/10' : 'text-zinc-400 hover:bg-zinc-800'}`}><CreditCard size={18} /> Cartão</button></div></div>
                 <div className="grid grid-cols-1 gap-4">
                     <button onClick={() => handleCheckout('FULL')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left ${paymentMethod === 'PIX' ? 'hover:border-emerald-500/50 hover:bg-emerald-500/5' : 'hover:border-purple-500/50 hover:bg-purple-500/5'} border-zinc-800 bg-zinc-900`}><div className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 mr-4 ${paymentMethod === 'PIX' ? 'bg-emerald-500' : 'bg-purple-500'}`}>{paymentMethod === 'PIX' ? <Smartphone size={24} /> : <CreditCard size={24} />}</div><div className="flex-1"><div className="flex justify-between items-start"><p className="font-bold text-white text-base">Pagamento Integral</p><span className="font-bold text-white text-base">{formatMoney(numericPrice)}</span></div><p className="text-xs text-zinc-400 mt-1">Quitação total com garantia imediata.</p><div className="mt-2 flex gap-2"><span className={`text-[10px] px-2 py-0.5 rounded font-bold ${paymentMethod === 'PIX' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-purple-500/20 text-purple-400'}`}>{paymentMethod === 'PIX' ? 'Aprovação Imediata' : 'Até 12x no cartão'}</span></div></div>{loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}</button>

@@ -11,61 +11,59 @@ export async function GET(request: Request) {
   const date = searchParams.get('date');
   const service = searchParams.get('service'); 
 
-  if (!date) {
-    return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
-  }
+  if (!date) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
 
-  // 1. CONFIGURAÇÃO DE GRUPOS (Para manter a separação Barba vs Sobrancelha)
   const GRUPO_BARBEARIA = ['Corte', 'Barba', 'Combo'];
   const GRUPO_ESTETICA = ['Sobrancelha'];
 
   let grupoAtual: string[] = [];
-
   if (service) {
-      const serviceLower = service.toLowerCase();
-      // Verifica se é estética, senão assume barbearia
-      const isEstetica = GRUPO_ESTETICA.some(item => serviceLower.includes(item.toLowerCase()));
-      
-      if (isEstetica) grupoAtual = GRUPO_ESTETICA;
-      else grupoAtual = GRUPO_BARBEARIA;
+      const isEstetica = GRUPO_ESTETICA.some(item => service.toLowerCase().includes(item.toLowerCase()));
+      grupoAtual = isEstetica ? GRUPO_ESTETICA : GRUPO_BARBEARIA;
   } else {
       grupoAtual = GRUPO_BARBEARIA;
   }
 
   try {
     const agendamentosDoDia = await prisma.agendamento.findMany({
-      where: { 
-        data: date,
-        status: { not: 'CANCELADO' }
-      },
-      select: { horario: true, servico: true, status: true } 
+      where: { data: date, status: { not: 'CANCELADO' } },
+      select: { horario: true, servico: true, status: true, createdAt: true } 
     });
 
-    const busySlots = agendamentosDoDia
-      .filter(agendamento => {
+    const busySlots: string[] = [];   // Horários PAGOS/CONFIRMADOS
+    const lockedSlots: string[] = []; // Horários EM PROCESSO (2 min)
+
+    const agora = new Date().getTime();
+
+    agendamentosDoDia.forEach(agendamento => {
         const servicoAgendado = agendamento.servico.toLowerCase();
         
-        // 1. Verifica conflito de grupo (Quem bloqueia quem)
-        const fazParteDoGrupo = grupoAtual.some(itemDoGrupo => servicoAgendado.includes(itemDoGrupo.toLowerCase()));
-        if (!fazParteDoGrupo) return false; // Se é de outro setor, ignora.
+        // Verifica se conflita com o grupo atual
+        if (!grupoAtual.some(g => servicoAgendado.includes(g.toLowerCase()))) return;
 
-        // >>> A CORREÇÃO ESTÁ AQUI <<<
-        // Só marcamos como "OCUPADO VISUALMENTE" se estiver 100% PAGO ou CONFIRMADO.
-        // Se estiver "PENDENTE", deixamos parecer LIVRE no calendário.
-        // Por que? Para o cliente clicar e receber a mensagem de "Aguarde 2 minutos" do Backend.
-        
-        const ocupadoDefinitivo = agendamento.status.includes('PAGO') || 
-                                  agendamento.status.includes('SINAL') || 
-                                  agendamento.status === 'CONFIRMADO';
+        // 1. Se já está pago, vai para a lista de OCUPADOS
+        if (agendamento.status.includes('PAGO') || 
+            agendamento.status.includes('SINAL') || 
+            agendamento.status === 'CONFIRMADO') {
+            busySlots.push(agendamento.horario);
+            return;
+        }
 
-        return ocupadoDefinitivo;
-      })
-      .map(a => a.horario);
+        // 2. Se está pendente, verifica a regra dos 2 minutos
+        if (agendamento.status === 'PENDENTE') {
+            const diff = (agora - new Date(agendamento.createdAt).getTime()) / 1000 / 60;
+            if (diff < 2) {
+                // Se faz menos de 2 minutos, vai para a lista de TRAVADOS
+                lockedSlots.push(agendamento.horario);
+            }
+            // Se faz mais de 2 minutos, ignoramos (o horário fica livre)
+        }
+    });
 
-    return NextResponse.json({ busy: busySlots });
+    // Retorna as duas listas para o Frontend saber qual mensagem mostrar
+    return NextResponse.json({ busy: busySlots, locked: lockedSlots });
 
   } catch (error) {
-    console.error(error);
     return NextResponse.json({ error: 'Erro ao buscar disponibilidade' }, { status: 500 });
   }
 }
