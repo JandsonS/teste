@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     
     const { 
-      title, date, time, clientName, clientPhone, // Recebendo o telefone aqui
+      title, date, time, clientName, clientPhone, 
       method, paymentType, pricePaid, pricePending 
     } = body;
     
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     console.log(`🔒 Processando: ${nomeClienteLimpo} | ${date} - ${time}`);
 
     // =================================================================================
-    // FASE 1: REGRA DE AGENDAMENTO ÚNICO (PRESERVADA)
+    // FASE 1: REGRA DE AGENDAMENTO ÚNICO
     // =================================================================================
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } }
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     // =================================================================================
-    // FASE 2: VERIFICAÇÃO DE GRUPOS E DISPONIBILIDADE (PRESERVADA)
+    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE
     // =================================================================================
     
     const GRUPO_BARBEARIA = ['Corte', 'Barba', 'Combo'];
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       // Bloqueio Permanente
       if (vaga.status.includes('PAGO') || vaga.status.includes('SINAL') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ 
-            error: '❌ Este horário já foi reservado para este profissional. Por favor, escolha outro.' 
+            error: '❌ Este horário já foi reservado. Por favor, escolha outro horário.' 
         }, { status: 409 });
       }
 
@@ -101,8 +101,9 @@ export async function POST(request: Request) {
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60; 
         
         if (diff < 2) {
+          // >>> MENSAGEM ATUALIZADA AQUI <<<
           return NextResponse.json({ 
-            error: '⏳ Este horário está em processo de pagamento por outro cliente. Tente novamente em 2 minutos.' 
+            error: '⏳ Este horário está sendo reservado. Por favor, escolha outro horário ou aguarde 2 minutos.' 
           }, { status: 409 });
         } else {
           await prisma.agendamento.delete({ where: { id: vaga.id } });
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
     }
 
     // =================================================================================
-    // FASE 3: CRIAÇÃO DO REGISTRO (AQUI ADICIONAMOS O TELEFONE)
+    // FASE 3: CRIAÇÃO DO REGISTRO
     // =================================================================================
     let nomeServicoSalvo = title;
     if (paymentType === 'DEPOSIT') {
@@ -123,10 +124,7 @@ export async function POST(request: Request) {
     const agendamento = await prisma.agendamento.create({
       data: { 
         cliente: nomeClienteLimpo, 
-        
-        // >>> AQUI ESTÁ A FIXAÇÃO DO TELEFONE <<<
         telefone: clientPhone, 
-        
         servico: nomeServicoSalvo, 
         data: date, 
         horario: time, 
@@ -137,7 +135,7 @@ export async function POST(request: Request) {
     });
 
     // =================================================================================
-    // FASE 4: PREFERÊNCIA MERCADO PAGO (PRESERVADA)
+    // FASE 4: PREFERÊNCIA MERCADO PAGO
     // =================================================================================
     let excludedPaymentTypes: { id: string }[] = []; 
     let installments = 12;

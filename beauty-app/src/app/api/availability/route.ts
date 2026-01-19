@@ -9,65 +9,56 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date');
-  const service = searchParams.get('service'); // O nome do serviço que o cliente quer
+  const service = searchParams.get('service'); 
 
   if (!date) {
     return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
   }
 
-  // =========================================================
-  // CONFIGURAÇÃO DOS GRUPOS DE PROFISSIONAIS
-  // =========================================================
-  // Aqui definimos quem compete com quem pelo horário.
-  
-  // GRUPO 1: BARBEARIA (Barbeiro João)
-  // Se marcar Corte, bloqueia Barba e Combo (mesma cadeira).
-  const GRUPO_BARBEARIA = [
-    'Corte de Cabelo', 
-    'Barba Completa', 
-    'Combo'
-  ];
+  // 1. CONFIGURAÇÃO DE GRUPOS (Para manter a separação Barba vs Sobrancelha)
+  const GRUPO_BARBEARIA = ['Corte', 'Barba', 'Combo'];
+  const GRUPO_ESTETICA = ['Sobrancelha'];
 
-  // GRUPO 2: ESTÉTICA (Esteticista Luiza)
-  // Sobrancelha corre em uma raia separada.
-  const GRUPO_ESTETICA = [
-    'Sobrancelha'
-  ];
-
-  // Identifica qual grupo o serviço atual pertence
   let grupoAtual: string[] = [];
 
-  // Verifica se o serviço solicitado contém palavras-chave dos grupos
   if (service) {
       const serviceLower = service.toLowerCase();
-      
-      const isBarbearia = GRUPO_BARBEARIA.some(item => serviceLower.includes(item.toLowerCase()));
+      // Verifica se é estética, senão assume barbearia
       const isEstetica = GRUPO_ESTETICA.some(item => serviceLower.includes(item.toLowerCase()));
-
-      if (isBarbearia) grupoAtual = GRUPO_BARBEARIA;
-      else if (isEstetica) grupoAtual = GRUPO_ESTETICA;
-      else grupoAtual = GRUPO_BARBEARIA; // Padrão se não achar
+      
+      if (isEstetica) grupoAtual = GRUPO_ESTETICA;
+      else grupoAtual = GRUPO_BARBEARIA;
+  } else {
+      grupoAtual = GRUPO_BARBEARIA;
   }
 
   try {
-    // Busca TODOS os agendamentos do dia
     const agendamentosDoDia = await prisma.agendamento.findMany({
       where: { 
         data: date,
         status: { not: 'CANCELADO' }
       },
-      select: { horario: true, servico: true }
+      select: { horario: true, servico: true, status: true } 
     });
 
-    // FILTRAGEM INTELIGENTE
-    // Um horário só é "Ocupado" se o agendamento existente for DO MESMO GRUPO.
-    // Ex: Se tem "Sobrancelha" às 14h, isso NÃO bloqueia "Corte" às 14h.
-    
     const busySlots = agendamentosDoDia
       .filter(agendamento => {
         const servicoAgendado = agendamento.servico.toLowerCase();
-        // Verifica se o serviço que já está agendado pertence ao grupo do serviço que eu quero marcar
-        return grupoAtual.some(itemDoGrupo => servicoAgendado.includes(itemDoGrupo.toLowerCase()));
+        
+        // 1. Verifica conflito de grupo (Quem bloqueia quem)
+        const fazParteDoGrupo = grupoAtual.some(itemDoGrupo => servicoAgendado.includes(itemDoGrupo.toLowerCase()));
+        if (!fazParteDoGrupo) return false; // Se é de outro setor, ignora.
+
+        // >>> A CORREÇÃO ESTÁ AQUI <<<
+        // Só marcamos como "OCUPADO VISUALMENTE" se estiver 100% PAGO ou CONFIRMADO.
+        // Se estiver "PENDENTE", deixamos parecer LIVRE no calendário.
+        // Por que? Para o cliente clicar e receber a mensagem de "Aguarde 2 minutos" do Backend.
+        
+        const ocupadoDefinitivo = agendamento.status.includes('PAGO') || 
+                                  agendamento.status.includes('SINAL') || 
+                                  agendamento.status === 'CONFIRMADO';
+
+        return ocupadoDefinitivo;
       })
       .map(a => a.horario);
 

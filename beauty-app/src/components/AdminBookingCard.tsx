@@ -18,11 +18,14 @@ const StatusBadge = ({ status, method }: { status: string, method?: string }) =>
 
 export function AdminBookingCard({ booking, onDelete }: any) {
   
-  // FUNÇÃO QUE ABRE O WHATSAPP
+  // ATUALIZADO: Agora inclui a HORA na mensagem
   const handleWhatsapp = () => {
     if (!booking.telefone) return;
     const cleanPhone = booking.telefone.replace(/\D/g, '');
-    const msg = `Olá ${booking.cliente}, tudo bem? Sobre seu agendamento de ${booking.servico} dia ${booking.data}...`;
+    
+    // >>> MUDANÇA AQUI: Adicionei "às ${booking.horario}"
+    const msg = `Olá ${booking.cliente}, tudo bem? Sobre seu agendamento de ${booking.servico} dia ${booking.data} às ${booking.horario}...`;
+    
     window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -33,7 +36,6 @@ export function AdminBookingCard({ booking, onDelete }: any) {
           <h3 className="text-white font-bold text-lg">{booking.cliente}</h3>
           <StatusBadge status={booking.status} method={booking.metodoPagamento} />
           
-          {/* BOTÃO QUE SÓ APARECE SE TIVER TELEFONE */}
           {booking.telefone && (
             <button onClick={handleWhatsapp} title={`Chamar: ${booking.telefone}`} className="flex items-center gap-1 px-2 py-1 rounded-md bg-green-500/10 text-green-500 hover:bg-green-500/20 transition-colors text-xs font-bold border border-green-500/20">
               <MessageCircle size={12} /> Whats
