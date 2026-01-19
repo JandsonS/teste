@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-// Novos ícones adicionados: Smartphone, QrCode, CreditCard
 import { CheckCircle2, Wallet, Loader2, Info, MessageCircle, AlertTriangle, Smartphone, CreditCard, QrCode } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
@@ -30,7 +29,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(false)
   
-  // NOVO: Estado para controlar o método de pagamento (PIX ou CARTÃO)
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD'>('PIX')
   
   const [busySlots, setBusySlots] = useState<string[]>([])
@@ -81,11 +79,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     
   }, [date]);
 
+  // === AQUI ESTÁ A MENSAGEM DO CLIENTE B (FRONTEND) ===
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
-        toast.error("Horário Indisponível", {
-            description: "Este horário já foi reservado.",
-            duration: 6000,
+        toast.error("Atenção", {
+            description: "Este horário está sendo reservado por favor escolha outra horário ou aguarde 2 minutos.",
+            duration: 5000,
             position: "top-center"
         });
         return;
@@ -110,7 +109,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           time: selectedTime,
           clientName: name,
           clientPhone: phone,
-          // Enviamos agora TAMBÉM o método escolhido (PIX ou CARD)
           method: paymentMethod, 
           price: numericPrice, 
           paymentType: paymentType, 
@@ -123,9 +121,11 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
 
       if (data.error) {
+        // Exibe o erro vindo do backend (que também terá a mensagem correta)
         toast.error("Atenção", { description: data.error });
         setLoading(false);
-        if (data.error.toLowerCase().includes("horário") || data.error.toLowerCase().includes("ocupado")) {
+        // Se der conflito, atualiza a lista de ocupados
+        if (data.error.toLowerCase().includes("reservado")) {
             setBusySlots(prev => [...prev, selectedTime!]);
             setSelectedTime(null);
         }
@@ -304,7 +304,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             border-zinc-800 bg-zinc-900
                         `}
                     >
-                        {/* Ícone Grande */}
                         <div className={`
                             w-14 h-14 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 mr-4
                             ${paymentMethod === 'PIX' ? 'bg-emerald-500' : 'bg-purple-500'}
@@ -312,7 +311,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             {paymentMethod === 'PIX' ? <Smartphone size={24} /> : <CreditCard size={24} />}
                         </div>
 
-                        {/* Textos */}
                         <div className="flex-1">
                             <div className="flex justify-between items-start">
                                 <p className="font-bold text-white text-base">Pagamento Integral</p>
@@ -320,15 +318,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             </div>
                             <p className="text-xs text-zinc-400 mt-1">Quitação total com garantia imediata.</p>
                             
-                            {/* Badges Dinâmicas */}
                             <div className="mt-2 flex gap-2">
                                 <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${paymentMethod === 'PIX' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-purple-500/20 text-purple-400'}`}>
                                     {paymentMethod === 'PIX' ? 'Aprovação Imediata' : 'Até 12x no cartão'}
                                 </span>
                             </div>
                         </div>
-                        
-                        {/* Indicador de Loading ou Seta */}
                         {loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}
                     </button>
                     

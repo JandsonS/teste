@@ -34,81 +34,68 @@ export async function POST(request: Request) {
 
     const agora = new Date().getTime();
 
-    // =================================================================================
-    // FASE 1: LIMPEZA E VERIFICAÇÃO DE DUPLICIDADE (MESMA PESSOA)
-    // =================================================================================
+    // FASE 1: LIMPEZA
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } }
     });
 
     for (const reserva of historicoCliente) {
-      // Regra: Se já pagou/confirmou, não pode agendar outro igual
       if (reserva.status.includes('PAGO') || reserva.status.includes('SINAL') || reserva.status === 'CONFIRMADO') {
         return NextResponse.json({ 
           error: `🚫 Você já possui um agendamento ativo de "${reserva.servico}" para o dia ${reserva.data}.` 
         }, { status: 409 });
       }
 
-      // Regra: Se tem pendência (clicou em pagar antes e desistiu ou fechou a aba)
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
-        // Se faz mais de 2 minutos, limpamos a pendência velha
         if (tempoDecorrido >= 2) {
           await prisma.agendamento.delete({ where: { id: reserva.id } });
         } 
-        // Se faz menos de 2 minutos, mas é para OUTRO horário, bloqueia (1 agendamento por vez)
         else if (reserva.data !== date || reserva.horario !== time) {
              return NextResponse.json({ 
                 error: '⏳ Você tem um pagamento em andamento. Finalize-o antes de iniciar outro.' 
              }, { status: 409 });
         }
-        // Se for o MESMO horário, a Fase 2 vai resolver (retentativa)
       }
     }
 
-    // =================================================================================
-    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE DA VAGA (HORÁRIO)
-    // =================================================================================
+    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE
     const vagaOcupada = await prisma.agendamento.findMany({
       where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
 
     for (const vaga of vagaOcupada) {
-      // 1. Bloqueio total se já estiver pago (Vaga perdida)
+      // 1. Se já pagou (Cliente A concluiu), Cliente B é bloqueado
       if (vaga.status.includes('PAGO') || vaga.status.includes('SINAL') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ 
             error: '❌ Este horário já foi reservado e pago por outro cliente.' 
         }, { status: 409 });
       }
 
-      // 2. Tratamento de vaga PENDENTE (Em processo de pagamento)
+      // 2. Se está PENDENTE (Cliente A está no Mercado Pago)
       if (vaga.status === 'PENDENTE') {
         
-        // AUTO-DESBLOQUEIO: Se for o MESMO cliente (verificação insensível a maiúsculas/minúsculas)
         if (vaga.cliente.toLowerCase() === nomeClienteLimpo.toLowerCase()) {
             await prisma.agendamento.delete({ where: { id: vaga.id } });
-            continue; // Deleta o antigo e deixa criar o novo
+            continue; 
         }
 
-        // BLOQUEIO DE TERCEIROS: Se for OUTRA pessoa, aplica regra de 2 minutos
+        // Cliente B tenta reservar, mas Cliente A tem prioridade de 2 minutos
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60; 
         
         if (diff < 2) {
-          // *** MENSAGEM ATUALIZADA AQUI ***
+          // *** MENSAGEM DO BACKEND ATUALIZADA ***
           return NextResponse.json({ 
-            error: '⏳ Este horário está sendo reservado. Aguarde 2 minutos ou escolha outro horário por favor!' 
+            error: 'Este horário está sendo reservado por favor escolha outra horário ou aguarde 2 minutos.' 
           }, { status: 409 });
         } else {
-          // Timeout expirou (passou de 2 min), libera a vaga
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
       }
     }
 
-    // =================================================================================
-    // FASE 3: CRIAÇÃO DO REGISTRO NO BANCO
-    // =================================================================================
+    // FASE 3: CRIAÇÃO
     let nomeServicoSalvo = title;
     if (paymentType === 'DEPOSIT') {
       nomeServicoSalvo = `${title} (Sinal Pago | Resta: R$ ${pricePending})`;
@@ -127,27 +114,22 @@ export async function POST(request: Request) {
       }
     });
 
-    // =================================================================================
-    // FASE 4: CONFIGURAÇÃO DO MERCADO PAGO (FILTRO PIX vs CARTÃO)
-    // =================================================================================
-    
+    // FASE 4: MERCADO PAGO
     let excludedPaymentTypes: { id: string }[] = []; 
     let installments = 12;
 
     if (method === 'PIX') {
-      // Se escolheu PIX, removemos TUDO que não é Pix
       excludedPaymentTypes = [
         { id: "credit_card" },
         { id: "debit_card" },
-        { id: "ticket" },       // Boleto
-        { id: "atm" },          // Lotérica
+        { id: "ticket" },       
+        { id: "atm" },          
         { id: "prepaid_card" }  
       ];
       installments = 1;
     } else if (method === 'CARD') {
-      // Se escolheu CARTÃO, removemos Pix e Boleto
       excludedPaymentTypes = [
-        { id: "bank_transfer" }, // Pix
+        { id: "bank_transfer" }, 
         { id: "ticket" },
         { id: "atm" }
       ];
