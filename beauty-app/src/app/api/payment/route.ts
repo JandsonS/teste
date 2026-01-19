@@ -88,7 +88,7 @@ export async function POST(request: Request) {
         if (diff < 2) {
           // MENSAGEM PARA QUANDO O CLIENTE A AINDA ESTÁ PAGANDO (BLOQUEIO TEMPORÁRIO)
           return NextResponse.json({ 
-            error: '⏳ Este horário está sendo reservado por outro cliente. Por favor, escolha outro horário ou aguarde 2 minutos.' 
+            error: '⏳ Este horário está em processo de pagamento por outro cliente. Tente novamente em 2 minutos caso ele desista.' 
           }, { status: 409 });
         } else {
           // Passou de 2 minutos? O Cliente A desistiu. Liberamos a vaga para você (Cliente B).
