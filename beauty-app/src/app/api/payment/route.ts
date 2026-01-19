@@ -34,68 +34,82 @@ export async function POST(request: Request) {
 
     const agora = new Date().getTime();
 
-    // FASE 1: LIMPEZA
+    // =================================================================================
+    // FASE 1: REGRA DE AGENDAMENTO ÚNICO POR CLIENTE
+    // =================================================================================
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } }
     });
 
     for (const reserva of historicoCliente) {
+      // REGRA DE OURO: SE JÁ TEM AGENDAMENTO CONFIRMADO, BLOQUEIA TUDO.
       if (reserva.status.includes('PAGO') || reserva.status.includes('SINAL') || reserva.status === 'CONFIRMADO') {
+        
+        // MENSAGEM EXPLÍCITA PARA O CLIENTE
         return NextResponse.json({ 
-          error: `🚫 Você já possui um agendamento ativo de "${reserva.servico}" para o dia ${reserva.data}.` 
+          error: `🚫 Você já possui um agendamento confirmado para "${reserva.servico}" no dia ${reserva.data} às ${reserva.horario}. Para realizar alterações de horário ou adicionar novos serviços, é necessário entrar em contato com o estabelecimento via WhatsApp.` 
         }, { status: 409 });
       }
 
+      // Se tem pendência (clicou em pagar antes e desistiu ou fechou a aba)
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
+        // Se faz mais de 2 minutos, limpamos a pendência velha (considera abandono)
         if (tempoDecorrido >= 2) {
           await prisma.agendamento.delete({ where: { id: reserva.id } });
         } 
+        // Se faz menos de 2 minutos, mas é para OUTRO horário/serviço
         else if (reserva.data !== date || reserva.horario !== time) {
              return NextResponse.json({ 
-                error: '⏳ Você tem um pagamento em andamento. Finalize-o antes de iniciar outro.' 
+                error: '⏳ Você já tem um processo de pagamento em aberto. Finalize-o antes de iniciar um novo.' 
              }, { status: 409 });
         }
       }
     }
 
-    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE
+    // =================================================================================
+    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE DA VAGA (HORÁRIO LIVRE?)
+    // =================================================================================
     const vagaOcupada = await prisma.agendamento.findMany({
       where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
 
     for (const vaga of vagaOcupada) {
-      // 1. Se já pagou (Cliente A concluiu), Cliente B é bloqueado
+      // 1. Bloqueio total se já estiver pago por outra pessoa
       if (vaga.status.includes('PAGO') || vaga.status.includes('SINAL') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ 
             error: '❌ Este horário já foi reservado e pago por outro cliente.' 
         }, { status: 409 });
       }
 
-      // 2. Se está PENDENTE (Cliente A está no Mercado Pago)
+      // 2. Tratamento de vaga PENDENTE (Em processo de pagamento)
       if (vaga.status === 'PENDENTE') {
         
+        // AUTO-DESBLOQUEIO: Se for o MESMO cliente tentando de novo (retentativa)
         if (vaga.cliente.toLowerCase() === nomeClienteLimpo.toLowerCase()) {
             await prisma.agendamento.delete({ where: { id: vaga.id } });
             continue; 
         }
 
-        // Cliente B tenta reservar, mas Cliente A tem prioridade de 2 minutos
+        // BLOQUEIO DE TERCEIROS: Se for OUTRA pessoa, aplica regra de 2 minutos
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60; 
         
         if (diff < 2) {
-          // *** MENSAGEM DO BACKEND ATUALIZADA ***
+          // Mensagem da regra de negócio de espera
           return NextResponse.json({ 
             error: 'Este horário está sendo reservado por favor escolha outra horário ou aguarde 2 minutos.' 
           }, { status: 409 });
         } else {
+          // Timeout expirou, libera a vaga
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
       }
     }
 
-    // FASE 3: CRIAÇÃO
+    // =================================================================================
+    // FASE 3: CRIAÇÃO DO REGISTRO NO BANCO
+    // =================================================================================
     let nomeServicoSalvo = title;
     if (paymentType === 'DEPOSIT') {
       nomeServicoSalvo = `${title} (Sinal Pago | Resta: R$ ${pricePending})`;
@@ -114,24 +128,20 @@ export async function POST(request: Request) {
       }
     });
 
-    // FASE 4: MERCADO PAGO
+    // =================================================================================
+    // FASE 4: CONFIGURAÇÃO DO MERCADO PAGO
+    // =================================================================================
     let excludedPaymentTypes: { id: string }[] = []; 
     let installments = 12;
 
     if (method === 'PIX') {
       excludedPaymentTypes = [
-        { id: "credit_card" },
-        { id: "debit_card" },
-        { id: "ticket" },       
-        { id: "atm" },          
-        { id: "prepaid_card" }  
+        { id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }, { id: "atm" }, { id: "prepaid_card" }  
       ];
       installments = 1;
     } else if (method === 'CARD') {
       excludedPaymentTypes = [
-        { id: "bank_transfer" }, 
-        { id: "ticket" },
-        { id: "atm" }
+        { id: "bank_transfer" }, { id: "ticket" }, { id: "atm" }
       ];
     }
 
@@ -144,9 +154,7 @@ export async function POST(request: Request) {
             unit_price: Number(pricePaid),
             quantity: 1,
         }],
-        payer: {
-          name: nomeClienteLimpo,
-        },
+        payer: { name: nomeClienteLimpo },
         payment_methods: {
           excluded_payment_types: excludedPaymentTypes,
           installments: installments
