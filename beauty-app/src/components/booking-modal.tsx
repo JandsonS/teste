@@ -84,7 +84,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     if (isBusy) {
         toast.error("Atenção", {
             description: "Este horário está sendo reservado por favor escolha outra horário ou aguarde 2 minutos.",
-            duration: 5000,
+            duration: 6000,
             position: "top-center"
         });
         return;
