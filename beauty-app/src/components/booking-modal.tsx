@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CheckCircle2, CreditCard, Wallet, Loader2, Info, MessageCircle, AlertTriangle } from "lucide-react"
+// Novos ícones adicionados: Smartphone, QrCode, CreditCard
+import { CheckCircle2, Wallet, Loader2, Info, MessageCircle, AlertTriangle, Smartphone, CreditCard, QrCode } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
@@ -29,19 +30,19 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(false)
   
+  // NOVO: Estado para controlar o método de pagamento (PIX ou CARTÃO)
+  const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD'>('PIX')
+  
   const [busySlots, setBusySlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  // --- LÓGICA FINANCEIRA CORRIGIDA ---
+  // --- LÓGICA FINANCEIRA ---
   const numericPrice = useMemo(() => {
     if (!price) return 0;
     const cleanStr = price.replace('R$', '').trim();
-    
-    // Se tiver vírgula, assume formato BR (1.000,00)
     if (cleanStr.includes(',')) {
         return parseFloat(cleanStr.replace(/\./g, '').replace(',', '.'));
     }
-    // Se não, assume formato numérico simples ou US (1.00)
     return parseFloat(cleanStr);
   }, [price]);
 
@@ -83,7 +84,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
         toast.error("Horário Indisponível", {
-            description: "Este horário já foi reservado. Por favor, escolha outro horário.",
+            description: "Este horário já foi reservado.",
             duration: 6000,
             position: "top-center"
         });
@@ -109,7 +110,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           time: selectedTime,
           clientName: name,
           clientPhone: phone,
-          // MANTÉM COMPATIBILIDADE: Envia o 'price' antigo E os novos campos
+          // Enviamos agora TAMBÉM o método escolhido (PIX ou CARD)
+          method: paymentMethod, 
           price: numericPrice, 
           paymentType: paymentType, 
           priceTotal: numericPrice,
@@ -121,11 +123,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
 
       if (data.error) {
-        // Se o erro vier da API
         toast.error("Atenção", { description: data.error });
         setLoading(false);
-        
-        // Atualiza slots se o erro for de conflito
         if (data.error.toLowerCase().includes("horário") || data.error.toLowerCase().includes("ocupado")) {
             setBusySlots(prev => [...prev, selectedTime!]);
             setSelectedTime(null);
@@ -262,45 +261,113 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
           {step === 3 && (
             <div className="py-2 space-y-4 animate-in fade-in slide-in-from-right-4">
-                <div className="text-center mb-4"><h3 className="text-lg font-bold text-white">Garantia de Vaga</h3></div>
                 
-                <div className="grid grid-cols-1 gap-3">
+                {/* --- SELETOR DE MÉTODO (PIX OU CARTÃO) --- */}
+                <div className="text-center mb-4">
+                    <h3 className="text-lg font-bold text-white mb-3">Escolha a forma de pagamento</h3>
+                    <div className="flex gap-3 p-1 bg-zinc-900 rounded-xl border border-zinc-800">
+                        <button 
+                            onClick={() => setPaymentMethod('PIX')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm transition-all ${
+                                paymentMethod === 'PIX' 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 shadow-lg shadow-emerald-500/10' 
+                                : 'text-zinc-400 hover:bg-zinc-800'
+                            }`}
+                        >
+                            <QrCode size={18} />
+                            PIX
+                        </button>
+                        <button 
+                            onClick={() => setPaymentMethod('CARD')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm transition-all ${
+                                paymentMethod === 'CARD' 
+                                ? 'bg-purple-500/10 text-purple-400 border border-purple-500/50 shadow-lg shadow-purple-500/10' 
+                                : 'text-zinc-400 hover:bg-zinc-800'
+                            }`}
+                        >
+                            <CreditCard size={18} />
+                            Cartão
+                        </button>
+                    </div>
+                </div>
+                
+                {/* --- CARDS DE OPÇÃO (TOTAL OU SINAL) --- */}
+                <div className="grid grid-cols-1 gap-4">
                     
                     {/* OPÇÃO 1: PAGAMENTO INTEGRAL */}
-                    <button onClick={() => handleCheckout('FULL')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 transition group disabled:opacity-50 text-left">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/20 shrink-0">
-                                <CreditCard size={20} />
+                    <button 
+                        onClick={() => handleCheckout('FULL')} 
+                        disabled={loading} 
+                        className={`
+                            relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left
+                            ${paymentMethod === 'PIX' ? 'hover:border-emerald-500/50 hover:bg-emerald-500/5' : 'hover:border-purple-500/50 hover:bg-purple-500/5'}
+                            border-zinc-800 bg-zinc-900
+                        `}
+                    >
+                        {/* Ícone Grande */}
+                        <div className={`
+                            w-14 h-14 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 mr-4
+                            ${paymentMethod === 'PIX' ? 'bg-emerald-500' : 'bg-purple-500'}
+                        `}>
+                            {paymentMethod === 'PIX' ? <Smartphone size={24} /> : <CreditCard size={24} />}
+                        </div>
+
+                        {/* Textos */}
+                        <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                                <p className="font-bold text-white text-base">Pagamento Integral</p>
+                                <span className="font-bold text-white text-base">{formatMoney(numericPrice)}</span>
                             </div>
-                            <div>
-                                <p className="font-bold text-white text-sm">Pagamento Integral ({formatMoney(numericPrice)})</p>
-                                <p className="text-xs text-pink-200/70">Quitação total do serviço com garantia imediata de atendimento.</p>
+                            <p className="text-xs text-zinc-400 mt-1">Quitação total com garantia imediata.</p>
+                            
+                            {/* Badges Dinâmicas */}
+                            <div className="mt-2 flex gap-2">
+                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${paymentMethod === 'PIX' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                                    {paymentMethod === 'PIX' ? 'Aprovação Imediata' : 'Até 12x no cartão'}
+                                </span>
                             </div>
                         </div>
-                        {loading ? <Loader2 className="animate-spin text-pink-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-pink-500"></div>}
+                        
+                        {/* Indicador de Loading ou Seta */}
+                        {loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}
                     </button>
                     
                     {/* OPÇÃO 2: SINAL (Reservar) */}
-                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading} className="flex items-center justify-between p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition group disabled:opacity-50 text-left">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                                <Wallet size={20} />
+                    <button 
+                        onClick={() => handleCheckout('DEPOSIT')} 
+                        disabled={loading} 
+                        className={`
+                            relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left
+                            hover:border-blue-500/50 hover:bg-blue-500/5
+                            border-zinc-800 bg-zinc-900
+                        `}
+                    >
+                        <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-inner shrink-0 mr-4">
+                            <Wallet size={24} />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                                <p className="font-bold text-white text-base">Reservar Vaga (20%)</p>
+                                <span className="font-bold text-white text-base">{formatMoney(depositValue)}</span>
                             </div>
-                            <div>
-                                <p className="font-bold text-white text-sm">Pague 20% do serviço para reservar sua vaga ({formatMoney(depositValue)})</p>
-                                <p className="text-xs text-zinc-400">Restante de {formatMoney(remainingValue)} a pagar no local.</p>
+                            <p className="text-xs text-zinc-400 mt-1">Pague o restante ({formatMoney(remainingValue)}) no local.</p>
+                            
+                             <div className="mt-2 flex gap-2">
+                                <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-blue-500/20 text-blue-400">
+                                    {paymentMethod === 'PIX' ? 'Pix Rápido' : 'Crédito/Débito'}
+                                </span>
                             </div>
                         </div>
-                         {loading ? <Loader2 className="animate-spin text-blue-500"/> : <div className="w-4 h-4 rounded-full border border-zinc-600 group-hover:border-blue-500"></div>}
+                         {loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}
                     </button>
                 </div>
 
                 {/* POLÍTICA */}
-                <div className="mt-2 p-4 bg-zinc-900/80 border border-zinc-800 rounded-lg flex gap-3 items-start">
+                <div className="mt-4 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg flex gap-3 items-start">
                     <Info className="w-5 h-5 text-zinc-500 shrink-0 mt-0.5" />
                     <div className="text-xs text-zinc-400 leading-relaxed">
                         <p className="mb-1"><strong className="text-zinc-300">Política de Agendamento:</strong></p>
-                        <p>A confirmação imediata da vaga ocorre <strong>exclusivamente</strong> mediante pagamento (Integral ou Sinal) via sistema. Solicitações de pagamento no local estão sujeitas à análise manual.</p>
+                        <p>A confirmação imediata da vaga ocorre <strong>exclusivamente</strong> via sistema. Solicitações de pagamento no local estão sujeitas à análise manual.</p>
                     </div>
                 </div>
 
