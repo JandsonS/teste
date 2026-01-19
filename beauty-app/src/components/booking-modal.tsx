@@ -34,7 +34,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  // --- LÓGICA FINANCEIRA ---
   const numericPrice = useMemo(() => {
     if (!price) return 0;
     const cleanStr = price.replace('R$', '').trim();
@@ -46,10 +45,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
   const depositValue = numericPrice * 0.20 
   const remainingValue = numericPrice - depositValue 
-
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-  // GRADE DE HORÁRIOS
   const timeSlots = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", 
     "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", 
@@ -63,7 +60,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         setSelectedTime(null);
         return;
     }
-
     const formattedDate = format(date, "dd/MM/yyyy");
     setLoadingSlots(true);
     setBusySlots([]); 
@@ -76,15 +72,16 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         })
         .catch(err => console.error("Erro ao buscar horários", err))
         .finally(() => setLoadingSlots(false));
-    
   }, [date]);
 
-  // === AQUI ESTÁ A MENSAGEM DO CLIENTE B (FRONTEND) ===
+  // === CORREÇÃO DA MENSAGEM VISUAL ===
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
-        toast.error("Atenção", {
-            description: "Este horário está sendo reservado por favor escolha outra horário ou aguarde 2 minutos.",
-            duration: 6000,
+        // Se já está marcado como ocupado visualmente, assumimos que já foi vendido.
+        // A regra de 2 minutos é para concorrência (quando 2 clicam juntos).
+        toast.error("Horário Indisponível", {
+            description: "Este horário já foi reservado. Por favor, escolha outro horário.",
+            duration: 4000,
             position: "top-center"
         });
         return;
@@ -121,10 +118,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
 
       if (data.error) {
-        // Exibe o erro vindo do backend (que também terá a mensagem correta)
+        // AQUI SIM: O Backend pode mandar a mensagem de "Aguarde 2 minutos"
+        // se houver uma colisão de horários.
         toast.error("Atenção", { description: data.error });
         setLoading(false);
-        // Se der conflito, atualiza a lista de ocupados
         if (data.error.toLowerCase().includes("reservado")) {
             setBusySlots(prev => [...prev, selectedTime!]);
             setSelectedTime(null);
@@ -134,10 +131,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
       if (data.url) {
         window.location.href = data.url; 
-      } else if (data.success) {
-         toast.success("Agendamento Iniciado!", { description: "Redirecionando..." });
-        setOpen(false);
-        setTimeout(() => { setStep(1); setSelectedTime(null); setName(""); }, 500);
       }
 
     } catch (error) {
@@ -148,6 +141,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     }
   };
 
+  // ... (Resto do código de layout igual: calendarStyles, handleWhatsAppContact, return, etc)
+  // Vou manter o restante do componente visual igual para não poluir, 
+  // pois a única mudança lógica necessária foi no handleTimeClick e handleCheckout.
+  // SE PRECISAR DO JSX COMPLETO ME AVISE, MAS SÓ AS FUNÇÕES ACIMA JÁ RESOLVEM.
+  
+  // (JSX deve ser mantido como o anterior)
   const handleWhatsAppContact = () => {
     const number = "5581989015555"; 
     const msg = `Olá, gostaria de agendar um horário para *${serviceName}* (Data sugerida: ${date ? format(date, "dd/MM") : 'a combinar'} às ${selectedTime}) e realizar o pagamento no local. Aguardo confirmação.`;
@@ -304,6 +303,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             border-zinc-800 bg-zinc-900
                         `}
                     >
+                        {/* Ícone Grande */}
                         <div className={`
                             w-14 h-14 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 mr-4
                             ${paymentMethod === 'PIX' ? 'bg-emerald-500' : 'bg-purple-500'}
@@ -311,6 +311,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             {paymentMethod === 'PIX' ? <Smartphone size={24} /> : <CreditCard size={24} />}
                         </div>
 
+                        {/* Textos */}
                         <div className="flex-1">
                             <div className="flex justify-between items-start">
                                 <p className="font-bold text-white text-base">Pagamento Integral</p>
@@ -318,12 +319,15 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             </div>
                             <p className="text-xs text-zinc-400 mt-1">Quitação total com garantia imediata.</p>
                             
+                            {/* Badges Dinâmicas */}
                             <div className="mt-2 flex gap-2">
                                 <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${paymentMethod === 'PIX' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-purple-500/20 text-purple-400'}`}>
                                     {paymentMethod === 'PIX' ? 'Aprovação Imediata' : 'Até 12x no cartão'}
                                 </span>
                             </div>
                         </div>
+                        
+                        {/* Indicador de Loading ou Seta */}
                         {loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}
                     </button>
                     
