@@ -30,7 +30,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  // --- 1. MÁSCARA DE TELEFONE ---
+  // --- REGRAS DE VALIDAÇÃO VISUAL ---
   const formatPhone = (value: string) => {
     const onlyNumbers = value.replace(/\D/g, '');
     const limited = onlyNumbers.slice(0, 11);
@@ -40,7 +40,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       .replace(/(-\d{4})\d+?$/, '$1');
   };
 
-  // --- 2. VALIDAÇÃO DE 11 DÍGITOS ---
   const isPhoneValid = phone.replace(/\D/g, '').length === 11;
 
   const numericPrice = useMemo(() => {
@@ -55,9 +54,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   const timeSlots = [
-    "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", 
-    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", 
-    "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"
+    "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", 
+    "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", 
+    "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", 
+    "17:00", "17:30", "18:00", "18:30", "19:00"
   ]
 
   useEffect(() => {
@@ -77,14 +77,14 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
-        toast.error("Horário Indisponível", { description: "Escolha outro horário." });
+        toast.error("Horário Indisponível", { description: "Este horário já foi reservado." });
         return;
     }
     setSelectedTime(time);
   };
 
   const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
-    if (!date || !selectedTime || !name || !isPhoneValid) return;
+    if (!date || !selectedTime || !name || !isPhoneValid) return; // BLOQUEIO DE SEGURANÇA AQUI
     setLoading(true);
 
     try {
@@ -96,7 +96,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           date: format(date, "dd/MM/yyyy"),
           time: selectedTime,
           clientName: name,
-          clientPhone: phone, // Enviando telefone validado
+          clientPhone: phone, // ENVIA O TELEFONE
           method: paymentMethod, 
           price: numericPrice, 
           paymentType: paymentType, 
@@ -122,6 +122,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleWhatsAppContact = () => {
+    const number = "5581989015555"; 
+    const msg = `Olá, gostaria de agendar um horário para *${serviceName}*...`;
+    window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   const calendarStyles = { caption: { color: '#e4e4e7', textTransform: 'capitalize' as const }, head_cell: { color: '#a1a1aa' }, day: { color: '#e4e4e7' }, nav_button: { color: '#ec4899' } };
@@ -161,8 +167,17 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                <div className="space-y-2"><Label className="text-zinc-300">Seu Nome Completo</Label><Input placeholder="Ex: Maria Silva" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" value={name} onChange={(e) => setName(e.target.value)}/></div>
                <div className="space-y-2">
                  <Label className="text-zinc-300">Seu WhatsApp</Label>
-                 <Input placeholder="(11) 99999-9999" className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} maxLength={15} />
+                 <Input 
+                   type="tel" 
+                   placeholder="(11) 99999-9999" 
+                   className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" 
+                   value={phone} 
+                   onChange={(e) => setPhone(formatPhone(e.target.value))} 
+                   maxLength={15} 
+                 />
+                 {/* FEEDBACK VISUAL DE VALIDAÇÃO */}
                  {!isPhoneValid && phone.length > 0 && (<p className="text-[10px] text-red-400 animate-pulse">* Digite o número completo com DDD (11 dígitos)</p>)}
+                 {isPhoneValid && (<p className="text-[10px] text-emerald-500 flex items-center gap-1"><CheckCircle2 size={10} /> Número válido</p>)}
                </div>
             </div>
           )}
@@ -174,6 +189,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     <button onClick={() => handleCheckout('FULL')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left ${paymentMethod === 'PIX' ? 'hover:border-emerald-500/50 hover:bg-emerald-500/5' : 'hover:border-purple-500/50 hover:bg-purple-500/5'} border-zinc-800 bg-zinc-900`}><div className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 mr-4 ${paymentMethod === 'PIX' ? 'bg-emerald-500' : 'bg-purple-500'}`}>{paymentMethod === 'PIX' ? <Smartphone size={24} /> : <CreditCard size={24} />}</div><div className="flex-1"><div className="flex justify-between items-start"><p className="font-bold text-white text-base">Pagamento Integral</p><span className="font-bold text-white text-base">{formatMoney(numericPrice)}</span></div><p className="text-xs text-zinc-400 mt-1">Quitação total com garantia imediata.</p><div className="mt-2 flex gap-2"><span className={`text-[10px] px-2 py-0.5 rounded font-bold ${paymentMethod === 'PIX' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-purple-500/20 text-purple-400'}`}>{paymentMethod === 'PIX' ? 'Aprovação Imediata' : 'Até 12x no cartão'}</span></div></div>{loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}</button>
                     <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left hover:border-blue-500/50 hover:bg-blue-500/5 border-zinc-800 bg-zinc-900`}><div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-inner shrink-0 mr-4"><Wallet size={24} /></div><div className="flex-1"><div className="flex justify-between items-start"><p className="font-bold text-white text-base">Reservar Vaga (20%)</p><span className="font-bold text-white text-base">{formatMoney(depositValue)}</span></div><p className="text-xs text-zinc-400 mt-1">Pague o restante ({formatMoney(remainingValue)}) no local.</p></div>{loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}</button>
                 </div>
+                <div className="text-center pt-2"><div className="flex items-center justify-center gap-1 text-[10px] text-yellow-600/80 mb-1"><AlertTriangle size={10} /><span>Atendimento sujeito a espera</span></div><button onClick={handleWhatsAppContact} className="text-xs text-zinc-500 hover:text-green-500 transition-colors flex items-center justify-center gap-2 mx-auto underline decoration-zinc-700 underline-offset-4 hover:decoration-green-500"><MessageCircle size={14} />Não consegue pagar online? Solicitar via WhatsApp</button></div>
             </div>
           )}
         </div>
