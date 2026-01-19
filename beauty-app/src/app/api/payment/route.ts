@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const agora = new Date().getTime();
 
     // =================================================================================
-    // FASE 1: LIMPEZA E VERIFICAÇÃO DE DUPLICIDADE (PESSOA)
+    // FASE 1: LIMPEZA E VERIFICAÇÃO DE DUPLICIDADE (MESMA PESSOA)
     // =================================================================================
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } }
@@ -75,29 +75,32 @@ export async function POST(request: Request) {
     });
 
     for (const vaga of vagaOcupada) {
-      // 1. Bloqueio total se já estiver pago
+      // 1. Bloqueio total se já estiver pago (Vaga perdida)
       if (vaga.status.includes('PAGO') || vaga.status.includes('SINAL') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ 
-            error: '❌ Este horário acabou de ser reservado por outro cliente.' 
+            error: '❌ Este horário já foi reservado e pago por outro cliente.' 
         }, { status: 409 });
       }
 
-      // 2. Tratamento de vaga PENDENTE (no checkout)
+      // 2. Tratamento de vaga PENDENTE (Em processo de pagamento)
       if (vaga.status === 'PENDENTE') {
         
-        // AUTO-DESBLOQUEIO: Se for o MESMO cliente tentando de novo, deleta a anterior e deixa passar
-        if (vaga.cliente === nomeClienteLimpo) {
+        // AUTO-DESBLOQUEIO: Se for o MESMO cliente (verificação insensível a maiúsculas/minúsculas)
+        if (vaga.cliente.toLowerCase() === nomeClienteLimpo.toLowerCase()) {
             await prisma.agendamento.delete({ where: { id: vaga.id } });
-            continue; 
+            continue; // Deleta o antigo e deixa criar o novo
         }
 
         // BLOQUEIO DE TERCEIROS: Se for OUTRA pessoa, aplica regra de 2 minutos
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60; 
         
         if (diff < 2) {
-          return NextResponse.json({ error: '⏳ Este horário está sendo finalizado por outra pessoa. Tente em 2 minutos.' }, { status: 409 });
+          // *** MENSAGEM ATUALIZADA AQUI ***
+          return NextResponse.json({ 
+            error: '⏳ Este horário está sendo reservado. Aguarde 2 minutos ou escolha outro horário por favor!' 
+          }, { status: 409 });
         } else {
-          // Timeout expirou, libera a vaga
+          // Timeout expirou (passou de 2 min), libera a vaga
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
       }
@@ -128,22 +131,21 @@ export async function POST(request: Request) {
     // FASE 4: CONFIGURAÇÃO DO MERCADO PAGO (FILTRO PIX vs CARTÃO)
     // =================================================================================
     
-    // IMPORTANTE: A tipagem aqui corrige o erro de "implicit any"
     let excludedPaymentTypes: { id: string }[] = []; 
     let installments = 12;
 
     if (method === 'PIX') {
-      // Se escolheu PIX, removemos TUDO que não é Pix para cair direto no QR Code
+      // Se escolheu PIX, removemos TUDO que não é Pix
       excludedPaymentTypes = [
         { id: "credit_card" },
         { id: "debit_card" },
         { id: "ticket" },       // Boleto
         { id: "atm" },          // Lotérica
-        { id: "prepaid_card" }  // Cartão pré-pago
+        { id: "prepaid_card" }  
       ];
       installments = 1;
     } else if (method === 'CARD') {
-      // Se escolheu CARTÃO, removemos Pix e Boleto para cair no formulário de cartão
+      // Se escolheu CARTÃO, removemos Pix e Boleto
       excludedPaymentTypes = [
         { id: "bank_transfer" }, // Pix
         { id: "ticket" },
@@ -162,7 +164,6 @@ export async function POST(request: Request) {
         }],
         payer: {
           name: nomeClienteLimpo,
-          // phone: { number: clientPhone } // Opcional: ajuda o MP a preencher dados
         },
         payment_methods: {
           excluded_payment_types: excludedPaymentTypes,
@@ -174,7 +175,7 @@ export async function POST(request: Request) {
           pending: `${BASE_URL}/`,
         },
         auto_return: 'approved',
-        binary_mode: true, // Isso ajuda a pular telas intermediárias
+        binary_mode: true, 
         external_reference: agendamento.id,
         notification_url: `${BASE_URL}/api/webhook`,
       },
