@@ -57,7 +57,7 @@ function SuccessContent() {
           </div>
 
           <div className="w-full bg-zinc-800 h-1 rounded-full overflow-hidden mb-4">
-            <div 
+            <div
               className="bg-emerald-500 h-full transition-all duration-1000 ease-linear" 
               style={{ width: `${(count / 5) * 100}%` }}
             />

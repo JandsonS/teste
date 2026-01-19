@@ -27,28 +27,35 @@ export async function POST(request: Request) {
     console.log(`🔒 Processando: ${nomeClienteLimpo} | ${date} - ${time}`);
 
     // =================================================================================
-    // FASE 1: LIMPEZA DE PENDÊNCIAS DO PRÓPRIO CLIENTE
+    // FASE 1: REGRA DE AGENDAMENTO ÚNICO (CLIENTE NÃO PODE ACUMULAR SERVIÇOS)
     // =================================================================================
-    // Se VOCÊ mesmo desistiu de um pagamento anterior, o sistema limpa pra você tentar de novo.
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } }
     });
 
     for (const reserva of historicoCliente) {
+      // SE JÁ TEM AGENDAMENTO CONFIRMADO (Ex: Já marcou Corte, não pode marcar Combo)
       if (reserva.status.includes('PAGO') || reserva.status.includes('SINAL') || reserva.status === 'CONFIRMADO') {
+        
+        // >>> MENSAGEM ATUALIZADA COM SUA REGRA DE NEGÓCIO <<<
         return NextResponse.json({ 
-          error: `🚫 Você já possui um agendamento confirmado para o dia ${reserva.data} às ${reserva.horario}. Para alterações, entre em contato via WhatsApp.` 
+          error: `🚫 Você já possui um agendamento confirmado de "${reserva.servico}". 
+          
+          O sistema não permite agendar dois serviços simultaneamente (Ex: Marcar Corte e depois marcar Combo).
+          
+          ⚠️ Para trocar de serviço (fazer um upgrade) ou mudar o horário, entre em contato via WhatsApp para realizarmos o cancelamento manual.` 
         }, { status: 409 });
       }
 
+      // Se tem pendência (Tentando pagar)
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
-        // Se faz mais de 2 min, limpa a pendência antiga
+        // Limpa pendência velha (> 2 min)
         if (tempoDecorrido >= 2) {
           await prisma.agendamento.delete({ where: { id: reserva.id } });
         } 
-        // Se faz menos de 2 min e é outro horário, bloqueia
+        // Bloqueia se tentar criar outra pendência em menos de 2 min
         else if (reserva.data !== date || reserva.horario !== time) {
              return NextResponse.json({ 
                 error: '⏳ Você já tem um pagamento em andamento. Finalize-o antes de iniciar outro.' 
@@ -65,33 +72,28 @@ export async function POST(request: Request) {
     });
 
     for (const vaga of vagaOcupada) {
-      // 1. SE JÁ ESTÁ PAGO -> BLOQUEIO PERMANENTE
+      // 1. BLOQUEIO PERMANENTE (Vaga já vendida para alguém)
       if (vaga.status.includes('PAGO') || vaga.status.includes('SINAL') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ 
-            // MENSAGEM PARA QUANDO O CLIENTE A JÁ FINALIZOU
             error: '❌ Este horário já foi reservado. Por favor, escolha outro horário.' 
         }, { status: 409 });
       }
 
-      // 2. SE ESTÁ PENDENTE (Cliente A clicou mas não pagou ainda)
+      // 2. BLOQUEIO TEMPORÁRIO (Alguém está pagando)
       if (vaga.status === 'PENDENTE') {
         
-        // Se for o MESMO cliente tentando de novo, deixa passar (limpa o anterior)
         if (vaga.cliente.toLowerCase() === nomeClienteLimpo.toLowerCase()) {
             await prisma.agendamento.delete({ where: { id: vaga.id } });
             continue; 
         }
 
-        // Se for OUTRO cliente, verifica o tempo
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60; 
         
         if (diff < 2) {
-          // MENSAGEM PARA QUANDO O CLIENTE A AINDA ESTÁ PAGANDO (BLOQUEIO TEMPORÁRIO)
           return NextResponse.json({ 
             error: '⏳ Este horário está em processo de pagamento por outro cliente. Tente novamente em 2 minutos caso ele desista.' 
           }, { status: 409 });
         } else {
-          // Passou de 2 minutos? O Cliente A desistiu. Liberamos a vaga para você (Cliente B).
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
       }
