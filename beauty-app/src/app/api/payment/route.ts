@@ -14,16 +14,27 @@ const client = new MercadoPagoConfig({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, price, date, time, clientName, method } = body;
+    
+    const { 
+      title, 
+      date, 
+      time, 
+      clientName, 
+      clientPhone, 
+      method,        
+      paymentType,   
+      pricePaid,     
+      pricePending   
+    } = body;
     
     const nomeClienteLimpo = clientName.trim();
     const BASE_URL = "https://teste-drab-rho-60.vercel.app";
 
-    console.log(`🔒 Validando vaga para: ${nomeClienteLimpo}`);
+    console.log(`🔒 Validando vaga para: ${nomeClienteLimpo} | Método: ${method} | Tipo: ${paymentType}`);
 
     const agora = new Date().getTime();
 
-    // === FASE 1: CLIENTE ===
+    // === FASE 1: VERIFICA SE O CLIENTE JÁ TEM AGENDAMENTO ===
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } }
     });
@@ -32,7 +43,6 @@ export async function POST(request: Request) {
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
-        // ⏳ MUDANÇA: AGORA É 2 MINUTOS
         if (tempoDecorrido >= 2) {
           await prisma.agendamento.delete({ where: { id: reserva.id } });
           continue; 
@@ -43,28 +53,27 @@ export async function POST(request: Request) {
         }
       }
 
-      if (reserva.status.includes('PAGO') || reserva.status === 'PAGAR NO LOCAL') {
+      if (reserva.status.includes('PAGO') || reserva.status.includes('SINAL') || reserva.status === 'CONFIRMADO') {
         return NextResponse.json({ 
-          error: `🚫 Você já possui um agendamento ativo de "${reserva.servico}" para o dia ${reserva.data} às ${reserva.horario}. Não é permitido criar duplicatas.` 
+          error: `🚫 Você já possui um agendamento ativo de "${reserva.servico}" para o dia ${reserva.data}. Não é permitido criar duplicatas.` 
         }, { status: 409 });
       }
     }
 
-    // === FASE 2: HORÁRIO ===
+    // === FASE 2: VERIFICA SE O HORÁRIO ESTÁ LIVRE ===
     const vagaOcupada = await prisma.agendamento.findMany({
       where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
 
     for (const vaga of vagaOcupada) {
-      if (vaga.status.includes('PAGO') || vaga.status === 'PAGAR NO LOCAL') {
+      if (vaga.status.includes('PAGO') || vaga.status.includes('SINAL') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ 
-            error: '❌ Este horário já foi reservado por outro cliente. Por favor, escolha outro horário disponível.' 
+            error: '❌ Este horário já foi reservado por outro cliente. Por favor, escolha outro horário.' 
         }, { status: 409 });
       }
 
       if (vaga.status === 'PENDENTE') {
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60;
-        // ⏳ MUDANÇA: AGORA É 2 MINUTOS
         if (diff < 2) {
           return NextResponse.json({ error: '⏳ Este horário está sendo reservado agora. Tente em 2 minutos.' }, { status: 409 });
         } else {
@@ -73,27 +82,65 @@ export async function POST(request: Request) {
       }
     }
 
-    // === SUCESSO ===
-    if (method === 'LOCAL') {
-      await prisma.agendamento.create({
-        data: { cliente: nomeClienteLimpo, servico: title, data: date, horario: time, valor: Number(price), status: "PAGAR NO LOCAL" }
-      });
-      return NextResponse.json({ success: true });
+    // === FASE 3: PREPARAÇÃO DO NOME DO SERVIÇO ===
+    let nomeServicoSalvo = title;
+    if (paymentType === 'DEPOSIT') {
+      nomeServicoSalvo = `${title} (Sinal Pago | Resta: R$ ${pricePending})`;
+    } else {
+      nomeServicoSalvo = `${title} (Integral)`;
     }
 
+    // === FASE 4: CRIAÇÃO NO BANCO DE DADOS ===
     const agendamento = await prisma.agendamento.create({
-      data: { cliente: nomeClienteLimpo, servico: title, data: date, horario: time, valor: Number(price), status: "PENDENTE" }
+      data: { 
+        cliente: nomeClienteLimpo, 
+        servico: nomeServicoSalvo, 
+        data: date, 
+        horario: time, 
+        valor: Number(pricePaid),
+        status: "PENDENTE" 
+      }
     });
+
+    // === FASE 5: CONFIGURAÇÃO DO MERCADO PAGO ===
+    
+    // --- CORREÇÃO DO ERRO DE TYPESCRIPT AQUI ---
+    // Adicionei ": { id: string }[]" para tipar a lista
+    let excludedPaymentTypes: { id: string }[] = []; 
+    let installments = 12;
+
+    if (method === 'PIX') {
+      excludedPaymentTypes = [
+        { id: "credit_card" },
+        { id: "debit_card" },
+        { id: "ticket" },       
+        { id: "atm" }           
+      ];
+      installments = 1;
+    } else if (method === 'CARD') {
+      excludedPaymentTypes = [
+        { id: "bank_transfer" }, 
+        { id: "ticket" },
+        { id: "atm" }
+      ];
+    }
 
     const preference = new Preference(client);
     const result = await preference.create({
       body: {
         items: [{
             id: agendamento.id,
-            title: `${title} - ${date} às ${time}`,
-            unit_price: Number(price),
+            title: paymentType === 'DEPOSIT' ? `Reserva: ${title}` : title,
+            unit_price: Number(pricePaid),
             quantity: 1,
         }],
+        payer: {
+          name: nomeClienteLimpo,
+        },
+        payment_methods: {
+          excluded_payment_types: excludedPaymentTypes,
+          installments: installments
+        },
         back_urls: {
           success: `${BASE_URL}/sucesso?id=${agendamento.id}`,
           failure: `${BASE_URL}/`,
@@ -109,7 +156,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: result.init_point });
     
   } catch (error: any) {
-    console.error("❌ ERRO:", error);
-    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+    console.error("❌ ERRO NO BACKEND:", error);
+    return NextResponse.json({ error: 'Erro interno ao processar pagamento.' }, { status: 500 });
   }
 }
