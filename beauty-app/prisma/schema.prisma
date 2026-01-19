@@ -11,6 +11,10 @@ datasource db {
 model Agendamento {
   id              String   @id @default(cuid())
   cliente         String
+  
+  // NOVO CAMPO ADICIONADO (Opcional para não quebrar dados antigos)
+  telefone        String?  
+  
   servico         String
   data            String
   horario         String
@@ -18,7 +22,6 @@ model Agendamento {
   valor           Float
   paymentId       String?
   
-  // Campo novo adicionado como Opcional (?) para não quebrar dados antigos
   metodoPagamento String?  
   
   createdAt       DateTime @default(now())

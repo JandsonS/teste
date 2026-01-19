@@ -34,6 +34,26 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
+  // --- FORMATAÇÃO E BLOQUEIO DE LETRAS ---
+  const formatPhone = (value: string) => {
+    // 1. Remove tudo que NÃO for número (Letras, símbolos)
+    const onlyNumbers = value.replace(/\D/g, '');
+    
+    // 2. Limita a 11 dígitos (DDD + 9 números)
+    // Se o usuário tentar colar um texto gigante, cortamos no 11º dígito.
+    const limited = onlyNumbers.slice(0, 11);
+
+    // 3. Aplica a máscara visual (XX) XXXXX-XXXX
+    return limited
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{5})(\d)/, '$1-$2')
+      .replace(/(-\d{4})\d+?$/, '$1');
+  };
+
+  // --- VALIDAÇÃO RIGOROSA ---
+  // Verifica se tem EXATAMENTE 11 números reais
+  const isPhoneValid = phone.replace(/\D/g, '').length === 11;
+
   const numericPrice = useMemo(() => {
     if (!price) return 0;
     const cleanStr = price.replace('R$', '').trim();
@@ -54,7 +74,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     "17:00", "17:30", "18:00", "18:30", "19:00"
   ]
 
-useEffect(() => {
+  useEffect(() => {
     if (!date || !isValid(date)) {
         setBusySlots([]);
         setSelectedTime(null);
@@ -66,10 +86,9 @@ useEffect(() => {
     setBusySlots([]); 
     setSelectedTime(null); 
 
-    // >>> ALTERAÇÃO AQUI: Enviamos também o nome do serviço <<<
     const params = new URLSearchParams({
         date: formattedDate,
-        service: serviceName // Enviando "Corte de Cabelo" ou "Sobrancelha"
+        service: serviceName
     });
 
     fetch(`/api/availability?${params.toString()}`)
@@ -80,13 +99,10 @@ useEffect(() => {
         .catch(err => console.error("Erro ao buscar horários", err))
         .finally(() => setLoadingSlots(false));
     
-  }, [date, serviceName]); // Adicione serviceName na dependência
+  }, [date, serviceName]);
 
-  // === CORREÇÃO DA MENSAGEM VISUAL ===
   const handleTimeClick = (time: string, isBusy: boolean) => {
     if (isBusy) {
-        // Se já está marcado como ocupado visualmente, assumimos que já foi vendido.
-        // A regra de 2 minutos é para concorrência (quando 2 clicam juntos).
         toast.error("Horário Indisponível", {
             description: "Este horário já foi reservado. Por favor, escolha outro horário.",
             duration: 4000,
@@ -98,7 +114,7 @@ useEffect(() => {
   };
 
   const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
-    if (!date || !selectedTime || !name) return;
+    if (!date || !selectedTime || !name || !isPhoneValid) return; // Bloqueio extra aqui
     setLoading(true);
 
     const amountToPayNow = paymentType === 'FULL' ? numericPrice : depositValue;
@@ -113,7 +129,7 @@ useEffect(() => {
           date: format(date, "dd/MM/yyyy"),
           time: selectedTime,
           clientName: name,
-          clientPhone: phone,
+          clientPhone: phone, 
           method: paymentMethod, 
           price: numericPrice, 
           paymentType: paymentType, 
@@ -126,8 +142,6 @@ useEffect(() => {
       const data = await response.json();
 
       if (data.error) {
-        // AQUI SIM: O Backend pode mandar a mensagem de "Aguarde 2 minutos"
-        // se houver uma colisão de horários.
         toast.error("Atenção", { description: data.error });
         setLoading(false);
         if (data.error.toLowerCase().includes("reservado")) {
@@ -149,12 +163,6 @@ useEffect(() => {
     }
   };
 
-  // ... (Resto do código de layout igual: calendarStyles, handleWhatsAppContact, return, etc)
-  // Vou manter o restante do componente visual igual para não poluir, 
-  // pois a única mudança lógica necessária foi no handleTimeClick e handleCheckout.
-  // SE PRECISAR DO JSX COMPLETO ME AVISE, MAS SÓ AS FUNÇÕES ACIMA JÁ RESOLVEM.
-  
-  // (JSX deve ser mantido como o anterior)
   const handleWhatsAppContact = () => {
     const number = "5581989015555"; 
     const msg = `Olá, gostaria de agendar um horário para *${serviceName}* (Data sugerida: ${date ? format(date, "dd/MM") : 'a combinar'} às ${selectedTime}) e realizar o pagamento no local. Aguardo confirmação.`;
@@ -254,14 +262,29 @@ useEffect(() => {
                    onChange={(e) => setName(e.target.value)}
                  />
                </div>
+               
                <div className="space-y-2">
                  <Label className="text-zinc-300">Seu WhatsApp</Label>
                  <Input 
+                   type="tel" // Ajuda em celulares a abrir o teclado numérico
                    placeholder="(11) 99999-9999" 
                    className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" 
                    value={phone} 
-                   onChange={(e) => setPhone(e.target.value)}
+                   onChange={(e) => setPhone(formatPhone(e.target.value))}
+                   maxLength={15} // Limita visualmente
                  />
+                 
+                 {/* Feedback visual se o número estiver incompleto */}
+                 {!isPhoneValid && phone.length > 0 && (
+                   <p className="text-[10px] text-red-400 animate-pulse">
+                     * Digite o número completo com DDD (11 dígitos)
+                   </p>
+                 )}
+                 {isPhoneValid && (
+                   <p className="text-[10px] text-emerald-500 flex items-center gap-1">
+                     <CheckCircle2 size={10} /> Número válido
+                   </p>
+                 )}
                </div>
             </div>
           )}
@@ -269,7 +292,6 @@ useEffect(() => {
           {step === 3 && (
             <div className="py-2 space-y-4 animate-in fade-in slide-in-from-right-4">
                 
-                {/* --- SELETOR DE MÉTODO (PIX OU CARTÃO) --- */}
                 <div className="text-center mb-4">
                     <h3 className="text-lg font-bold text-white mb-3">Escolha a forma de pagamento</h3>
                     <div className="flex gap-3 p-1 bg-zinc-900 rounded-xl border border-zinc-800">
@@ -298,7 +320,6 @@ useEffect(() => {
                     </div>
                 </div>
                 
-                {/* --- CARDS DE OPÇÃO (TOTAL OU SINAL) --- */}
                 <div className="grid grid-cols-1 gap-4">
                     
                     {/* OPÇÃO 1: PAGAMENTO INTEGRAL */}
@@ -311,7 +332,6 @@ useEffect(() => {
                             border-zinc-800 bg-zinc-900
                         `}
                     >
-                        {/* Ícone Grande */}
                         <div className={`
                             w-14 h-14 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 mr-4
                             ${paymentMethod === 'PIX' ? 'bg-emerald-500' : 'bg-purple-500'}
@@ -319,7 +339,6 @@ useEffect(() => {
                             {paymentMethod === 'PIX' ? <Smartphone size={24} /> : <CreditCard size={24} />}
                         </div>
 
-                        {/* Textos */}
                         <div className="flex-1">
                             <div className="flex justify-between items-start">
                                 <p className="font-bold text-white text-base">Pagamento Integral</p>
@@ -327,15 +346,12 @@ useEffect(() => {
                             </div>
                             <p className="text-xs text-zinc-400 mt-1">Quitação total com garantia imediata.</p>
                             
-                            {/* Badges Dinâmicas */}
                             <div className="mt-2 flex gap-2">
                                 <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${paymentMethod === 'PIX' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-purple-500/20 text-purple-400'}`}>
                                     {paymentMethod === 'PIX' ? 'Aprovação Imediata' : 'Até 12x no cartão'}
                                 </span>
                             </div>
                         </div>
-                        
-                        {/* Indicador de Loading ou Seta */}
                         {loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}
                     </button>
                     
@@ -369,7 +385,6 @@ useEffect(() => {
                     </button>
                 </div>
 
-                {/* POLÍTICA */}
                 <div className="mt-4 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg flex gap-3 items-start">
                     <Info className="w-5 h-5 text-zinc-500 shrink-0 mt-0.5" />
                     <div className="text-xs text-zinc-400 leading-relaxed">
@@ -378,7 +393,6 @@ useEffect(() => {
                     </div>
                 </div>
 
-                {/* BOTÃO WHATSAPP */}
                 <div className="text-center pt-2">
                    <div className="flex items-center justify-center gap-1 text-[10px] text-yellow-600/80 mb-1">
                       <AlertTriangle size={10} />
@@ -399,7 +413,22 @@ useEffect(() => {
         
         <DialogFooter className="p-4 md:p-6 bg-zinc-900 border-t border-zinc-800 flex flex-col sm:flex-row gap-2">
           {step === 1 && (<Button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>)}
-          {step === 2 && (<div className="flex gap-2 w-full"><Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !phone} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl">Ir para Pagamento</Button></div>)}
+          
+          {/* BOTÃO DO PASSO 2 (AGORA COM VALIDAÇÃO DE TELEFONE) */}
+          {step === 2 && (
+              <div className="flex gap-2 w-full">
+                  <Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button>
+                  <Button 
+                    onClick={() => setStep(3)} 
+                    // >>> AQUI ESTÁ O SEGREDO: Só habilita se tiver nome E telefone válido (11 dígitos)
+                    disabled={!name || !isPhoneValid} 
+                    className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Ir para Pagamento
+                  </Button>
+              </div>
+          )}
+          
           {step === 3 && (<div className="w-full"><Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-white mb-2 rounded-xl">Voltar</Button></div>)}
         </DialogFooter>
       </DialogContent>
