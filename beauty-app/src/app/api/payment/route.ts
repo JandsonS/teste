@@ -16,97 +16,89 @@ export async function POST(request: Request) {
     const body = await request.json();
     
     const { 
-      title, 
-      date, 
-      time, 
-      clientName, 
-      clientPhone, 
-      method,        // 'PIX' ou 'CARD'
-      paymentType,   // 'FULL' ou 'DEPOSIT'
-      pricePaid,     // Valor a pagar agora
-      pricePending   // Valor restante
+      title, date, time, clientName, clientPhone, 
+      method, paymentType, pricePaid, pricePending 
     } = body;
     
     const nomeClienteLimpo = clientName.trim();
     const BASE_URL = "https://teste-drab-rho-60.vercel.app";
-
-    console.log(`🔒 Processando: ${nomeClienteLimpo} | Método: ${method}`);
-
     const agora = new Date().getTime();
 
+    console.log(`🔒 Processando: ${nomeClienteLimpo} | ${date} - ${time}`);
+
     // =================================================================================
-    // FASE 1: REGRA DE AGENDAMENTO ÚNICO POR CLIENTE
+    // FASE 1: LIMPEZA DE PENDÊNCIAS DO PRÓPRIO CLIENTE
     // =================================================================================
+    // Se VOCÊ mesmo desistiu de um pagamento anterior, o sistema limpa pra você tentar de novo.
     const historicoCliente = await prisma.agendamento.findMany({
       where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } }
     });
 
     for (const reserva of historicoCliente) {
-      // REGRA DE OURO: SE JÁ TEM AGENDAMENTO CONFIRMADO, BLOQUEIA TUDO.
       if (reserva.status.includes('PAGO') || reserva.status.includes('SINAL') || reserva.status === 'CONFIRMADO') {
         return NextResponse.json({ 
-          error: `🚫 Você já possui um agendamento confirmado para "${reserva.servico}" no dia ${reserva.data} às ${reserva.horario}. Para realizar alterações de horário ou adicionar novos serviços, é necessário entrar em contato com o estabelecimento via WhatsApp.` 
+          error: `🚫 Você já possui um agendamento confirmado para o dia ${reserva.data} às ${reserva.horario}. Para alterações, entre em contato via WhatsApp.` 
         }, { status: 409 });
       }
 
-      // Se tem pendência (clicou em pagar antes e desistiu ou fechou a aba)
       if (reserva.status === 'PENDENTE') {
         const tempoDecorrido = (agora - new Date(reserva.createdAt).getTime()) / 1000 / 60;
         
-        // Se faz mais de 2 minutos, limpamos a pendência velha (considera abandono)
+        // Se faz mais de 2 min, limpa a pendência antiga
         if (tempoDecorrido >= 2) {
           await prisma.agendamento.delete({ where: { id: reserva.id } });
         } 
-        // Se faz menos de 2 minutos, mas é para OUTRO horário/serviço
+        // Se faz menos de 2 min e é outro horário, bloqueia
         else if (reserva.data !== date || reserva.horario !== time) {
              return NextResponse.json({ 
-                error: '⏳ Você já tem um processo de pagamento em aberto. Finalize-o antes de iniciar um novo.' 
+                error: '⏳ Você já tem um pagamento em andamento. Finalize-o antes de iniciar outro.' 
              }, { status: 409 });
         }
       }
     }
 
     // =================================================================================
-    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE DA VAGA (HORÁRIO LIVRE?)
+    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE DA VAGA (REGRA DOS 2 MINUTOS)
     // =================================================================================
     const vagaOcupada = await prisma.agendamento.findMany({
       where: { data: date, horario: time, status: { not: 'CANCELADO' } }
     });
 
     for (const vaga of vagaOcupada) {
-      // 1. Bloqueio total se já estiver pago por outra pessoa
+      // 1. SE JÁ ESTÁ PAGO -> BLOQUEIO PERMANENTE
       if (vaga.status.includes('PAGO') || vaga.status.includes('SINAL') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ 
-            error: '❌ Este horário já foi reservado e pago por outro cliente.' 
+            // MENSAGEM PARA QUANDO O CLIENTE A JÁ FINALIZOU
+            error: '❌ Este horário já foi reservado. Por favor, escolha outro horário.' 
         }, { status: 409 });
       }
 
-      // 2. Tratamento de vaga PENDENTE (Em processo de pagamento)
+      // 2. SE ESTÁ PENDENTE (Cliente A clicou mas não pagou ainda)
       if (vaga.status === 'PENDENTE') {
         
-        // AUTO-DESBLOQUEIO: Se for o MESMO cliente tentando de novo (retentativa)
+        // Se for o MESMO cliente tentando de novo, deixa passar (limpa o anterior)
         if (vaga.cliente.toLowerCase() === nomeClienteLimpo.toLowerCase()) {
             await prisma.agendamento.delete({ where: { id: vaga.id } });
             continue; 
         }
 
-        // BLOQUEIO DE TERCEIROS: Se for OUTRA pessoa, aplica regra de 2 minutos
+        // Se for OUTRO cliente, verifica o tempo
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60; 
         
         if (diff < 2) {
-          // Mensagem da regra de negócio de espera
+          // MENSAGEM PARA QUANDO O CLIENTE A AINDA ESTÁ PAGANDO (BLOQUEIO TEMPORÁRIO)
           return NextResponse.json({ 
-            error: 'Este horário está sendo reservado por favor escolha outra horário ou aguarde 2 minutos.' 
+            error: '⏳ Este horário está sendo reservado por outro cliente. Por favor, escolha outro horário ou aguarde 2 minutos.' 
           }, { status: 409 });
         } else {
-          // Timeout expirou, libera a vaga
+          // Passou de 2 minutos? O Cliente A desistiu. Liberamos a vaga para você (Cliente B).
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
       }
     }
 
     // =================================================================================
-    // FASE 3: CRIAÇÃO DO REGISTRO NO BANCO (AQUI FOI FEITA A ALTERAÇÃO)
+    // FASE 3: CRIAÇÃO DO REGISTRO
     // =================================================================================
     let nomeServicoSalvo = title;
     if (paymentType === 'DEPOSIT') {
@@ -123,14 +115,12 @@ export async function POST(request: Request) {
         horario: time, 
         valor: Number(pricePaid),
         status: "PENDENTE",
-        
-        // >>> ALTERAÇÃO AQUI: Salvando se é PIX ou CARD <<<
         metodoPagamento: method 
       }
     });
 
     // =================================================================================
-    // FASE 4: CONFIGURAÇÃO DO MERCADO PAGO
+    // FASE 4: PREFERÊNCIA MERCADO PAGO
     // =================================================================================
     let excludedPaymentTypes: { id: string }[] = []; 
     let installments = 12;
