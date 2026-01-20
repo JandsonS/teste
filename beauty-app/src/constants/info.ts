@@ -25,12 +25,12 @@ export const SITE_CONFIG = {
 };
 
 
-export const BUSINESS_HOURS = {
+export const BUSINESS_HOURS = {  //HORÁRIO DE FUNCIONAMENTO
   start: 9, 
   end: 19   
 };
 
-export const SERVICES = [
+export const SERVICES = [ //SERVIÇOS OFERECIDOS E VALORES
   {
     title: "Corte de Cabelo (Teste)",
     price: 5.00,
