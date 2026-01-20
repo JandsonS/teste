@@ -3,12 +3,13 @@ export const SITE_CONFIG = {
   name: "Teste ",
   description: "Realce sua beleza única com nossos procedimentos exclusivos.",
   url: "https://teste-drab-rho-60.vercel.app", 
-  
-  // 2. WHATSAPP
+  // 2. SENHA DO ADMIN
+  adminPassword: "admin", // <--- TROQUE ESSA SENHA DEPOIS
+  // 3. WHATSAPP
   whatsappNumber: "558189015555", 
   whatsappDisplay: "(81) 98901-5555", 
 
-  // 3. IMAGENS (Adicionamos o campo LOGO aqui)
+  // 4. IMAGENS (Adicionamos o campo LOGO aqui)
   images: {
     // Coloque aqui o link da logo do cliente (pode ser quadrada ou redonda)
     logo: "https://t4.ftcdn.net/jpg/02/32/92/55/360_F_232925587_st4gM8b3TJHtjjddCIUNyVyFJmZqMmn4.jpg", 
@@ -22,6 +23,7 @@ export const SITE_CONFIG = {
     ]
   }
 };
+
 
 export const BUSINESS_HOURS = {
   start: 9, 
@@ -54,3 +56,4 @@ export const SERVICES = [
     description: "Design e limpeza dos fios."
   }
 ];
+
