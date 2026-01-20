@@ -22,8 +22,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'hoje' | 'amanha' | 'todos'>('hoje') // Estado do filtro
 
+  // Função de busca (com modo silencioso para atualização automática)
   const fetchBookings = async (isAuto = false) => {
-    if (!isAuto) setLoading(true) // Só mostra loading se for manual
+    if (!isAuto) setLoading(true)
     try {
       const res = await fetch("/api/admin") 
       if (!res.ok) throw new Error("Falha ao buscar")
@@ -43,14 +44,14 @@ export default function AdminPage() {
       const res = await fetch(`/api/admin?id=${id}`, { method: 'DELETE' })
       if (res.ok) {
         toast.success("Agendamento cancelado")
-        fetchBookings() 
+        fetchBookings(true) // Recarrega sem tela de loading
       }
     } catch (error) {
       toast.error("Erro ao cancelar")
     }
   }
 
-  // --- 1. ATUALIZAÇÃO AUTOMÁTICA (A CADA 30s) ---
+  // 1. ATUALIZAÇÃO AUTOMÁTICA (A CADA 30s)
   useEffect(() => {
     fetchBookings() // Busca inicial
     const interval = setInterval(() => {
@@ -60,14 +61,14 @@ export default function AdminPage() {
     return () => clearInterval(interval);
   }, [])
 
-  // --- 2. CÁLCULO DE MÉTRICAS (HUD) ---
+  // 2. CÁLCULO DE MÉTRICAS (HUD)
   const stats = useMemo(() => {
     const hoje = new Date().toLocaleDateString('pt-BR');
     
     // Filtra agendamentos de hoje
     const agendamentosHoje = bookings.filter(b => b.data === hoje);
     
-    // Calcula Faturamento Real (Só o que está PAGO ou SINAL)
+    // Calcula Faturamento Real (Só o que está PAGO, SINAL ou CONFIRMADO)
     const faturamento = agendamentosHoje.reduce((acc, curr) => {
       if (curr.status.includes('PAGO') || curr.status.includes('SINAL') || curr.status === 'CONFIRMADO') {
         return acc + Number(curr.valor);
@@ -78,11 +79,12 @@ export default function AdminPage() {
     return {
       faturamento,
       clientesHoje: agendamentosHoje.length,
+      // Conta quantos estão tentando pagar AGORA (Pendentes em geral)
       pendentes: bookings.filter(b => b.status === 'PENDENTE').length
     };
   }, [bookings]);
 
-  // --- 3. LÓGICA DE FILTRO (ABAS) ---
+  // 3. LÓGICA DE FILTRO INTELIGENTE
   const filteredList = useMemo(() => {
     const hoje = new Date();
     const amanha = new Date(hoje);
@@ -93,25 +95,25 @@ export default function AdminPage() {
 
     if (filter === 'hoje') return bookings.filter(b => b.data === hojeStr);
     if (filter === 'amanha') return bookings.filter(b => b.data === amanhaStr);
-    return bookings;
+    return bookings; // Retorna todos
   }, [bookings, filter]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
         
-        {/* CABEÇALHO */}
+        {/* CABEÇALHO COM INDICADOR "AO VIVO" */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">
-              Dashboard
+              Painel Administrativo
             </h1>
             <p className="text-zinc-400 text-sm flex items-center gap-2 mt-1">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              Sistema operando em tempo real
+              Sistema atualizando em tempo real
             </p>
           </div>
           
