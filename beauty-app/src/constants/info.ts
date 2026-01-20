@@ -33,25 +33,25 @@ export const BUSINESS_HOURS = {  //HORÁRIO DE FUNCIONAMENTO
 export const SERVICES = [ //SERVIÇOS OFERECIDOS E VALORES
   {
     title: "Corte de Cabelo (Teste)",
-    price: 5.00,
+    price: 1.00,
     duration: "45 min",
     description: "Corte moderno com finalização."
   },
   {
     title: "Barba Completa (Teste)",
-    price: 5.00,
+    price: 1.00,
     duration: "30 min",
     description: "Modelagem e hidratação com toalha quente."
   },
   {
     title: "Combo (Corte + Barba)",
-    price: 5.00,
+    price: 1.00,
     duration: "1h 15min",
     description: "O serviço completo com desconto."
   },
   {
     title: "Sobrancelha (Teste)",
-    price: 5.00,
+    price: 1.00,
     duration: "15 min",
     description: "Design e limpeza dos fios."
   }
