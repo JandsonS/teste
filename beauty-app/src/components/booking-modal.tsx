@@ -157,12 +157,20 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  // ESTILOS DO CALENDÁRIO (FIXOS NO ESCURO)
+  const calendarStyles = { 
+    caption: { color: '#e4e4e7', textTransform: 'capitalize' as const }, 
+    head_cell: { color: '#a1a1aa' }, 
+    day: { color: '#e4e4e7' }, 
+    nav_button: { color: '#ec4899' } 
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       
-      {/* Container Principal com Suporte a Tema Escuro e Claro */}
-      <DialogContent className="w-[95vw] sm:max-w-[650px] max-h-[90vh] overflow-y-auto p-0 bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-white border-zinc-200 dark:border-zinc-800 rounded-2xl scrollbar-hide transition-colors duration-300">
+      {/* TEMA DARK FIXO (bg-zinc-950) */}
+      <DialogContent className="w-[95vw] sm:max-w-[650px] max-h-[90vh] overflow-y-auto p-0 bg-zinc-950 text-white border-zinc-800 rounded-2xl scrollbar-hide">
         
         <div className="bg-gradient-to-r from-pink-600 to-purple-700 p-4 md:p-6 text-white text-center sticky top-0 z-10 shadow-md">
           <DialogTitle className="text-xl md:text-2xl font-bold mb-1">Agendar Horário</DialogTitle>
@@ -175,36 +183,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 1 && (
             <div className="flex flex-col md:flex-row gap-6 md:gap-8">
               <div className="flex-1 flex justify-center">
-                
-                {/* Calendário: Forçando cores para garantir contraste e beleza em ambos os temas */}
-                <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 bg-white dark:bg-zinc-900 shadow-sm dark:shadow-inner w-full flex justify-center transition-colors">
+                <div className="border border-zinc-800 rounded-xl p-3 bg-zinc-900 shadow-inner w-full flex justify-center">
                     <style>{`
-                      .rdp { --rdp-cell-size: 35px; margin: 0; }
-                      .rdp-caption_label { text-transform: capitalize; font-size: 1rem; font-weight: 700; }
+                      .rdp { --rdp-cell-size: 35px; --rdp-accent-color: #db2777; --rdp-background-color: #27272a; margin: 0; }
+                      .rdp-caption_label { text-transform: capitalize; font-size: 1rem; font-weight: 700; color: white; }
+                      .rdp-day_selected:not([disabled]) { background-color: #db2777; color: white; font-weight: bold; }
+                      .rdp-day:hover:not([disabled]) { background-color: #3f3f46; border-radius: 8px; }
                       .rdp-button:focus, .rdp-button:active { border: 2px solid #db2777; }
-                      
-                      /* Força a cor ROSA no selecionado (importante para não ficar azul no claro) */
-                      .rdp-day_selected, .rdp-day_selected:hover { 
-                        background-color: #db2777 !important; 
-                        color: white !important; 
-                        font-weight: bold;
-                      }
-
-                      /* Modo Escuro */
-                      @media (prefers-color-scheme: dark) {
-                        .rdp { --rdp-background-color: #27272a; color: #e4e4e7; }
-                        .rdp-caption_label { color: white; }
-                        .rdp-day:hover:not([disabled]) { background-color: #3f3f46; border-radius: 8px; }
-                      }
-
-                      /* Modo Claro */
-                      @media (prefers-color-scheme: light) {
-                        .rdp { --rdp-background-color: #ffffff; color: #18181b; }
-                        .rdp-caption_label { color: #18181b; }
-                        .rdp-day:hover:not([disabled]) { background-color: #f4f4f5; border-radius: 8px; }
-                        .rdp-head_cell { color: #71717a; }
-                      }
-                      
                       @media (max-width: 400px) { .rdp { --rdp-cell-size: 30px; } }
                     `}</style>
                     <DayPicker 
@@ -213,12 +198,17 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                         onSelect={setDate}
                         locale={ptBR}
                         disabled={{ before: new Date() }}
+                        styles={calendarStyles}
+                        modifiersClassNames={{
+                            selected: "bg-pink-600 text-white rounded-md",
+                            today: "text-pink-500 font-bold"
+                        }}
                     />
                 </div>
               </div>
               
               <div className="flex-1">
-                <Label className="mb-3 flex justify-between items-center text-zinc-600 dark:text-zinc-300 font-bold text-sm md:text-base">
+                <Label className="mb-3 flex justify-between items-center text-zinc-300 font-bold text-sm md:text-base">
                     <span>2. Escolha o horário</span>
                     {loadingSlots && <Loader2 className="animate-spin w-4 h-4 text-pink-500"/>}
                 </Label>
@@ -235,11 +225,11 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             className={`
                                 text-[11px] md:text-xs h-9 md:h-10 font-medium transition-all
                                 ${selectedTime === time 
-                                    ? "bg-pink-600 hover:bg-pink-700 border-none scale-105 shadow-lg shadow-pink-900/20 text-white" 
-                                    : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"}
+                                    ? "bg-pink-600 hover:bg-pink-700 border-none scale-105 shadow-lg shadow-pink-900/20" 
+                                    : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700"}
                                 
                                 ${isUnavailable
-                                    ? "bg-red-50 dark:bg-red-950/10 border-red-100 dark:border-red-900/20 text-red-300 dark:text-zinc-600 line-through decoration-red-400 dark:decoration-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 opacity-70 cursor-pointer" 
+                                    ? "bg-red-950/10 border-red-900/20 text-zinc-600 line-through decoration-red-500 hover:bg-red-950/20 opacity-70 cursor-pointer" 
                                     : ""}
                             `} 
                             onClick={() => handleTimeClick(time)}
@@ -256,26 +246,26 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 2 && (
             <div className="space-y-4 py-4 animate-in fade-in slide-in-from-right-4">
                <div className="space-y-2">
-                 <Label className="text-zinc-700 dark:text-zinc-300">Seu Nome Completo</Label>
+                 <Label className="text-zinc-300">Seu Nome Completo</Label>
                  <Input 
                    placeholder="Ex: Maria Silva" 
-                   className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:ring-pink-500 h-12 transition-colors" 
+                   className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" 
                    value={name} 
                    onChange={(e) => setName(e.target.value)}
                  />
                </div>
                <div className="space-y-2">
-                 <Label className="text-zinc-700 dark:text-zinc-300">Seu WhatsApp</Label>
+                 <Label className="text-zinc-300">Seu WhatsApp</Label>
                  <Input 
                    type="tel" 
                    placeholder="(11) 99999-9999" 
-                   className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:ring-pink-500 h-12 transition-colors" 
+                   className="bg-zinc-900 border-zinc-700 text-white focus:ring-pink-500 h-12" 
                    value={phone} 
                    onChange={(e) => setPhone(formatPhone(e.target.value))} 
                    maxLength={15} 
                  />
-                 {!isPhoneValid && phone.length > 0 && (<p className="text-[10px] text-red-500 dark:text-red-400 animate-pulse">* Digite o número completo com DDD (11 dígitos)</p>)}
-                 {isPhoneValid && (<p className="text-[10px] text-emerald-600 dark:text-emerald-500 flex items-center gap-1"><CheckCircle2 size={10} /> Número válido</p>)}
+                 {!isPhoneValid && phone.length > 0 && (<p className="text-[10px] text-red-400 animate-pulse">* Digite o número completo com DDD (11 dígitos)</p>)}
+                 {isPhoneValid && (<p className="text-[10px] text-emerald-500 flex items-center gap-1"><CheckCircle2 size={10} /> Número válido</p>)}
                </div>
             </div>
           )}
@@ -283,29 +273,29 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 3 && (
             <div className="py-2 space-y-4 animate-in fade-in slide-in-from-right-4">
                 <div className="text-center mb-4">
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-3">Escolha a forma de pagamento</h3>
-                    <div className="flex gap-3 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 transition-colors">
-                        <button onClick={() => setPaymentMethod('PIX')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm transition-all ${paymentMethod === 'PIX' ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/50 shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}><QrCode size={18} /> PIX</button>
-                        <button onClick={() => setPaymentMethod('CARD')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm transition-all ${paymentMethod === 'CARD' ? 'bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/50 shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}><CreditCard size={18} /> Cartão</button>
+                    <h3 className="text-lg font-bold text-white mb-3">Escolha a forma de pagamento</h3>
+                    <div className="flex gap-3 p-1 bg-zinc-900 rounded-xl border border-zinc-800">
+                        <button onClick={() => setPaymentMethod('PIX')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm transition-all ${paymentMethod === 'PIX' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 shadow-lg shadow-emerald-500/10' : 'text-zinc-400 hover:bg-zinc-800'}`}><QrCode size={18} /> PIX</button>
+                        <button onClick={() => setPaymentMethod('CARD')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm transition-all ${paymentMethod === 'CARD' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/50 shadow-lg shadow-purple-500/10' : 'text-zinc-400 hover:bg-zinc-800'}`}><CreditCard size={18} /> Cartão</button>
                     </div>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">
-                    <button onClick={() => handleCheckout('FULL')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left ${paymentMethod === 'PIX' ? 'hover:border-emerald-500/50 hover:bg-emerald-50' : 'hover:border-purple-500/50 hover:bg-purple-50'} border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900`}>
+                    <button onClick={() => handleCheckout('FULL')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left ${paymentMethod === 'PIX' ? 'hover:border-emerald-500/50 hover:bg-emerald-500/5' : 'hover:border-purple-500/50 hover:bg-purple-500/5'} border-zinc-800 bg-zinc-900`}>
                         <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 mr-4 ${paymentMethod === 'PIX' ? 'bg-emerald-500' : 'bg-purple-500'}`}>{paymentMethod === 'PIX' ? <Smartphone size={24} /> : <CreditCard size={24} />}</div>
                         <div className="flex-1">
-                            <div className="flex justify-between items-start"><p className="font-bold text-zinc-900 dark:text-white text-base">Pagamento Integral</p><span className="font-bold text-zinc-900 dark:text-white text-base">{formatMoney(numericPrice)}</span></div>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Quitação total com garantia imediata.</p>
-                            <div className="mt-2 flex gap-2"><span className={`text-[10px] px-2 py-0.5 rounded font-bold ${paymentMethod === 'PIX' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400'}`}>{paymentMethod === 'PIX' ? 'Aprovação Imediata' : 'Até 12x no cartão'}</span></div>
+                            <div className="flex justify-between items-start"><p className="font-bold text-white text-base">Pagamento Integral</p><span className="font-bold text-white text-base">{formatMoney(numericPrice)}</span></div>
+                            <p className="text-xs text-zinc-400 mt-1">Quitação total com garantia imediata.</p>
+                            <div className="mt-2 flex gap-2"><span className={`text-[10px] px-2 py-0.5 rounded font-bold ${paymentMethod === 'PIX' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-purple-500/20 text-purple-400'}`}>{paymentMethod === 'PIX' ? 'Aprovação Imediata' : 'Até 12x no cartão'}</span></div>
                         </div>
                         {loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}
                     </button>
 
-                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left hover:border-blue-500/50 hover:bg-blue-50 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900`}>
+                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left hover:border-blue-500/50 hover:bg-blue-500/5 border-zinc-800 bg-zinc-900`}>
                         <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-inner shrink-0 mr-4"><Wallet size={24} /></div>
                         <div className="flex-1">
-                            <div className="flex justify-between items-start"><p className="font-bold text-zinc-900 dark:text-white text-base">Reservar Vaga (20%)</p><span className="font-bold text-zinc-900 dark:text-white text-base">{formatMoney(depositValue)}</span></div>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Pague o restante ({formatMoney(remainingValue)}) no local.</p>
+                            <div className="flex justify-between items-start"><p className="font-bold text-white text-base">Reservar Vaga (20%)</p><span className="font-bold text-white text-base">{formatMoney(depositValue)}</span></div>
+                            <p className="text-xs text-zinc-400 mt-1">Pague o restante ({formatMoney(remainingValue)}) no local.</p>
                         </div>
                         {loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}
                     </button>
@@ -313,23 +303,22 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
                 <div className="text-center pt-2">
                     <div className="flex items-center justify-center gap-1 text-[10px] text-yellow-600/80 mb-1"><AlertTriangle size={10} /><span>Atendimento sujeito a espera</span></div>
-                    <button onClick={handleWhatsAppContact} className="text-xs text-zinc-500 hover:text-green-500 transition-colors flex items-center justify-center gap-2 mx-auto underline decoration-zinc-400 dark:decoration-zinc-700 underline-offset-4 hover:decoration-green-500"><MessageCircle size={14} />Não consegue pagar online? Solicitar via WhatsApp</button>
+                    <button onClick={handleWhatsAppContact} className="text-xs text-zinc-500 hover:text-green-500 transition-colors flex items-center justify-center gap-2 mx-auto underline decoration-zinc-700 underline-offset-4 hover:decoration-green-500"><MessageCircle size={14} />Não consegue pagar online? Solicitar via WhatsApp</button>
                 </div>
             </div>
           )}
         </div>
         
-        <DialogFooter className="p-4 md:p-6 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row gap-2 transition-colors">
+        <DialogFooter className="p-4 md:p-6 bg-zinc-900 border-t border-zinc-800 flex flex-col sm:flex-row gap-2">
           {step === 1 && (
             <div className="flex gap-2 w-full">
-                {/* >>> AQUI ESTÁ O BOTÃO DE VOLTAR QUE VOCÊ PEDIU <<< */}
-                <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 bg-transparent border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button>
+                {/* BOTÃO VOLTAR (FECHAR) - Adicionado aqui */}
+                <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button>
                 <Button className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>
             </div>
           )}
-          
-          {step === 2 && (<div className="flex gap-2 w-full"><Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl disabled:opacity-50">Ir para Pagamento</Button></div>)}
-          {step === 3 && (<div className="w-full"><Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-zinc-900 dark:hover:text-white mb-2 rounded-xl">Voltar</Button></div>)}
+          {step === 2 && (<div className="flex gap-2 w-full"><Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-700 text-white hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl disabled:opacity-50">Ir para Pagamento</Button></div>)}
+          {step === 3 && (<div className="w-full"><Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-white mb-2 rounded-xl">Voltar</Button></div>)}
         </DialogFooter>
       </DialogContent>
     </Dialog>
