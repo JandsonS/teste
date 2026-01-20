@@ -13,27 +13,34 @@ const client = new MercadoPagoConfig({
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    
-    // Aceita o teste do painel para não dar erro
-    if (body.data?.id === "123456" || body.type === "test") {
+    const body = await request.json().catch(() => null);
+
+    // 1. Validação simples para ignorar testes automáticos do MP
+    if (!body || (body.data?.id === "123456" || body.type === "test")) {
         return NextResponse.json({ received: true }, { status: 200 });
     }
 
+    // 2. Identifica o ID do pagamento
+    const paymentId = body.data?.id || body.id;
     const action = body.action;
     const type = body.type;
-    let id = body.data?.id || body.id;
 
-    if (action === "payment.created" || action === "payment.updated" || type === "payment") {
-      if (id) {
-        const payment = new Payment(client);
-        const paymentInfo = await payment.get({ id: id });
+    // Só processamos notificações de pagamento reais
+    if (!paymentId || (type !== "payment" && action !== "payment.created" && action !== "payment.updated")) {
+        return NextResponse.json({ received: true }, { status: 200 });
+    }
 
-        if (paymentInfo.status === "approved") {
-          const agendamentoId = paymentInfo.external_reference;
-          
-          if (agendamentoId) {
-            // DESCUBRA O MÉTODO DE PAGAMENTO
+    // 3. Consulta a API do Mercado Pago para ver o status real
+    const payment = new Payment(client);
+    const paymentInfo = await payment.get({ id: paymentId });
+
+    // 4. Se estiver APROVADO, atualiza o banco
+    if (paymentInfo.status === "approved") {
+        // Pega o ID que enviamos no 'external_reference' no arquivo de pagamento
+        const agendamentoId = paymentInfo.external_reference;
+
+        if (agendamentoId) {
+            // Define o texto bonito para o Painel Administrativo
             let statusDetalhado = "PAGO";
             const metodo = paymentInfo.payment_type_id;
 
@@ -47,23 +54,27 @@ export async function POST(request: Request) {
                 statusDetalhado = "PAGO (SALDO MP)";
             }
 
+            // Atualiza no Prisma
             await prisma.agendamento.update({
-              where: { id: agendamentoId },
-              data: { 
-                  status: statusDetalhado, 
-                  paymentId: String(id) 
-              },
+                where: { id: agendamentoId },
+                data: { 
+                    status: statusDetalhado,
+                    // Se você tiver a coluna paymentId no seu schema.prisma, pode descomentar a linha abaixo:
+                    // paymentId: String(paymentId) 
+                },
             });
-            console.log(`✅ ${agendamentoId} atualizado para: ${statusDetalhado}`);
-          }
+
+            console.log(`✅ Agendamento ${agendamentoId} confirmado! Status: ${statusDetalhado}`);
+        } else {
+            console.warn("⚠️ Pagamento aprovado sem ID do agendamento (external_reference vazio).");
         }
-      }
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
 
   } catch (error) {
     console.error("❌ Erro no Webhook:", error);
+    // Retorna 200 para evitar loop de erro com o Mercado Pago
     return NextResponse.json({ received: true }, { status: 200 });
   }
 }
