@@ -11,36 +11,33 @@ export async function GET(request: Request) {
   const date = searchParams.get('date');
   const service = searchParams.get('service'); 
 
-  if (!date) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
+  if (!date) return NextResponse.json({ error: 'Por favor, forneça uma data válida.' }, { status: 400 });
 
-  // --- NOVA LÓGICA DE BLOQUEIO INTELIGENTE ---
-  // Aqui definimos exatamente quais palavras-chave causam conflito para o serviço escolhido.
+  // --- LÓGICA DE CONTAINER ÚNICO (ISOLAMENTO TOTAL) ---
+  // Cada serviço olha apenas para si mesmo. Um não interfere no outro.
   let keywordsDeBloqueio: string[] = [];
 
   if (service) {
       const s = service.toLowerCase();
 
       if (s.includes('sobrancelha')) {
-          // Sobrancelha: Conflita apenas com outras Sobrancelhas
           keywordsDeBloqueio = ['sobrancelha'];
       } 
       else if (s.includes('combo')) {
-          // Combo: Ocupa o barbeiro totalmente, então conflita com Corte, Barba e Combo
-          keywordsDeBloqueio = ['corte', 'barba', 'combo'];
+          keywordsDeBloqueio = ['combo']; // Combo só olha para Combo
       }
       else if (s.includes('corte')) {
-          // Corte: Conflita com Corte e Combo (mas deixa a Barba livre)
-          keywordsDeBloqueio = ['corte', 'combo'];
+          keywordsDeBloqueio = ['corte']; // Corte só olha para Corte (não vê Combo)
       }
       else if (s.includes('barba')) {
-          // Barba: Conflita com Barba e Combo (mas deixa o Corte livre)
-          keywordsDeBloqueio = ['barba', 'combo'];
+          keywordsDeBloqueio = ['barba']; // Barba só olha para Barba (não vê Combo)
       }
       else {
-          // Segurança: Se não identificar, bloqueia tudo para evitar erros
-          keywordsDeBloqueio = ['corte', 'barba', 'combo', 'sobrancelha'];
+          // Se for um serviço novo, usa o próprio nome como filtro estrito
+          keywordsDeBloqueio = [s];
       }
   } else {
+      // Fallback de segurança
       keywordsDeBloqueio = ['corte', 'barba', 'combo', 'sobrancelha'];
   }
 
@@ -50,24 +47,24 @@ export async function GET(request: Request) {
       select: { horario: true, servico: true, status: true, createdAt: true } 
     });
 
-    const busySlots: string[] = [];   // Horários ocupados definitivamente
-    const lockedSlots: string[] = []; // Horários em processo de reserva (Regra de 2 min)
+    const busySlots: string[] = [];   
+    const lockedSlots: string[] = []; 
 
     const agora = new Date().getTime();
 
     agendamentosDoDia.forEach(agendamento => {
         const servicoAgendado = agendamento.servico.toLowerCase();
         
-        // --- VERIFICAÇÃO DE CONFLITO ESPECÍFICA ---
-        // Verifica se o serviço que já está agendado contém alguma das palavras proibidas para o serviço que o cliente quer agora.
+        // --- FILTRAGEM ESTRITA ---
+        // Verifica se o agendamento existente é EXATAMENTE do tipo que estamos buscando.
+        // Se eu quero "Barba", só me importo se já existe "Barba". Se tiver "Combo", eu ignoro.
         const temConflito = keywordsDeBloqueio.some(keyword => servicoAgendado.includes(keyword));
 
-        // Se não tiver conflito (ex: Cliente quer Barba e o agendamento lá é Corte), a gente PULA e deixa o horário livre.
-        if (!temConflito) return; 
+        if (!temConflito) return; // Se for serviço diferente, o horário fica LIVRE.
 
-        // --- REGRAS DE STATUS (MANTIDAS PERFEITAMENTE) ---
+        // --- REGRAS DE STATUS ---
         
-        // 1. Bloqueio Definitivo (Pago/Sinal/Confirmado)
+        // 1. Bloqueio Definitivo
         if (agendamento.status.includes('PAGO') || 
             agendamento.status.includes('SINAL') || 
             agendamento.status === 'CONFIRMADO') {
@@ -75,20 +72,18 @@ export async function GET(request: Request) {
             return;
         }
 
-        // 2. Bloqueio Temporário (Pendente < 2 minutos)
+        // 2. Bloqueio Temporário (Regra de 2 minutos)
         if (agendamento.status === 'PENDENTE') {
             const diff = (agora - new Date(agendamento.createdAt).getTime()) / 1000 / 60;
             if (diff < 2) {
-                // Está dentro dos 2 minutos de segurança da Josefa
                 lockedSlots.push(agendamento.horario);
             }
-            // Se passou de 2 minutos, o sistema ignora e libera o horário automaticamente.
         }
     });
 
     return NextResponse.json({ busy: busySlots, locked: lockedSlots });
 
   } catch (error) {
-    return NextResponse.json({ error: 'Ocorreu um erro ao verificar a disponibilidade.' }, { status: 500 });
+    return NextResponse.json({ error: 'Ocorreu um erro ao verificar a disponibilidade. Por favor, tente novamente.' }, { status: 500 });
   }
 }
