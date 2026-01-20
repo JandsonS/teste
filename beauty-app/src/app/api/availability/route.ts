@@ -37,25 +37,25 @@ export async function GET(request: Request) {
     agendamentosDoDia.forEach(agendamento => {
         const servicoNoBanco = agendamento.servico.toLowerCase();
         
-        // --- FILTRO DE ISOLAMENTO ---
-        // Se eu estou vendo "Corte", só me mostre ocupado se tiver "Corte".
-        // Ignore "Barba", ignore "Sobrancelha".
         let temConflito = false;
 
         if (containerAlvo === 'corte') {
-             if (servicoNoBanco.includes('corte')) temConflito = true;
+             // Só mostra ocupado se tiver CORTE e NÃO for COMBO
+             if (servicoNoBanco.includes('corte') && !servicoNoBanco.includes('combo')) temConflito = true;
         }
         else if (containerAlvo === 'barba') {
-             if (servicoNoBanco.includes('barba')) temConflito = true;
+             // Só mostra ocupado se tiver BARBA e NÃO for COMBO
+             if (servicoNoBanco.includes('barba') && !servicoNoBanco.includes('combo')) temConflito = true;
         }
         else if (containerAlvo === 'combo') {
+             // Só mostra ocupado se tiver COMBO
              if (servicoNoBanco.includes('combo')) temConflito = true;
         }
         else {
              if (servicoNoBanco.includes(containerAlvo)) temConflito = true;
         }
 
-        if (!temConflito) return; // Horário fica LIVRE visualmente
+        if (!temConflito) return; // Se não é o mesmo serviço exato, considera LIVRE.
 
         // --- STATUS ---
         if (agendamento.status.includes('PAGO') || 

@@ -52,8 +52,8 @@ export async function POST(request: Request) {
     // FASE 2: LEI DO SERVIÇO (ISOLAMENTO DE CONTAINER)
     // =================================================================================
     const servicoSolicitado = title.toLowerCase();
+    
     let containerAlvo = "";
-
     if (servicoSolicitado.includes('sobrancelha')) containerAlvo = 'sobrancelha';
     else if (servicoSolicitado.includes('combo')) containerAlvo = 'combo';
     else if (servicoSolicitado.includes('corte')) containerAlvo = 'corte';
@@ -66,9 +66,27 @@ export async function POST(request: Request) {
 
     const vagaOcupada = vagasNoHorario.filter(vaga => {
          const servicoNoBanco = vaga.servico.toLowerCase();
-         if (containerAlvo === 'corte') return servicoNoBanco.includes('corte'); 
-         if (containerAlvo === 'barba') return servicoNoBanco.includes('barba');
-         if (containerAlvo === 'combo') return servicoNoBanco.includes('combo');
+         
+         // REGRA DE OURO: Separar o "Combo" dos individuais
+         
+         if (containerAlvo === 'corte') {
+            // Se eu quero CORTE, trava se tiver CORTE, mas IGNORA se for COMBO.
+            // (Porque Combo é outro serviço independente para você)
+            return servicoNoBanco.includes('corte') && !servicoNoBanco.includes('combo'); 
+         }
+
+         if (containerAlvo === 'barba') {
+            // Se eu quero BARBA, trava se tiver BARBA, mas IGNORA se for COMBO.
+            return servicoNoBanco.includes('barba') && !servicoNoBanco.includes('combo');
+         }
+
+         if (containerAlvo === 'combo') {
+            // Se eu quero COMBO, só trava se tiver outro COMBO.
+            // Ignora se tiver Corte solto ou Barba solta.
+            return servicoNoBanco.includes('combo');
+         }
+         
+         // Para Sobrancelha e outros, segue normal
          return servicoNoBanco.includes(containerAlvo);
     });
 
