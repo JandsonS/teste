@@ -11,36 +11,20 @@ export async function GET(request: Request) {
   const date = searchParams.get('date');
   const service = searchParams.get('service'); 
 
-  if (!date) return NextResponse.json({ error: 'Por favor, forneça uma data válida.' }, { status: 400 });
+  if (!date) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
 
-  // --- REGRAS DE NEGÓCIO (QUEM BLOQUEIA QUEM) ---
-  // Grupo 1: Barbeiro (Qualquer serviço aqui ocupa o barbeiro)
-  const GRUPO_BARBEARIA = ['corte', 'barba', 'combo'];
-  
-  // Grupo 2: Estética (Independente da barbearia)
-  const GRUPO_ESTETICA = ['sobrancelha'];
-
-  // Define qual grupo o serviço atual pertence
-  let keywordsDoGrupoAtual: string[] = [];
-
+  // DEFINIÇÃO DO "CONTAINER" (O que eu estou procurando?)
+  let containerAlvo = "";
   if (service) {
       const s = service.toLowerCase();
-      
-      // Se for Sobrancelha, olha apenas para conflitos de Sobrancelha
-      if (GRUPO_ESTETICA.some(g => s.includes(g))) {
-          keywordsDoGrupoAtual = GRUPO_ESTETICA;
-      } 
-      // Se for qualquer coisa de Barbearia, olha para TUDO da Barbearia
-      else {
-          keywordsDoGrupoAtual = GRUPO_BARBEARIA;
-      }
-  } else {
-      // Segurança: Bloqueia tudo se não souber o serviço
-      keywordsDoGrupoAtual = [...GRUPO_BARBEARIA, ...GRUPO_ESTETICA];
+      if (s.includes('sobrancelha')) containerAlvo = 'sobrancelha';
+      else if (s.includes('combo')) containerAlvo = 'combo';
+      else if (s.includes('corte')) containerAlvo = 'corte';
+      else if (s.includes('barba')) containerAlvo = 'barba';
+      else containerAlvo = s;
   }
 
   try {
-    // Busca TODOS os agendamentos do dia (não cancelados)
     const agendamentosDoDia = await prisma.agendamento.findMany({
       where: { data: date, status: { not: 'CANCELADO' } },
       select: { horario: true, servico: true, status: true, createdAt: true } 
@@ -48,22 +32,32 @@ export async function GET(request: Request) {
 
     const busySlots: string[] = [];   
     const lockedSlots: string[] = []; 
-
     const agora = new Date().getTime();
 
     agendamentosDoDia.forEach(agendamento => {
-        const servicoAgendado = agendamento.servico.toLowerCase();
+        const servicoNoBanco = agendamento.servico.toLowerCase();
         
-        // --- VERIFICAÇÃO DE CONFLITO ---
-        // Verifica se o serviço agendado pertence ao MESMO GRUPO do serviço que estamos tentando marcar.
-        // Ex: Se quero "Barba" (Grupo Barbearia), vou travar se tiver "Corte" ou "Combo" lá.
-        const ehDoMesmoGrupo = keywordsDoGrupoAtual.some(keyword => servicoAgendado.includes(keyword));
+        // --- FILTRO DE ISOLAMENTO ---
+        // Se eu estou vendo "Corte", só me mostre ocupado se tiver "Corte".
+        // Ignore "Barba", ignore "Sobrancelha".
+        let temConflito = false;
 
-        if (!ehDoMesmoGrupo) return; // Se for de outro grupo (ex: Sobrancelha), deixa livre.
+        if (containerAlvo === 'corte') {
+             if (servicoNoBanco.includes('corte')) temConflito = true;
+        }
+        else if (containerAlvo === 'barba') {
+             if (servicoNoBanco.includes('barba')) temConflito = true;
+        }
+        else if (containerAlvo === 'combo') {
+             if (servicoNoBanco.includes('combo')) temConflito = true;
+        }
+        else {
+             if (servicoNoBanco.includes(containerAlvo)) temConflito = true;
+        }
 
-        // --- REGRAS DE STATUS ---
-        
-        // 1. Bloqueio Definitivo (Pago/Confirmado)
+        if (!temConflito) return; // Horário fica LIVRE visualmente
+
+        // --- STATUS ---
         if (agendamento.status.includes('PAGO') || 
             agendamento.status.includes('SINAL') || 
             agendamento.status === 'CONFIRMADO') {
@@ -71,7 +65,6 @@ export async function GET(request: Request) {
             return;
         }
 
-        // 2. Bloqueio Temporário (Regra de 2 minutos)
         if (agendamento.status === 'PENDENTE') {
             const diff = (agora - new Date(agendamento.createdAt).getTime()) / 1000 / 60;
             if (diff < 2) {
@@ -83,6 +76,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ busy: busySlots, locked: lockedSlots });
 
   } catch (error) {
-    return NextResponse.json({ error: 'Ocorreu um erro ao verificar a disponibilidade.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro disponibilidade' }, { status: 500 });
   }
 }
