@@ -32,6 +32,14 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [lockedSlots, setLockedSlots] = useState<string[]>([]) 
   const [loadingSlots, setLoadingSlots] = useState(false)
 
+  // Resetar passos ao abrir/fechar
+  useEffect(() => {
+    if (!open) {
+        setStep(1);
+        setSelectedTime(null);
+    }
+  }, [open]);
+
   const formatPhone = (value: string) => {
     const onlyNumbers = value.replace(/\D/g, '');
     const limited = onlyNumbers.slice(0, 11);
@@ -86,16 +94,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   }, [date, serviceName]);
 
   const handleTimeClick = (time: string) => {
-    // 1. Bloqueio Permanente (Já Pago)
     if (busySlots.includes(time)) {
         toast.error("Horário Indisponível", { 
             description: "Este horário já foi confirmado.",
         });
         return;
     }
-
-    // 2. Bloqueio Temporário (Em andamento)
-    // VOLTAMOS AO VISUAL PADRÃO DO TOAST (SEM O AMARELO FEIO)
     if (lockedSlots.includes(time)) {
         toast.error("Aguarde um momento", { 
             description: "Este horário está sendo reservado. Escolha outro ou aguarde 2 minutos.",
@@ -103,7 +107,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         });
         return; 
     }
-
     setSelectedTime(time);
   };
 
@@ -158,10 +161,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       
-      {/* AQUI COMEÇA A MÁGICA DO DARK/LIGHT MODE 
-        bg-white (Claro) vs dark:bg-zinc-950 (Escuro)
-      */}
-      <DialogContent className="w-[95vw] sm:max-w-[650px] max-h-[90vh] overflow-y-auto p-0 bg-white dark:bg-zinc-950 text-zinc-950 dark:text-white border-zinc-200 dark:border-zinc-800 rounded-2xl scrollbar-hide transition-colors duration-300">
+      {/* Container Principal com Suporte a Tema Escuro e Claro */}
+      <DialogContent className="w-[95vw] sm:max-w-[650px] max-h-[90vh] overflow-y-auto p-0 bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-white border-zinc-200 dark:border-zinc-800 rounded-2xl scrollbar-hide transition-colors duration-300">
         
         <div className="bg-gradient-to-r from-pink-600 to-purple-700 p-4 md:p-6 text-white text-center sticky top-0 z-10 shadow-md">
           <DialogTitle className="text-xl md:text-2xl font-bold mb-1">Agendar Horário</DialogTitle>
@@ -174,27 +175,33 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 1 && (
             <div className="flex flex-col md:flex-row gap-6 md:gap-8">
               <div className="flex-1 flex justify-center">
-                {/* Calendário Container: Claro (bg-white/borda clara) vs Escuro (bg-zinc-900/borda escura) */}
-                <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 bg-zinc-50 dark:bg-zinc-900 shadow-inner w-full flex justify-center transition-colors">
+                
+                {/* Calendário: Forçando cores para garantir contraste e beleza em ambos os temas */}
+                <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 bg-white dark:bg-zinc-900 shadow-sm dark:shadow-inner w-full flex justify-center transition-colors">
                     <style>{`
-                      .rdp { --rdp-cell-size: 35px; --rdp-accent-color: #db2777; margin: 0; }
+                      .rdp { --rdp-cell-size: 35px; margin: 0; }
                       .rdp-caption_label { text-transform: capitalize; font-size: 1rem; font-weight: 700; }
                       .rdp-button:focus, .rdp-button:active { border: 2px solid #db2777; }
                       
-                      /* MODO ESCURO (Padrão ou System Dark) */
+                      /* Força a cor ROSA no selecionado (importante para não ficar azul no claro) */
+                      .rdp-day_selected, .rdp-day_selected:hover { 
+                        background-color: #db2777 !important; 
+                        color: white !important; 
+                        font-weight: bold;
+                      }
+
+                      /* Modo Escuro */
                       @media (prefers-color-scheme: dark) {
                         .rdp { --rdp-background-color: #27272a; color: #e4e4e7; }
                         .rdp-caption_label { color: white; }
                         .rdp-day:hover:not([disabled]) { background-color: #3f3f46; border-radius: 8px; }
-                        .rdp-day_selected:not([disabled]) { background-color: #db2777; color: white; font-weight: bold; }
                       }
 
-                      /* MODO CLARO (System Light) */
+                      /* Modo Claro */
                       @media (prefers-color-scheme: light) {
-                        .rdp { --rdp-background-color: #fafafa; color: #18181b; }
+                        .rdp { --rdp-background-color: #ffffff; color: #18181b; }
                         .rdp-caption_label { color: #18181b; }
-                        .rdp-day:hover:not([disabled]) { background-color: #e4e4e7; border-radius: 8px; }
-                        .rdp-day_selected:not([disabled]) { background-color: #db2777; color: white; font-weight: bold; }
+                        .rdp-day:hover:not([disabled]) { background-color: #f4f4f5; border-radius: 8px; }
                         .rdp-head_cell { color: #71717a; }
                       }
                       
@@ -232,7 +239,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                                     : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"}
                                 
                                 ${isUnavailable
-                                    ? "bg-red-100 dark:bg-red-950/10 border-red-200 dark:border-red-900/20 text-red-400 dark:text-zinc-600 line-through decoration-red-400 dark:decoration-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 opacity-70 cursor-pointer" 
+                                    ? "bg-red-50 dark:bg-red-950/10 border-red-100 dark:border-red-900/20 text-red-300 dark:text-zinc-600 line-through decoration-red-400 dark:decoration-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 opacity-70 cursor-pointer" 
                                     : ""}
                             `} 
                             onClick={() => handleTimeClick(time)}
@@ -252,7 +259,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                  <Label className="text-zinc-700 dark:text-zinc-300">Seu Nome Completo</Label>
                  <Input 
                    placeholder="Ex: Maria Silva" 
-                   className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:ring-pink-500 h-12 transition-colors" 
+                   className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:ring-pink-500 h-12 transition-colors" 
                    value={name} 
                    onChange={(e) => setName(e.target.value)}
                  />
@@ -262,7 +269,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                  <Input 
                    type="tel" 
                    placeholder="(11) 99999-9999" 
-                   className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:ring-pink-500 h-12 transition-colors" 
+                   className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:ring-pink-500 h-12 transition-colors" 
                    value={phone} 
                    onChange={(e) => setPhone(formatPhone(e.target.value))} 
                    maxLength={15} 
@@ -284,8 +291,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">
-                    {/* Botão Pagamento Integral */}
-                    <button onClick={() => handleCheckout('FULL')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left ${paymentMethod === 'PIX' ? 'hover:border-emerald-500/50 hover:bg-emerald-50' : 'hover:border-purple-500/50 hover:bg-purple-50'} border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900`}>
+                    <button onClick={() => handleCheckout('FULL')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left ${paymentMethod === 'PIX' ? 'hover:border-emerald-500/50 hover:bg-emerald-50' : 'hover:border-purple-500/50 hover:bg-purple-50'} border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900`}>
                         <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 mr-4 ${paymentMethod === 'PIX' ? 'bg-emerald-500' : 'bg-purple-500'}`}>{paymentMethod === 'PIX' ? <Smartphone size={24} /> : <CreditCard size={24} />}</div>
                         <div className="flex-1">
                             <div className="flex justify-between items-start"><p className="font-bold text-zinc-900 dark:text-white text-base">Pagamento Integral</p><span className="font-bold text-zinc-900 dark:text-white text-base">{formatMoney(numericPrice)}</span></div>
@@ -295,8 +301,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                         {loading ? <Loader2 className="absolute top-5 right-5 animate-spin text-zinc-500 w-4 h-4"/> : null}
                     </button>
 
-                    {/* Botão Sinal */}
-                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left hover:border-blue-500/50 hover:bg-blue-50 border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900`}>
+                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading} className={`relative flex items-center p-5 rounded-2xl border-2 transition-all group disabled:opacity-50 text-left hover:border-blue-500/50 hover:bg-blue-50 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900`}>
                         <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-inner shrink-0 mr-4"><Wallet size={24} /></div>
                         <div className="flex-1">
                             <div className="flex justify-between items-start"><p className="font-bold text-zinc-900 dark:text-white text-base">Reservar Vaga (20%)</p><span className="font-bold text-zinc-900 dark:text-white text-base">{formatMoney(depositValue)}</span></div>
@@ -315,7 +320,14 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
         
         <DialogFooter className="p-4 md:p-6 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row gap-2 transition-colors">
-          {step === 1 && (<Button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>)}
+          {step === 1 && (
+            <div className="flex gap-2 w-full">
+                {/* >>> AQUI ESTÁ O BOTÃO DE VOLTAR QUE VOCÊ PEDIU <<< */}
+                <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 bg-transparent border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button>
+                <Button className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>
+            </div>
+          )}
+          
           {step === 2 && (<div className="flex gap-2 w-full"><Button variant="outline" onClick={() => setStep(1)} className="flex-1 bg-transparent border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 h-12 rounded-xl">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold h-12 rounded-xl disabled:opacity-50">Ir para Pagamento</Button></div>)}
           {step === 3 && (<div className="w-full"><Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-zinc-900 dark:hover:text-white mb-2 rounded-xl">Voltar</Button></div>)}
         </DialogFooter>
