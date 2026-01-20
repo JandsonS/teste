@@ -102,7 +102,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     }
     if (lockedSlots.includes(time)) {
         toast.error("Aguarde um momento", { 
-            description: "Este horário está sendo reservado. Escolha outro ou aguarde 2 minutos.",
+            description: "Este horário está sendo reservado. Por favor escolha outro horário ou aguarde 2 minutos.",
             duration: 4000
         });
         return; 
