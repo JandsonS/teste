@@ -13,35 +13,34 @@ export async function GET(request: Request) {
 
   if (!date) return NextResponse.json({ error: 'Por favor, forneça uma data válida.' }, { status: 400 });
 
-  // --- LÓGICA DE CONTAINER ÚNICO (ISOLAMENTO TOTAL) ---
-  // Cada serviço olha apenas para si mesmo. Um não interfere no outro.
-  let keywordsDeBloqueio: string[] = [];
+  // --- REGRAS DE NEGÓCIO (QUEM BLOQUEIA QUEM) ---
+  // Grupo 1: Barbeiro (Qualquer serviço aqui ocupa o barbeiro)
+  const GRUPO_BARBEARIA = ['corte', 'barba', 'combo'];
+  
+  // Grupo 2: Estética (Independente da barbearia)
+  const GRUPO_ESTETICA = ['sobrancelha'];
+
+  // Define qual grupo o serviço atual pertence
+  let keywordsDoGrupoAtual: string[] = [];
 
   if (service) {
       const s = service.toLowerCase();
-
-      if (s.includes('sobrancelha')) {
-          keywordsDeBloqueio = ['sobrancelha'];
+      
+      // Se for Sobrancelha, olha apenas para conflitos de Sobrancelha
+      if (GRUPO_ESTETICA.some(g => s.includes(g))) {
+          keywordsDoGrupoAtual = GRUPO_ESTETICA;
       } 
-      else if (s.includes('combo')) {
-          keywordsDeBloqueio = ['combo']; // Combo só olha para Combo
-      }
-      else if (s.includes('corte')) {
-          keywordsDeBloqueio = ['corte']; // Corte só olha para Corte (não vê Combo)
-      }
-      else if (s.includes('barba')) {
-          keywordsDeBloqueio = ['barba']; // Barba só olha para Barba (não vê Combo)
-      }
+      // Se for qualquer coisa de Barbearia, olha para TUDO da Barbearia
       else {
-          // Se for um serviço novo, usa o próprio nome como filtro estrito
-          keywordsDeBloqueio = [s];
+          keywordsDoGrupoAtual = GRUPO_BARBEARIA;
       }
   } else {
-      // Fallback de segurança
-      keywordsDeBloqueio = ['corte', 'barba', 'combo', 'sobrancelha'];
+      // Segurança: Bloqueia tudo se não souber o serviço
+      keywordsDoGrupoAtual = [...GRUPO_BARBEARIA, ...GRUPO_ESTETICA];
   }
 
   try {
+    // Busca TODOS os agendamentos do dia (não cancelados)
     const agendamentosDoDia = await prisma.agendamento.findMany({
       where: { data: date, status: { not: 'CANCELADO' } },
       select: { horario: true, servico: true, status: true, createdAt: true } 
@@ -55,16 +54,16 @@ export async function GET(request: Request) {
     agendamentosDoDia.forEach(agendamento => {
         const servicoAgendado = agendamento.servico.toLowerCase();
         
-        // --- FILTRAGEM ESTRITA ---
-        // Verifica se o agendamento existente é EXATAMENTE do tipo que estamos buscando.
-        // Se eu quero "Barba", só me importo se já existe "Barba". Se tiver "Combo", eu ignoro.
-        const temConflito = keywordsDeBloqueio.some(keyword => servicoAgendado.includes(keyword));
+        // --- VERIFICAÇÃO DE CONFLITO ---
+        // Verifica se o serviço agendado pertence ao MESMO GRUPO do serviço que estamos tentando marcar.
+        // Ex: Se quero "Barba" (Grupo Barbearia), vou travar se tiver "Corte" ou "Combo" lá.
+        const ehDoMesmoGrupo = keywordsDoGrupoAtual.some(keyword => servicoAgendado.includes(keyword));
 
-        if (!temConflito) return; // Se for serviço diferente, o horário fica LIVRE.
+        if (!ehDoMesmoGrupo) return; // Se for de outro grupo (ex: Sobrancelha), deixa livre.
 
         // --- REGRAS DE STATUS ---
         
-        // 1. Bloqueio Definitivo
+        // 1. Bloqueio Definitivo (Pago/Confirmado)
         if (agendamento.status.includes('PAGO') || 
             agendamento.status.includes('SINAL') || 
             agendamento.status === 'CONFIRMADO') {
@@ -84,6 +83,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ busy: busySlots, locked: lockedSlots });
 
   } catch (error) {
-    return NextResponse.json({ error: 'Ocorreu um erro ao verificar a disponibilidade. Por favor, tente novamente.' }, { status: 500 });
+    return NextResponse.json({ error: 'Ocorreu um erro ao verificar a disponibilidade.' }, { status: 500 });
   }
 }

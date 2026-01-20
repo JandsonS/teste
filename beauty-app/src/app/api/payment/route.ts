@@ -17,7 +17,9 @@ export async function POST(request: Request) {
     const BASE_URL = "https://teste-drab-rho-60.vercel.app";
     const agora = new Date().getTime();
 
-    // FASE 1: ANTI-DUPLICIDADE
+    // =================================================================================
+    // FASE 1: ANTI-DUPLICIDADE (Regra do Cliente)
+    // =================================================================================
     const historicoCliente = await prisma.agendamento.findMany({ where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } } });
     for (const r of historicoCliente) {
       if (r.status.includes('PAGO') || r.status === 'CONFIRMADO') return NextResponse.json({ error: `🚫 Você já possui um agendamento confirmado.` }, { status: 409 });
@@ -29,22 +31,43 @@ export async function POST(request: Request) {
       }
     }
 
-    // FASE 2: VERIFICAÇÃO DE VAGA (A REGRA DE OURO)
-    const GRUPO_BARBEARIA = ['Corte', 'Barba', 'Combo'];
-    const GRUPO_ESTETICA = ['Sobrancelha'];
-    let grupoAtual = GRUPO_BARBEARIA;
-    if (GRUPO_ESTETICA.some(s => title.toLowerCase().includes(s.toLowerCase()))) grupoAtual = GRUPO_ESTETICA;
+    // =================================================================================
+    // FASE 2: VERIFICAÇÃO DE VAGA (Regra da Mão de Obra/Profissional)
+    // =================================================================================
+    
+    // 1. Definição dos Grupos de Profissionais
+    const GRUPO_BARBEARIA = ['corte', 'barba', 'combo'];
+    const GRUPO_ESTETICA = ['sobrancelha'];
+    
+    // 2. Identifica qual profissional será usado para o serviço ATUAL
+    let keywordsDoProfissional: string[] = [];
+    const servicoSolicitado = title.toLowerCase();
 
-    const vagasNoHorario = await prisma.agendamento.findMany({ where: { data: date, horario: time, status: { not: 'CANCELADO' } } });
-    const vagaOcupada = vagasNoHorario.filter(v => grupoAtual.some(g => v.servico.toLowerCase().includes(g.toLowerCase())));
+    if (GRUPO_ESTETICA.some(s => servicoSolicitado.includes(s))) {
+        keywordsDoProfissional = GRUPO_ESTETICA; // É a Esteticista
+    } else {
+        keywordsDoProfissional = GRUPO_BARBEARIA; // É o Barbeiro
+    }
+
+    // 3. Busca agendamentos naquele horário
+    const vagasNoHorario = await prisma.agendamento.findMany({ 
+        where: { data: date, horario: time, status: { not: 'CANCELADO' } } 
+    });
+
+    // 4. Filtra conflitos: Só trava se o agendamento existente for do MESMO PROFISSIONAL
+    const vagaOcupada = vagasNoHorario.filter(vaga => {
+         const servicoAgendado = vaga.servico.toLowerCase();
+         // Se o serviço que já está lá for do mesmo grupo (ex: já tem um Corte e eu quero Barba), dá conflito.
+         return keywordsDoProfissional.some(k => servicoAgendado.includes(k));
+    });
 
     for (const vaga of vagaOcupada) {
-      // 1. Bloqueio Permanente
+      // Bloqueio Permanente
       if (vaga.status.includes('PAGO') || vaga.status === 'CONFIRMADO') {
         return NextResponse.json({ error: '❌ Este horário já foi reservado.' }, { status: 409 });
       }
 
-      // 2. Bloqueio Temporário (Regra dos 2 Minutos)
+      // Bloqueio Temporário (Regra dos 2 Minutos)
       if (vaga.status === 'PENDENTE') {
         if (vaga.cliente.toLowerCase() === nomeClienteLimpo.toLowerCase()) {
             await prisma.agendamento.delete({ where: { id: vaga.id } });
@@ -54,18 +77,20 @@ export async function POST(request: Request) {
         const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60;
         
         if (diff < 2) {
-          // >>> MENSAGEM CORRETA AQUI <<<
+          // Mensagem formal e educada
           return NextResponse.json({ 
             error: '⏳ Este horário está sendo reservado por favor escolha outro horário ou aguarde 2 minutos.' 
           }, { status: 409 });
         } else {
-          // Se passou 2 min, libera a vaga da Josefa para o novo cliente
+          // Libera a vaga expirada
           await prisma.agendamento.delete({ where: { id: vaga.id } });
         }
       }
     }
 
-    // FASE 3: CRIAÇÃO
+    // =================================================================================
+    // FASE 3: CRIAÇÃO DO REGISTRO
+    // =================================================================================
     let nomeServico = paymentType === 'DEPOSIT' ? `${title} (Sinal Pago | Resta: R$ ${pricePending})` : `${title} (Integral)`;
     const agendamento = await prisma.agendamento.create({
       data: { 
@@ -74,7 +99,9 @@ export async function POST(request: Request) {
       }
     });
 
+    // =================================================================================
     // FASE 4: CHECKOUT MP
+    // =================================================================================
     const preference = new Preference(client);
     const result = await preference.create({
       body: {
