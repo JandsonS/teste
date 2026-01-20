@@ -4,7 +4,7 @@ export const SITE_CONFIG = {
   description: "Realce sua beleza única com nossos procedimentos exclusivos.",
   url: "https://teste-drab-rho-60.vercel.app", 
   // 2. SENHA DO ADMIN
-  adminPassword: "admin", // <--- TROQUE ESSA SENHA DEPOIS
+  adminPassword: "jandson", // <--- TROQUE ESSA SENHA DEPOIS
   // 3. WHATSAPP
   whatsappNumber: "558189015555", 
   whatsappDisplay: "(81) 98901-5555", 
