@@ -7,8 +7,8 @@ export async function POST(request: Request) {
 
   if (body.password === ADMIN_CONFIG.password) {
     
-    // 👇 O ERRO DO SEU PRINT É A FALTA DESSE 'await' AQUI 👇
-    const cookieStore = await cookies(); 
+    // 👇 ADICIONE O 'await' AQUI. ISSO CORRIGE O ERRO DO SEU PRINT.
+    const cookieStore = await cookies();
 
     cookieStore.set("admin_token", "authenticated", {
         httpOnly: true,
