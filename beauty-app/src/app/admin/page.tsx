@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { 
   Loader2, LogOut, CalendarDays, User, Phone, 
   CheckCircle2, AlertCircle, LayoutDashboard, 
-  RefreshCw, Wallet, TrendingUp, Filter, MessageCircle, Trash2, X 
+  RefreshCw, Wallet, TrendingUp, Filter, MessageCircle, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,7 +30,7 @@ export default function AdminDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'today' | 'tomorrow' | 'all'>('today'); 
-  const [deletingId, setDeletingId] = useState<string | null>(null); // ID sendo deletado
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -66,8 +66,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteBooking = async (id: string) => {
-    // Confirmação simples do navegador (mais seguro e rápido)
-    if (!confirm("Tem certeza que deseja cancelar este agendamento? Essa ação não pode ser desfeita.")) return;
+    if (!confirm("Tem certeza que deseja cancelar este agendamento?")) return;
 
     setDeletingId(id);
     try {
@@ -78,8 +77,7 @@ export default function AdminDashboard() {
       });
 
       if (res.ok) {
-        toast.success("Agendamento cancelado com sucesso!");
-        // Remove da lista visualmente sem precisar recarregar
+        toast.success("Agendamento cancelado!");
         setBookings((prev) => prev.filter((b) => b.id !== id));
       } else {
         toast.error("Erro ao cancelar.");
@@ -225,20 +223,27 @@ export default function AdminDashboard() {
               >
                 <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
 
-                {/* BOTÃO DE EXCLUIR (LIXEIRA) NO TOPO DIREITO */}
+                {/* --- BOTÃO DE CANCELAR REFORMULADO --- */}
                 <button 
                   onClick={() => handleDeleteBooking(booking.id)}
-                  className="absolute top-3 right-3 p-2 rounded-full bg-zinc-900/50 hover:bg-red-500/20 hover:text-red-500 text-zinc-500 transition-all border border-white/5"
-                  title="Cancelar Agendamento"
                   disabled={deletingId === booking.id}
+                  className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20 group/cancel"
                 >
-                  {deletingId === booking.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  {deletingId === booking.id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <>
+                        <Trash2 size={12} className="group-hover/cancel:scale-110 transition-transform"/> 
+                        Cancelar
+                    </>
+                  )}
                 </button>
+                {/* ------------------------------------- */}
                 
-                <div className="p-5 space-y-4 flex-1">
-                    <div className="flex justify-between items-start gap-3 pr-8">
+                <div className="p-5 space-y-4 flex-1 mt-2">
+                    <div className="flex justify-between items-start gap-3 pr-2">
                         <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-white text-base truncate leading-tight">{booking.serviceTitle}</h3>
+                            <h3 className="font-bold text-white text-base truncate leading-tight pr-20">{booking.serviceTitle}</h3>
                             <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
                                 {formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}
                             </p>
