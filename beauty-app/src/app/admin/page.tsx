@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { 
   Loader2, LogOut, CalendarDays, Clock, User, Phone, 
   CheckCircle2, AlertCircle, Smartphone, LayoutDashboard, 
-  RefreshCw, Wallet, TrendingUp, Filter 
+  RefreshCw, Wallet, TrendingUp, Filter, MessageCircle 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,7 +29,7 @@ interface Booking {
 export default function AdminDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'all'>('today'); // Padrão: HOJE
+  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'all'>('today'); 
   const router = useRouter();
 
   useEffect(() => {
@@ -53,7 +53,6 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Ordenação por data/hora
       const sortedData = data.sort((a: Booking, b: Booking) => {
         const dateA = new Date(`${a.bookingDate}T${a.bookingTime}`);
         const dateB = new Date(`${b.bookingDate}T${b.bookingTime}`);
@@ -75,21 +74,17 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
-  // --- LÓGICA DE FILTROS E TOTAIS ---
-  
   const filteredBookings = bookings.filter(booking => {
     if (!booking.bookingDate) return false;
     const date = parseISO(booking.bookingDate);
     
     if (filter === 'today') return isToday(date);
     if (filter === 'tomorrow') return isTomorrow(date);
-    return true; // 'all'
+    return true; 
   });
 
   const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (curr.pricePaid || 0), 0);
   const totalCount = filteredBookings.length;
-
-  // --- FORMATAÇÃO ---
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -132,7 +127,6 @@ export default function AdminDashboard() {
           <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-white/5 rounded-full blur-[120px] opacity-30" />
       </div>
 
-      {/* HEADER */}
       <header className="relative z-10 flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-zinc-900/50 backdrop-blur-xl p-4 md:p-6 rounded-3xl border border-white/5">
         <div className="text-center md:text-left">
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center justify-center md:justify-start gap-3">
@@ -153,7 +147,7 @@ export default function AdminDashboard() {
 
       <main className="relative z-10 max-w-7xl mx-auto space-y-8">
         
-        {/* CARDS DE RESUMO (DASHBOARD) */}
+        {/* CARDS DE RESUMO */}
         <div className="grid grid-cols-2 gap-4">
             <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
                 <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={48} /></div>
@@ -170,7 +164,7 @@ export default function AdminDashboard() {
             </div>
         </div>
 
-        {/* ABAS DE FILTRO */}
+        {/* FILTROS */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <CalendarDays className="text-zinc-500" size={20} /> 
@@ -185,7 +179,7 @@ export default function AdminDashboard() {
             </div>
         </div>
         
-        {/* LISTA DE AGENDAMENTOS */}
+        {/* LISTA DE CARDS */}
         {filteredBookings.length === 0 ? (
           <div className="text-center py-20 bg-zinc-900/30 rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col items-center animate-in fade-in zoom-in duration-500">
             <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
@@ -209,7 +203,6 @@ export default function AdminDashboard() {
                 <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                 
                 <div className="p-5 space-y-4 flex-1">
-                    {/* CABEÇALHO DO CARD */}
                     <div className="flex justify-between items-start gap-3">
                         <div className="min-w-0 flex-1">
                             <h3 className="font-bold text-white text-base truncate leading-tight">{booking.serviceTitle}</h3>
@@ -224,7 +217,6 @@ export default function AdminDashboard() {
                         </span>
                     </div>
 
-                    {/* INFORMAÇÕES DO CLIENTE */}
                     <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
                         <div className="flex items-center gap-3">
                             <User size={14} className="text-zinc-500" />
@@ -236,7 +228,7 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    {/* RODAPÉ DO CARD (VALOR) */}
+                    {/* RODAPÉ DO CARD COM BOTÃO WHATSAPP MELHORADO */}
                     <div className="flex items-center justify-between pt-2 border-t border-white/5">
                         <div className="flex flex-col">
                              <span className="text-[10px] text-zinc-500 font-bold uppercase">Valor</span>
@@ -252,10 +244,10 @@ export default function AdminDashboard() {
                             href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-zinc-100 hover:bg-white text-black p-2 rounded-lg transition-colors"
-                            title="Chamar no WhatsApp"
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 active:scale-95 group/btn"
                         >
-                            <Smartphone size={18} />
+                            <MessageCircle size={16} className="group-hover/btn:animate-bounce" />
+                            <span className="text-xs font-bold uppercase tracking-wide">WhatsApp</span>
                         </a>
                     </div>
                 </div>
