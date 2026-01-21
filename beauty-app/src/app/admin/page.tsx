@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { format, parseISO, isValid } from "date-fns"; // Adicionamos isValid
+import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { Loader2, LogOut, CalendarDays, Clock, User, Phone, CheckCircle2, AlertCircle, Smartphone, LayoutDashboard, RefreshCw } from "lucide-react";
@@ -42,18 +42,15 @@ export default function AdminDashboard() {
 
       const data = await res.json();
 
-      // PROTEÇÃO 1: Garante que é um array antes de mexer
       if (!Array.isArray(data)) {
-        console.error("Dados inválidos recebidos:", data);
+        console.error("Dados inválidos:", data);
         setBookings([]);
         return;
       }
 
-      // Ordenação segura
       const sortedData = data.sort((a: Booking, b: Booking) => {
         const dateA = new Date(`${a.bookingDate}T${a.bookingTime}`);
         const dateB = new Date(`${b.bookingDate}T${b.bookingTime}`);
-        // Se a data for inválida, joga pro final, mas não quebra o site
         if (isNaN(dateA.getTime())) return 1;
         if (isNaN(dateB.getTime())) return -1;
         return dateB.getTime() - dateA.getTime();
@@ -77,15 +74,22 @@ export default function AdminDashboard() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
   };
 
-  // Função segura para formatar data
+  // Melhoria na formatação de data para tentar corrigir o "Data Inválida"
   const formatDateSafe = (dateString: string) => {
     try {
       if (!dateString) return "--/--";
-      const date = parseISO(dateString);
-      if (!isValid(date)) return "Data Inválida";
+      // Tenta parsear direto (YYYY-MM-DD)
+      let date = parseISO(dateString);
+      
+      // Se falhar, tenta criar data simples (caso venha string diferente)
+      if (!isValid(date)) {
+         date = new Date(dateString);
+      }
+
+      if (!isValid(date)) return "Data Pendente";
       return format(date, "dd/MM/yyyy");
     } catch (e) {
-      return "Erro Data";
+      return "Data Pendente";
     }
   };
 
@@ -118,17 +122,17 @@ export default function AdminDashboard() {
           </h1>
           <p className="text-zinc-500 text-sm mt-1">Gerencie seus agendamentos.</p>
         </div>
-        <div className="flex gap-3">
-             <Button onClick={() => fetchBookings()} variant="outline" className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl">
-              <RefreshCw size={16} /> Atualizar
+        <div className="flex gap-3 w-full md:w-auto">
+             <Button onClick={() => fetchBookings()} variant="outline" className="flex-1 md:flex-none border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl">
+              <RefreshCw size={16} /> <span className="hidden sm:inline">Atualizar</span>
             </Button>
-            <Button onClick={handleLogout} variant="outline" className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl">
+            <Button onClick={handleLogout} variant="outline" className="flex-1 md:flex-none border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl">
               <LogOut size={16} /> Sair
             </Button>
         </div>
       </header>
 
-      <main className="relative z-10 max-w-6xl mx-auto">
+      <main className="relative z-10 max-w-7xl mx-auto">
         <h2 className="text-xl font-bold text-white mb-6">Agendamentos</h2>
         
         {bookings.length === 0 ? (
@@ -137,24 +141,28 @@ export default function AdminDashboard() {
             <p className="text-zinc-400 text-lg">Nenhum agendamento encontrado.</p>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          // AQUI ESTÁ A CORREÇÃO DO GRID:
+          // grid-cols-1 (Mobile/Tablet) -> Só 1 coluna para não cortar
+          // lg:grid-cols-2 (Notebook) -> 2 colunas
+          // xl:grid-cols-3 (Tela Grande) -> 3 colunas
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {bookings.map((booking, index) => (
               <motion.div
                 key={booking.id || index}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-zinc-950/80 backdrop-blur-md rounded-3xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg"
+                className="bg-zinc-950/80 backdrop-blur-md rounded-3xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col"
               >
                 <div className={`h-1.5 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                 
-                <div className="p-6 space-y-5">
-                    <div className="flex justify-between items-start">
-                        <div>
+                <div className="p-5 md:p-6 space-y-5 flex-1">
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0 flex-1">
                             <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">Serviço</p>
-                            <h3 className="font-bold text-white text-lg truncate pr-2">{booking.serviceTitle}</h3>
+                            <h3 className="font-bold text-white text-lg truncate">{booking.serviceTitle}</h3>
                         </div>
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                        <span className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
                           booking.status === 'paid' 
                             ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                             : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
@@ -165,35 +173,34 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex items-center gap-3 text-zinc-300 bg-white/5 p-3 rounded-xl border border-white/5">
-                        <div className="flex items-center gap-2">
-                            <CalendarDays size={16} className="text-white" />
-                            {/* PROTEÇÃO 2: Usa a função segura de data aqui */}
-                            <span className="font-medium text-sm">{formatDateSafe(booking.bookingDate)}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                            <CalendarDays size={16} className="text-white shrink-0" />
+                            <span className="font-medium text-sm truncate">{formatDateSafe(booking.bookingDate)}</span>
                         </div>
-                        <div className="w-px h-4 bg-zinc-700" />
+                        <div className="w-px h-4 bg-zinc-700 shrink-0" />
                         <div className="flex items-center gap-2">
-                            <Clock size={16} className="text-white" />
+                            <Clock size={16} className="text-white shrink-0" />
                             <span className="font-medium text-sm">{booking.bookingTime}</span>
                         </div>
                     </div>
                     
                     <div className="space-y-3">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
                                 <User size={14} />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-[10px] text-zinc-500 uppercase font-bold">Cliente</p>
-                                <p className="text-white font-medium text-sm">{booking.clientName}</p>
+                                <p className="text-white font-medium text-sm truncate">{booking.clientName}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
                                 <Phone size={14} />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-[10px] text-zinc-500 uppercase font-bold">Telefone</p>
-                                <p className="text-zinc-300 text-sm">{booking.clientPhone}</p>
+                                <p className="text-zinc-300 text-sm truncate">{booking.clientPhone}</p>
                             </div>
                         </div>
                     </div>
