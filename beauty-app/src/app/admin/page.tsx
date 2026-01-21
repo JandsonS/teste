@@ -74,18 +74,13 @@ export default function AdminDashboard() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
   };
 
-  // Melhoria na formatação de data para tentar corrigir o "Data Inválida"
   const formatDateSafe = (dateString: string) => {
     try {
       if (!dateString) return "--/--";
-      // Tenta parsear direto (YYYY-MM-DD)
       let date = parseISO(dateString);
-      
-      // Se falhar, tenta criar data simples (caso venha string diferente)
       if (!isValid(date)) {
          date = new Date(dateString);
       }
-
       if (!isValid(date)) return "Data Pendente";
       return format(date, "dd/MM/yyyy");
     } catch (e) {
@@ -141,10 +136,6 @@ export default function AdminDashboard() {
             <p className="text-zinc-400 text-lg">Nenhum agendamento encontrado.</p>
           </div>
         ) : (
-          // AQUI ESTÁ A CORREÇÃO DO GRID:
-          // grid-cols-1 (Mobile/Tablet) -> Só 1 coluna para não cortar
-          // lg:grid-cols-2 (Notebook) -> 2 colunas
-          // xl:grid-cols-3 (Tela Grande) -> 3 colunas
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {bookings.map((booking, index) => (
               <motion.div
@@ -205,10 +196,16 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
+                    {/* CORREÇÃO DO STATUS DE PAGAMENTO AQUI */}
                     <div className="bg-zinc-900 p-4 rounded-xl text-sm border border-zinc-800 flex justify-between items-center">
                         <div>
                             <p className="text-zinc-500 text-[10px] uppercase font-bold">Via {booking.paymentMethod === 'PIX' ? 'Pix' : 'Cartão'}</p>
-                            <p className="text-white font-bold mt-0.5">{formatCurrency(booking.pricePaid)} <span className="text-[10px] font-normal text-zinc-500">pago</span></p>
+                            <p className="text-white font-bold mt-0.5">
+                                {formatCurrency(booking.pricePaid)}{" "}
+                                <span className={`text-[10px] font-normal ${booking.status === 'paid' ? 'text-zinc-500' : 'text-amber-500'}`}>
+                                    {booking.status === 'paid' ? 'pago' : 'a receber'}
+                                </span>
+                            </p>
                         </div>
                     </div>
 
