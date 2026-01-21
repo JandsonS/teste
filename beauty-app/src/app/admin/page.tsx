@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { 
   Loader2, LogOut, CalendarDays, User, Phone, 
   CheckCircle2, AlertCircle, LayoutDashboard, 
-  RefreshCw, Wallet, TrendingUp, Filter, MessageCircle 
+  RefreshCw, Wallet, TrendingUp, Filter, MessageCircle, Trash2, X 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,6 +30,7 @@ export default function AdminDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'today' | 'tomorrow' | 'all'>('today'); 
+  const [deletingId, setDeletingId] = useState<string | null>(null); // ID sendo deletado
   const router = useRouter();
 
   useEffect(() => {
@@ -40,33 +41,19 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/bookings");
-      
-      if (res.status === 401) {
-        router.push("/admin/login");
-        return;
-      }
-
+      if (res.status === 401) { router.push("/admin/login"); return; }
       const data = await res.json();
+      if (!Array.isArray(data)) { setBookings([]); return; }
 
-      if (!Array.isArray(data)) {
-        setBookings([]);
-        return;
-      }
-
-      // Ordena por data mais recente
       const sortedData = data.sort((a: Booking, b: Booking) => {
         const dateA = parseSmartDate(a.bookingDate);
         const dateB = parseSmartDate(b.bookingDate);
         if (!dateA) return 1;
         if (!dateB) return -1;
-        
-        // Combina com a hora para ordenação precisa
         const timeA = a.bookingTime || "00:00";
         const timeB = b.bookingTime || "00:00";
-        
         const dateTimeA = new Date(`${format(dateA, 'yyyy-MM-dd')}T${timeA}`);
         const dateTimeB = new Date(`${format(dateB, 'yyyy-MM-dd')}T${timeB}`);
-        
         return dateTimeB.getTime() - dateTimeA.getTime();
       });
 
@@ -78,45 +65,60 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteBooking = async (id: string) => {
+    // Confirmação simples do navegador (mais seguro e rápido)
+    if (!confirm("Tem certeza que deseja cancelar este agendamento? Essa ação não pode ser desfeita.")) return;
+
+    setDeletingId(id);
+    try {
+      const res = await fetch("/api/admin/bookings", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      if (res.ok) {
+        toast.success("Agendamento cancelado com sucesso!");
+        // Remove da lista visualmente sem precisar recarregar
+        setBookings((prev) => prev.filter((b) => b.id !== id));
+      } else {
+        toast.error("Erro ao cancelar.");
+      }
+    } catch (error) {
+      toast.error("Erro de conexão.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/admin/login");
   };
 
-  // --- FUNÇÃO DE DATA INTELIGENTE (CORREÇÃO DO PROBLEMA) ---
   const parseSmartDate = (dateString: string): Date | null => {
     if (!dateString) return null;
     try {
-        // Tenta formato ISO (YYYY-MM-DD)
         let date = parseISO(dateString);
         if (isValid(date)) return date;
-
-        // Tenta formato Brasileiro (dd/MM/yyyy)
         date = parse(dateString, 'dd/MM/yyyy', new Date());
         if (isValid(date)) return date;
-
         return null;
-    } catch {
-        return null;
-    }
+    } catch { return null; }
   };
 
   const filteredBookings = bookings.filter(booking => {
     if (!booking.bookingDate) return false;
-    
     const date = parseSmartDate(booking.bookingDate);
-    if (!date) return false; // Se a data for inválida, esconde
-
+    if (!date) return false;
     if (filter === 'today') return isToday(date);
     if (filter === 'tomorrow') return isTomorrow(date);
     return true; 
   });
 
-  // --- Cálculos ---
   const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (curr.pricePaid || 0), 0);
   const totalCount = filteredBookings.length;
 
-  // --- Formatadores ---
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
   };
@@ -124,7 +126,6 @@ export default function AdminDashboard() {
   const formatDateDisplay = (dateString: string) => {
     const date = parseSmartDate(dateString);
     if (!date) return "Data Pendente";
-    
     if (isToday(date)) return "Hoje";
     if (isTomorrow(date)) return "Amanhã";
     return format(date, "dd/MM", { locale: ptBR });
@@ -170,7 +171,6 @@ export default function AdminDashboard() {
       </header>
 
       <main className="relative z-10 max-w-7xl mx-auto space-y-8">
-        
         {/* CARDS DE RESUMO */}
         <div className="grid grid-cols-2 gap-4">
             <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
@@ -195,7 +195,6 @@ export default function AdminDashboard() {
                 Agenda <span className="text-zinc-600">|</span> 
                 <span className="text-white capitalize">{filter === 'all' ? 'Completa' : filter === 'today' ? 'Hoje' : 'Amanhã'}</span>
             </h2>
-            
             <div className="bg-zinc-900 p-1 rounded-xl border border-white/5 flex w-full md:w-auto">
                 <button onClick={() => setFilter('today')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filter === 'today' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Hoje</button>
                 <button onClick={() => setFilter('tomorrow')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filter === 'tomorrow' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Amanhã</button>
@@ -222,24 +221,28 @@ export default function AdminDashboard() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col"
+                className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col relative"
               >
-                {/* Barra Colorida de Status */}
                 <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+
+                {/* BOTÃO DE EXCLUIR (LIXEIRA) NO TOPO DIREITO */}
+                <button 
+                  onClick={() => handleDeleteBooking(booking.id)}
+                  className="absolute top-3 right-3 p-2 rounded-full bg-zinc-900/50 hover:bg-red-500/20 hover:text-red-500 text-zinc-500 transition-all border border-white/5"
+                  title="Cancelar Agendamento"
+                  disabled={deletingId === booking.id}
+                >
+                  {deletingId === booking.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                </button>
                 
                 <div className="p-5 space-y-4 flex-1">
-                    <div className="flex justify-between items-start gap-3">
+                    <div className="flex justify-between items-start gap-3 pr-8">
                         <div className="min-w-0 flex-1">
                             <h3 className="font-bold text-white text-base truncate leading-tight">{booking.serviceTitle}</h3>
                             <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
                                 {formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}
                             </p>
                         </div>
-                        <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-                          booking.status === 'paid' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'
-                        }`}>
-                          {booking.status === 'paid' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                        </span>
                     </div>
 
                     <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">

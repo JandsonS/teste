@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-// 👇 MUDANÇA AQUI: Usamos o caminho relativo para garantir que ele ache o arquivo
-// Em vez de '@/lib/prisma', use este caminho que volta 4 pastas:
-// Caminho manual que volta 4 pastas até chegar em src/lib
+// Importe usando o caminho relativo manual que funcionou pra você
 import { prisma } from "../../../../lib/prisma";
 
+// --- BUSCAR AGENDAMENTOS (GET) ---
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -14,14 +13,12 @@ export async function GET() {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    // Busca os agendamentos no banco
     const data = await prisma.agendamento.findMany({
       orderBy: {
         createdAt: 'desc'
       }
     });
 
-    // Formata os dados para o painel
     const bookings = data.map((item) => ({
       id: item.id,
       clientName: item.cliente,
@@ -32,7 +29,6 @@ export async function GET() {
       status: item.status === 'CONFIRMADO' || item.status === 'PAGO' ? 'paid' : 'pending',
       paymentMethod: item.metodoPagamento || "PIX",
       pricePaid: item.valor,
-      priceTotal: item.valor,
       pricePending: 0,
       createdAt: item.createdAt
     }));
@@ -41,6 +37,37 @@ export async function GET() {
     
   } catch (error) {
     console.error("Erro ao buscar agendamentos:", error);
-    return NextResponse.json({ error: "Erro interno ao buscar dados" }, { status: 500 });
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+// --- DELETAR AGENDAMENTO (DELETE) ---
+export async function DELETE(request: Request) {
+  try {
+    // 1. Segurança
+    const cookieStore = await cookies();
+    const token = cookieStore.get("admin_token");
+
+    if (!token) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    }
+
+    // 2. Pegar o ID que veio no corpo do pedido
+    const { id } = await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: "ID não fornecido" }, { status: 400 });
+    }
+
+    // 3. Deletar do banco
+    await prisma.agendamento.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true });
+
+  } catch (error) {
+    console.error("Erro ao deletar:", error);
+    return NextResponse.json({ error: "Erro ao deletar" }, { status: 500 });
   }
 }
