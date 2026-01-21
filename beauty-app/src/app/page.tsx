@@ -128,7 +128,7 @@ export default function Home() {
                         rel="noopener noreferrer"
                         className="mt-2 px-5 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-pink-600 hover:border-pink-500 text-zinc-300 hover:text-white text-xs md:text-sm flex items-center gap-2 transition-all hover:scale-105 backdrop-blur-sm"
                     >
-                        <Instagram size={16} /> <span>Siga no Instagram</span>
+                        <Instagram size={16} /> <span>Siga-nos no Instagram</span>
                     </motion.a>
                 )}
             </div>
@@ -195,18 +195,19 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* --- RODAPÉ --- */}
+      {/* --- RODAPÉ PADRÃO (RESPONSIVO COM AJUSTE DE TÍTULO) --- */}
       <footer className="bg-zinc-950/80 backdrop-blur-lg border-t border-white/5 pt-16 pb-10 relative z-10 mt-auto">
-        <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 mb-12 items-center">
+        <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
             
-            <div className="col-span-1 text-center md:text-left">
-                <div className="flex justify-center md:justify-start items-center gap-3 text-white font-black text-2xl mb-4 tracking-tighter">
+            {/* Lado Esquerdo (Informações) - Alinhado à esquerda no PC */}
+            <div className="text-center md:text-left flex flex-col items-center md:items-start">
+                <div className="flex items-center gap-3 text-white font-black text-2xl mb-4 tracking-tighter">
                     {SITE_CONFIG.name}
                 </div>
-                <p className="text-zinc-500 leading-relaxed text-sm max-w-sm mx-auto md:mx-0 mb-6">
+                <p className="text-zinc-500 leading-relaxed text-sm max-w-sm mb-6">
                     {SITE_CONFIG.text.footerMessage}
                 </p>
-                <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 mt-4">
+                <div className="flex items-center gap-3 mt-2">
                     {SITE_CONFIG.links.maps && (
                         <a href={SITE_CONFIG.links.maps} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 hover:border-pink-500/50 hover:text-pink-400 px-4 py-2 rounded-full text-xs font-medium text-zinc-400 transition-all cursor-pointer shadow-sm">
                             <MapPin size={14} /> Localização
@@ -215,10 +216,15 @@ export default function Home() {
                 </div>
             </div>
 
-            <div className="col-span-1 flex justify-center md:justify-end">
-                <div className="flex flex-col items-center md:items-end w-full max-w-[320px]">
-                    <h4 className="text-white font-bold mb-4 text-xs md:text-sm uppercase tracking-wider text-center">Precisa de Ajuda?</h4>
-                    <a href={`https://wa.me/${SITE_CONFIG.whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer" className="group relative w-full bg-zinc-900/50 hover:bg-zinc-900 border border-white/5 hover:border-green-500/30 p-5 rounded-3xl transition-all duration-300 overflow-hidden cursor-pointer">
+            {/* Lado Direito (Suporte) - Alinhado à direita no PC */}
+            <div className="flex flex-col items-center md:items-end w-full">
+                <div className="w-full max-w-[320px]">
+                    {/* Título Centralizado em cima do cartão */}
+                    <h4 className="text-white font-bold mb-4 text-xs md:text-sm uppercase tracking-wider text-center">
+                        Precisa de Ajuda?
+                    </h4>
+                    
+                    <a href={`https://wa.me/${SITE_CONFIG.whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer" className="group relative w-full bg-zinc-900/50 hover:bg-zinc-900 border border-white/5 hover:border-green-500/30 p-5 rounded-3xl transition-all duration-300 overflow-hidden cursor-pointer block">
                         <div className="absolute inset-0 bg-green-500/0 group-hover:bg-green-500/5 transition-colors duration-500" />
                         <div className="relative z-10 flex items-center justify-between">
                             <div className="flex flex-col justify-center text-left">
@@ -229,7 +235,7 @@ export default function Home() {
                                  <WhatsAppIcon className="w-5 h-5 md:w-6 md:h-6 fill-current" />
                             </div>
                         </div>
-                        <p className="relative z-10 mt-2 text-xs md:text-sm text-zinc-500 group-hover:text-zinc-400 transition-colors font-mono">{SITE_CONFIG.whatsappDisplay}</p>
+                        <p className="relative z-10 mt-2 text-xs md:text-sm text-zinc-500 group-hover:text-zinc-400 transition-colors font-mono text-left">{SITE_CONFIG.whatsappDisplay}</p>
                         <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-x-2 -translate-y-2 group-hover:translate-x-0 group-hover:translate-y-0">
                              <ArrowUpRight size={14} className="text-green-500" />
                         </div>
@@ -238,7 +244,7 @@ export default function Home() {
             </div>
         </div>
         
-        <div className="border-t border-white/5 pt-8 text-center px-4">
+        <div className="border-t border-white/5 pt-8 text-center px-4 mt-8">
             <p className="text-zinc-600 text-[10px] md:text-xs font-medium">© {new Date().getFullYear()} {SITE_CONFIG.name}. Todos os direitos reservados.</p>
         </div>
       </footer>

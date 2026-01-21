@@ -231,6 +231,7 @@ export default function AdminDashboard() {
               >
                 <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
 
+                {/* BOTÃO DE CANCELAR */}
                 <button 
                   onClick={() => handleDeleteBooking(booking.id)}
                   disabled={deletingId === booking.id}
@@ -296,21 +297,24 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* --- RODAPÉ CENTRALIZADO (FINAL) --- */}
-      <footer className="relative z-10 w-full mt-20 pb-10 flex flex-col items-center justify-center space-y-4 opacity-70 hover:opacity-100 transition-opacity">
+      {/* --- RODAPÉ CENTRALIZADO (FINAL E CORRIGIDO) --- */}
+      {/* Removemos qualquer md:flex-row ou md:justify-between para garantir que fique centralizado sempre */}
+      <footer className="relative z-10 w-full mt-20 pb-8 flex flex-col items-center justify-center gap-4 opacity-70 hover:opacity-100 transition-opacity border-t border-white/5 pt-8">
         
-        {/* Nome do Estabelecimento */}
-        <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase">
-          © {new Date().getFullYear()} Barbearia Teste
+        {/* Nome do Estabelecimento (Centralizado) */}
+        <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase text-center">
+          © {new Date().getFullYear()} BARBEARIA TESTE
         </p>
 
-        {/* Link de Ajuda */}
+        {/* Link de Ajuda (Centralizado logo abaixo) */}
         <a 
-            href="#" // Coloque aqui o link do WhatsApp do Suporte
-            className="flex items-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white px-5 py-2 rounded-full transition-all text-xs font-bold uppercase border border-white/5 hover:border-white/20"
+            href="https://wa.me/5500000000000" 
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white px-5 py-2 rounded-full transition-all text-xs font-bold uppercase border border-white/5 hover:border-white/20 shadow-sm"
         >
             <HelpCircle size={14} />
-            Preciso de Ajuda
+            Precisa de Ajuda?
         </a>
 
       </footer>
