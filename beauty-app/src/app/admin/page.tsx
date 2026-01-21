@@ -7,8 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { 
   Loader2, LogOut, CalendarDays, User, Phone, 
-  CheckCircle2, AlertCircle, LayoutDashboard, 
-  RefreshCw, Wallet, TrendingUp, Filter, Trash2
+  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -154,7 +153,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 p-4 md:p-8 overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 p-4 md:p-8 overflow-x-hidden relative flex flex-col">
       <div className="fixed inset-0 z-0 pointer-events-none">
           <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-white/5 rounded-full blur-[120px] opacity-30" />
       </div>
@@ -177,7 +176,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <main className="relative z-10 max-w-7xl mx-auto space-y-8">
+      <main className="relative z-10 max-w-7xl mx-auto space-y-8 flex-1 w-full">
         {/* CARDS DE RESUMO */}
         <div className="grid grid-cols-2 gap-4">
             <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
@@ -232,7 +231,6 @@ export default function AdminDashboard() {
               >
                 <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
 
-                {/* BOTÃO DE CANCELAR REFORMULADO */}
                 <button 
                   onClick={() => handleDeleteBooking(booking.id)}
                   disabled={deletingId === booking.id}
@@ -280,7 +278,6 @@ export default function AdminDashboard() {
                              </div>
                         </div>
                         
-                        {/* BOTÃO WHATSAPP OFICIAL */}
                         <a 
                             href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)}
                             target="_blank"
@@ -298,6 +295,26 @@ export default function AdminDashboard() {
           </motion.div>
         )}
       </main>
+
+      {/* --- RODAPÉ CENTRALIZADO (FINAL) --- */}
+      <footer className="relative z-10 w-full mt-20 pb-10 flex flex-col items-center justify-center space-y-4 opacity-70 hover:opacity-100 transition-opacity">
+        
+        {/* Nome do Estabelecimento */}
+        <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase">
+          © {new Date().getFullYear()} Barbearia Teste
+        </p>
+
+        {/* Link de Ajuda */}
+        <a 
+            href="#" // Coloque aqui o link do WhatsApp do Suporte
+            className="flex items-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white px-5 py-2 rounded-full transition-all text-xs font-bold uppercase border border-white/5 hover:border-white/20"
+        >
+            <HelpCircle size={14} />
+            Preciso de Ajuda
+        </a>
+
+      </footer>
+
     </div>
   );
 }
