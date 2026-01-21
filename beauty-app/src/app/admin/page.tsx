@@ -6,8 +6,8 @@ import { format, parseISO, isValid, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { 
-  Loader2, LogOut, CalendarDays, Clock, User, Phone, 
-  CheckCircle2, AlertCircle, Smartphone, LayoutDashboard, 
+  Loader2, LogOut, CalendarDays, User, Phone, 
+  CheckCircle2, AlertCircle, LayoutDashboard, 
   RefreshCw, Wallet, TrendingUp, Filter, MessageCircle 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -129,8 +129,9 @@ export default function AdminDashboard() {
 
       <header className="relative z-10 flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-zinc-900/50 backdrop-blur-xl p-4 md:p-6 rounded-3xl border border-white/5">
         <div className="text-center md:text-left">
+          {/* CORRIGIDO: Ícone branco e limpo */}
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center justify-center md:justify-start gap-3">
-            <LayoutDashboard className="text-pink-500" />
+            <LayoutDashboard className="text-white" />
             Painel Admin
           </h1>
           <p className="text-zinc-500 text-xs md:text-sm mt-1">Visão geral do negócio</p>
@@ -164,12 +165,13 @@ export default function AdminDashboard() {
             </div>
         </div>
 
-        {/* FILTROS */}
+        {/* FILTROS (Sem o Rosa) */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <CalendarDays className="text-zinc-500" size={20} /> 
                 Agenda <span className="text-zinc-600">|</span> 
-                <span className="text-pink-500 capitalize">{filter === 'all' ? 'Completa' : filter === 'today' ? 'Hoje' : 'Amanhã'}</span>
+                {/* CORRIGIDO: Texto em branco */}
+                <span className="text-white capitalize">{filter === 'all' ? 'Completa' : filter === 'today' ? 'Hoje' : 'Amanhã'}</span>
             </h2>
             
             <div className="bg-zinc-900 p-1 rounded-xl border border-white/5 flex w-full md:w-auto">
@@ -198,8 +200,9 @@ export default function AdminDashboard() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-pink-500/20 transition-all group shadow-lg flex flex-col"
+                className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col"
               >
+                {/* MANTIDO: Barra Colorida de Status (Importante para o financeiro) */}
                 <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                 
                 <div className="p-5 space-y-4 flex-1">
@@ -228,7 +231,6 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    {/* RODAPÉ DO CARD COM BOTÃO WHATSAPP MELHORADO */}
                     <div className="flex items-center justify-between pt-2 border-t border-white/5">
                         <div className="flex flex-col">
                              <span className="text-[10px] text-zinc-500 font-bold uppercase">Valor</span>
