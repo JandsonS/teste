@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { format, parseISO, isValid, isToday, isTomorrow } from "date-fns";
+import { format, parseISO, isValid, isToday, isTomorrow, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { 
@@ -53,12 +53,21 @@ export default function AdminDashboard() {
         return;
       }
 
+      // Ordena por data mais recente
       const sortedData = data.sort((a: Booking, b: Booking) => {
-        const dateA = new Date(`${a.bookingDate}T${a.bookingTime}`);
-        const dateB = new Date(`${b.bookingDate}T${b.bookingTime}`);
-        if (isNaN(dateA.getTime())) return 1;
-        if (isNaN(dateB.getTime())) return -1;
-        return dateB.getTime() - dateA.getTime();
+        const dateA = parseSmartDate(a.bookingDate);
+        const dateB = parseSmartDate(b.bookingDate);
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        
+        // Combina com a hora para ordenação precisa
+        const timeA = a.bookingTime || "00:00";
+        const timeB = b.bookingTime || "00:00";
+        
+        const dateTimeA = new Date(`${format(dateA, 'yyyy-MM-dd')}T${timeA}`);
+        const dateTimeB = new Date(`${format(dateB, 'yyyy-MM-dd')}T${timeB}`);
+        
+        return dateTimeB.getTime() - dateTimeA.getTime();
       });
 
       setBookings(sortedData);
@@ -74,42 +83,57 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
+  // --- FUNÇÃO DE DATA INTELIGENTE (CORREÇÃO DO PROBLEMA) ---
+  const parseSmartDate = (dateString: string): Date | null => {
+    if (!dateString) return null;
+    try {
+        // Tenta formato ISO (YYYY-MM-DD)
+        let date = parseISO(dateString);
+        if (isValid(date)) return date;
+
+        // Tenta formato Brasileiro (dd/MM/yyyy)
+        date = parse(dateString, 'dd/MM/yyyy', new Date());
+        if (isValid(date)) return date;
+
+        return null;
+    } catch {
+        return null;
+    }
+  };
+
   const filteredBookings = bookings.filter(booking => {
     if (!booking.bookingDate) return false;
-    const date = parseISO(booking.bookingDate);
     
+    const date = parseSmartDate(booking.bookingDate);
+    if (!date) return false; // Se a data for inválida, esconde
+
     if (filter === 'today') return isToday(date);
     if (filter === 'tomorrow') return isTomorrow(date);
     return true; 
   });
 
+  // --- Cálculos ---
   const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (curr.pricePaid || 0), 0);
   const totalCount = filteredBookings.length;
 
+  // --- Formatadores ---
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
   };
 
-  const formatDateSafe = (dateString: string) => {
-    try {
-      if (!dateString) return "--/--";
-      let date = parseISO(dateString);
-      if (!isValid(date)) date = new Date(dateString);
-      if (!isValid(date)) return "Data Pendente";
-      
-      if (isToday(date)) return "Hoje";
-      if (isTomorrow(date)) return "Amanhã";
-      
-      return format(date, "dd/MM", { locale: ptBR });
-    } catch (e) {
-      return "Data Pendente";
-    }
+  const formatDateDisplay = (dateString: string) => {
+    const date = parseSmartDate(dateString);
+    if (!date) return "Data Pendente";
+    
+    if (isToday(date)) return "Hoje";
+    if (isTomorrow(date)) return "Amanhã";
+    return format(date, "dd/MM", { locale: ptBR });
   };
 
   const getWhatsAppLink = (phone: string, name: string, date: string, time: string, service: string) => {
     if (!phone) return "#";
     const cleanPhone = phone.replace(/\D/g, '');
-    const message = `Olá ${name}, confirmando agendamento de *${service}* dia *${formatDateSafe(date)}* às *${time}*.`;
+    const message = `Olá ${name}, confirmando agendamento de *${service}* dia *${formatDateDisplay(date)}* às *${time}*.`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
   };
 
@@ -129,7 +153,6 @@ export default function AdminDashboard() {
 
       <header className="relative z-10 flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-zinc-900/50 backdrop-blur-xl p-4 md:p-6 rounded-3xl border border-white/5">
         <div className="text-center md:text-left">
-          {/* CORRIGIDO: Ícone branco e limpo */}
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center justify-center md:justify-start gap-3">
             <LayoutDashboard className="text-white" />
             Painel Admin
@@ -165,12 +188,11 @@ export default function AdminDashboard() {
             </div>
         </div>
 
-        {/* FILTROS (Sem o Rosa) */}
+        {/* FILTROS */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <CalendarDays className="text-zinc-500" size={20} /> 
                 Agenda <span className="text-zinc-600">|</span> 
-                {/* CORRIGIDO: Texto em branco */}
                 <span className="text-white capitalize">{filter === 'all' ? 'Completa' : filter === 'today' ? 'Hoje' : 'Amanhã'}</span>
             </h2>
             
@@ -202,7 +224,7 @@ export default function AdminDashboard() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col"
               >
-                {/* MANTIDO: Barra Colorida de Status (Importante para o financeiro) */}
+                {/* Barra Colorida de Status */}
                 <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                 
                 <div className="p-5 space-y-4 flex-1">
@@ -210,7 +232,7 @@ export default function AdminDashboard() {
                         <div className="min-w-0 flex-1">
                             <h3 className="font-bold text-white text-base truncate leading-tight">{booking.serviceTitle}</h3>
                             <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
-                                {formatDateSafe(booking.bookingDate)} • {booking.bookingTime}
+                                {formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}
                             </p>
                         </div>
                         <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
