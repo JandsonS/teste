@@ -4,14 +4,13 @@ export const SITE_CONFIG = {
   description: "Realce sua beleza única com nossos procedimentos exclusivos.",
   url: "https://teste-drab-rho-60.vercel.app", 
   
-  // 2. SENHA DO ADMIN
-  adminPassword: "admin123", 
+  // 🚨 REMOVI A SENHA DAQUI POR SEGURANÇA (Agora está no private-config.ts)
   
   // 3. WHATSAPP
   whatsappNumber: "558189015555", 
   whatsappDisplay: "(81) 98901-5555", 
 
-  // 4. TEXTOS PERSONALIZÁVEIS (Adicionado para corrigir o erro na Home)
+  // 4. TEXTOS PERSONALIZÁVEIS
   text: {
     servicesTitle: "Nossos Procedimentos", 
     scheduleTitle: "Agendar Horário",
@@ -19,10 +18,11 @@ export const SITE_CONFIG = {
     whatsappBtn: "Dúvidas? Chame no Zap"
   },
 
-  // 5. LINKS (Adicionado para evitar erros de leitura)
+  // 5. LINKS
   links: {
     instagram: "https://instagram.com", 
-    maps: "https://www.google.com/maps/place/Av.+Zeferino+Galv%C3%A3o+-+Centro,+Arcoverde+-+PE,+56506-400/@-8.4189164,-37.0549248,916m/data=!3m2!1e3!4b1!4m6!3m5!1s0x7a81be8201c4fa7:0x5cbfd760accec143!8m2!3d-8.4189164!4d-37.0523499!16s%2Fg%2F1ymv2qv2j?entry=ttu&g_ep=EgoyMDI2MDExMy4wIKXMDSoKLDEwMDc5MjA3M0gBUAM%3D"
+    // Link do mapa (Se deixar vazio "", o botão de localização some)
+    maps: "https://www.google.com/maps" 
   },
 
   // 6. IMAGENS
@@ -47,7 +47,7 @@ export const BUSINESS_HOURS = {
 export const SERVICES = [
   {
     title: "Corte de Cabelo (Teste)",
-    price: 1.00, // Alterei para 5.00 para testar o pix real (mínimo de alguns bancos), mas pode manter 1.00 se preferir
+    price: 1.00, 
     duration: "45 min",
     description: "Corte moderno com finalização."
   },
