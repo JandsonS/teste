@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 // 👇 MUDANÇA AQUI: Usamos o caminho relativo para garantir que ele ache o arquivo
 // Em vez de '@/lib/prisma', use este caminho que volta 4 pastas:
+// Caminho manual que volta 4 pastas até chegar em src/lib
 import { prisma } from "../../../../lib/prisma";
 
 export async function GET() {
