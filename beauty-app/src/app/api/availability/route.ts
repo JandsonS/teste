@@ -6,46 +6,74 @@ const prisma = globalForPrisma.prisma || new PrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// ⚠️ CONTROLE DE ESCALA ⚠️
-// Hoje você deixa 1. Se vender para uma loja maior, mude para 3, 5, 10...
-// Isso define quantos clientes podem ser atendidos AO MESMO TEMPO.
-const CAPACIDADE_MAXIMA = 1; 
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date');
+  const service = searchParams.get('service'); 
 
   if (!date) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
 
+  // DEFINIÇÃO DO "CONTAINER" (O que eu estou procurando?)
+  let containerAlvo = "";
+  if (service) {
+      const s = service.toLowerCase();
+      if (s.includes('sobrancelha')) containerAlvo = 'sobrancelha';
+      else if (s.includes('combo')) containerAlvo = 'combo';
+      else if (s.includes('corte')) containerAlvo = 'corte';
+      else if (s.includes('barba')) containerAlvo = 'barba';
+      else containerAlvo = s;
+  }
+
   try {
-    // 1. Busca TUDO do dia (menos cancelados)
     const agendamentosDoDia = await prisma.agendamento.findMany({
-      where: { 
-        data: date, 
-        status: { not: 'CANCELADO' } 
-      },
-      select: { horario: true } 
+      where: { data: date, status: { not: 'CANCELADO' } },
+      select: { horario: true, servico: true, status: true, createdAt: true } 
     });
 
-    // 2. CONTAGEM INTELIGENTE
-    // Em vez de só bloquear, vamos contar quantos tem em cada horário
-    const contagemPorHorario: Record<string, number> = {};
+    const busySlots: string[] = [];   
+    const lockedSlots: string[] = []; 
+    const agora = new Date().getTime();
 
-    agendamentosDoDia.forEach((agendamento) => {
-       const hora = agendamento.horario;
-       if (!contagemPorHorario[hora]) {
-           contagemPorHorario[hora] = 0;
-       }
-       contagemPorHorario[hora]++;
+    agendamentosDoDia.forEach(agendamento => {
+        const servicoNoBanco = agendamento.servico.toLowerCase();
+        
+        let temConflito = false;
+
+        if (containerAlvo === 'corte') {
+             // Só mostra ocupado se tiver CORTE e NÃO for COMBO
+             if (servicoNoBanco.includes('corte') && !servicoNoBanco.includes('combo')) temConflito = true;
+        }
+        else if (containerAlvo === 'barba') {
+             // Só mostra ocupado se tiver BARBA e NÃO for COMBO
+             if (servicoNoBanco.includes('barba') && !servicoNoBanco.includes('combo')) temConflito = true;
+        }
+        else if (containerAlvo === 'combo') {
+             // Só mostra ocupado se tiver COMBO
+             if (servicoNoBanco.includes('combo')) temConflito = true;
+        }
+        else {
+             if (servicoNoBanco.includes(containerAlvo)) temConflito = true;
+        }
+
+        if (!temConflito) return; // Se não é o mesmo serviço exato, considera LIVRE.
+
+        // --- STATUS ---
+        if (agendamento.status.includes('PAGO') || 
+            agendamento.status.includes('SINAL') || 
+            agendamento.status === 'CONFIRMADO') {
+            busySlots.push(agendamento.horario);
+            return;
+        }
+
+        if (agendamento.status === 'PENDENTE') {
+            const diff = (agora - new Date(agendamento.createdAt).getTime()) / 1000 / 60;
+            if (diff < 2) {
+                lockedSlots.push(agendamento.horario);
+            }
+        }
     });
 
-    // 3. APLICAR A REGRA DE CAPACIDADE
-    // Se (Clientes Agendados) >= (Capacidade da Loja), aí sim entra na lista de ocupados
-    const busySlots = Object.keys(contagemPorHorario).filter((hora) => {
-        return contagemPorHorario[hora] >= CAPACIDADE_MAXIMA;
-    });
-
-    return NextResponse.json({ busy: busySlots, locked: [] });
+    return NextResponse.json({ busy: busySlots, locked: lockedSlots });
 
   } catch (error) {
     return NextResponse.json({ error: 'Erro disponibilidade' }, { status: 500 });
