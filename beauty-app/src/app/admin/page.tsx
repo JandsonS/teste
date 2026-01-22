@@ -93,7 +93,15 @@ export default function AdminPage() {
                 <div className="w-2 h-2 bg-emerald-500 rounded-full relative z-10"></div>
              </div>
              <span className="text-xs text-zinc-500 font-mono">Atualizado: {lastUpdate.toLocaleTimeString()}</span>
-             <button onClick={() => { setLoading(true); fetchBookings(); }} className="p-1 hover:bg-white/10 rounded-full transition-colors"><RefreshCw size={14} className={`text-zinc-400 ${loading ? 'animate-spin' : ''}`} /></button>
+             
+             {/* AQUI ESTAVA O ERRO: Adicionei title="Atualizar" */}
+             <button 
+                title="Atualizar lista"
+                onClick={() => { setLoading(true); fetchBookings(); }} 
+                className="p-1 hover:bg-white/10 rounded-full transition-colors"
+             >
+                <RefreshCw size={14} className={`text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
+             </button>
           </div>
         </div>
 
