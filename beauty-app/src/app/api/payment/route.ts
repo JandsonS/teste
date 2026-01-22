@@ -1,163 +1,117 @@
-import { NextResponse } from 'next/server';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from "next/server";
+import { MercadoPagoConfig, Preference } from "mercadopago";
+import { prisma } from "@/lib/prisma";
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
+// Configura o Mercado Pago
+const client = new MercadoPagoConfig({
+  accessToken: process.env.MP_ACCESS_TOKEN!,
+});
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+// URL Base (Ajuste para seu domínio de produção na Vercel quando subir)
+// Ex: const BASE_URL = "https://sua-barbearia.vercel.app";
+const BASE_URL = "http://localhost:3000"; // Mude isso quando for para o ar!
 
-const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN! });
-
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const { title, date, time, clientName, clientPhone, method, paymentType, pricePaid, pricePending } = body;
-    const nomeClienteLimpo = clientName.trim();
-    
-    // ⚠️ CONFIRA SE ESSE LINK É O DA SUA VERCEL (SEM BARRA NO FINAL)
-    const BASE_URL = "https://teste-drab-rho-60.vercel.app"; 
-    
-    const agora = new Date().getTime();
+    const { 
+      title, 
+      date, 
+      time, 
+      price, 
+      clientName, 
+      clientPhone, 
+      method,
+      paymentType,   
+      priceTotal,    
+      pricePaid,     
+      pricePending   
+    } = await req.json();
 
-    // =================================================================================
-    // FASE 1: LEI DO CLIENTE (BLOQUEIO PESSOAL)
-    // =================================================================================
-    const historicoCliente = await prisma.agendamento.findMany({ 
-        where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } } 
-    });
-
-    for (const r of historicoCliente) {
-      if (r.status.includes('PAGO') || r.status.includes('SINAL') || r.status === 'CONFIRMADO') {
-           return NextResponse.json({ 
-             error: `🚫 Olá ${nomeClienteLimpo}, você já possui um agendamento confirmado (${r.servico}). Não é possível agendar dois serviços simultâneos.` 
-           }, { status: 409 });
-      }
-      
-      if (r.status === 'PENDENTE') {
-        const diff = (agora - new Date(r.createdAt).getTime()) / 1000 / 60;
-        
-        if (diff >= 2) {
-          await prisma.agendamento.delete({ where: { id: r.id } });
-        } 
-        else {
-          return NextResponse.json({ 
-            error: '⏳ Você já tem um procedimento pendente de pagamento. Por favor, finalize-o ou aguarde 2 minutos.' 
-          }, { status: 409 });
+    // 1. VERIFICAÇÃO DE SEGURANÇA (A Vaga ainda está livre?)
+    // Aqui também ignoramos os CANCELADOS
+    const existingBooking = await prisma.agendamento.findFirst({
+      where: {
+        data: date,
+        horario: time,
+        status: {
+          not: "CANCELADO" // <--- SE TIVER UM CANCELADO, ELE LIBERA A VAGA
         }
-      }
-    }
-
-    // =================================================================================
-    // FASE 2: LEI DO SERVIÇO (ISOLAMENTO DE CONTAINER)
-    // =================================================================================
-    const servicoSolicitado = title.toLowerCase();
-    
-    let containerAlvo = "";
-    if (servicoSolicitado.includes('sobrancelha')) containerAlvo = 'sobrancelha';
-    else if (servicoSolicitado.includes('combo')) containerAlvo = 'combo';
-    else if (servicoSolicitado.includes('corte')) containerAlvo = 'corte';
-    else if (servicoSolicitado.includes('barba')) containerAlvo = 'barba';
-    else containerAlvo = servicoSolicitado; 
-
-    const vagasNoHorario = await prisma.agendamento.findMany({ 
-        where: { data: date, horario: time, status: { not: 'CANCELADO' } } 
+      },
     });
 
-    const vagaOcupada = vagasNoHorario.filter(vaga => {
-         const servicoNoBanco = vaga.servico.toLowerCase();
-         
-         // REGRA DE OURO: Separar o "Combo" dos individuais
-         
-         if (containerAlvo === 'corte') {
-            // Se eu quero CORTE, trava se tiver CORTE, mas IGNORA se for COMBO.
-            // (Porque Combo é outro serviço independente para você)
-            return servicoNoBanco.includes('corte') && !servicoNoBanco.includes('combo'); 
-         }
-
-         if (containerAlvo === 'barba') {
-            // Se eu quero BARBA, trava se tiver BARBA, mas IGNORA se for COMBO.
-            return servicoNoBanco.includes('barba') && !servicoNoBanco.includes('combo');
-         }
-
-         if (containerAlvo === 'combo') {
-            // Se eu quero COMBO, só trava se tiver outro COMBO.
-            // Ignora se tiver Corte solto ou Barba solta.
-            return servicoNoBanco.includes('combo');
-         }
-         
-         // Para Sobrancelha e outros, segue normal
-         return servicoNoBanco.includes(containerAlvo);
-    });
-
-    for (const vaga of vagaOcupada) {
-      if (vaga.status.includes('PAGO') || vaga.status === 'CONFIRMADO') {
-        return NextResponse.json({ error: '❌ Este horário já foi reservado para este serviço.' }, { status: 409 });
-      }
-      if (vaga.status === 'PENDENTE') {
-        const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60;
-        if (diff < 2) {
-          return NextResponse.json({ 
-            error: '⏳ Este horário está sendo reservado por favor escolha outro horário ou aguarde 2 minutos.' 
-          }, { status: 409 });
-        } else {
-          await prisma.agendamento.delete({ where: { id: vaga.id } });
-        }
-      }
+    if (existingBooking) {
+      return NextResponse.json(
+        { error: "Este horário acabou de ser reservado por outra pessoa." },
+        { status: 409 }
+      );
     }
 
-    // =================================================================================
-    // FASE 3: CRIAÇÃO DO NOVO AGENDAMENTO
-    // =================================================================================
-    let nomeServico = paymentType === 'DEPOSIT' ? `${title} (Sinal Pago | Resta: R$ ${pricePending})` : `${title} (Integral)`;
-    const agendamento = await prisma.agendamento.create({
-      data: { 
-        cliente: nomeClienteLimpo, telefone: clientPhone, servico: nomeServico, 
-        data: date, horario: time, valor: Number(pricePaid), status: "PENDENTE", metodoPagamento: method 
-      }
-    });
-
-    // =================================================================================
-    // FASE 4: MERCADO PAGO (CORRIGIDO)
-    // =================================================================================
-    let excludedPaymentTypes: { id: string }[] = [];
-    let installments = 12;
-
-    if (method === 'PIX') {
-        excludedPaymentTypes = [
-            { id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }, { id: "prepaid_card" }, { id: "atm" }
-        ];
-        installments = 1;
-    } 
-    else if (method === 'CARD') {
-        excludedPaymentTypes = [
-            { id: "bank_transfer" }, { id: "ticket" }, { id: "atm" }, { id: "digital_currency"}
-        ];
+    // 2. Cria o registro no Banco de Dados como PENDENTE
+    // Monta o nome do serviço com a info financeira
+    let serviceLabel = title;
+    if (paymentType === 'DEPOSIT') {
+       serviceLabel = `${title} (Sinal Pago | Resta: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pricePending)})`;
     }
 
+    const newBooking = await prisma.agendamento.create({
+      data: {
+        data: date,
+        horario: time,
+        cliente: clientName,
+        telefone: clientPhone,
+        servico: serviceLabel,
+        valor: parseFloat(pricePaid), // Salva o valor que foi pago agora
+        metodoPagamento: method,
+        status: "PENDENTE",
+      },
+    });
+
+    // 3. Gera o Link de Pagamento no Mercado Pago
     const preference = new Preference(client);
+    
+    // Calcula data de vencimento (15 minutos para pagar)
+    const expirationDate = new Date();
+    expirationDate.setMinutes(expirationDate.getMinutes() + 15);
+
     const result = await preference.create({
       body: {
-        // 👇👇👇 AQUI ESTAVA FALTANDO! ESSA É A LINHA MÁGICA 👇👇👇
-        external_reference: agendamento.id,
-        // 👆👆👆 SEM ISSO, O SISTEMA NÃO SABE QUEM PAGOU 👆👆👆
-
-        items: [{ id: agendamento.id, title: title, unit_price: Number(pricePaid), quantity: 1 }],
-        payer: { name: nomeClienteLimpo },
-        
-        payment_methods: {
-          excluded_payment_types: excludedPaymentTypes,
-          installments: installments
+        items: [
+          {
+            id: newBooking.id,
+            title: serviceLabel,
+            quantity: 1,
+            unit_price: Number(pricePaid), // Cobra apenas o que foi combinado (Total ou Sinal)
+          },
+        ],
+        payer: {
+          name: clientName,
+          // O Mercado Pago pede email, usamos um fictício se não tiver
+          email: "cliente@barbearia.com", 
         },
-
-        back_urls: { success: `${BASE_URL}/sucesso?id=${agendamento.id}`, failure: `${BASE_URL}/`, pending: `${BASE_URL}/` },
-        auto_return: 'approved',
-        notification_url: `${BASE_URL}/api/webhook`,
+        payment_methods: {
+           excluded_payment_types: [
+             { id: "ticket" } // Remove boleto (demora a compensar)
+           ],
+           installments: 1 // Bloqueia parcelamento se quiser
+        },
+        back_urls: {
+          success: `${BASE_URL}/sucesso?id=${newBooking.id}`,
+          failure: `${BASE_URL}/?status=failure`,
+          pending: `${BASE_URL}/?status=pending`,
+        },
+        auto_return: "approved",
+        external_reference: newBooking.id, // VITAL: Liga o pagamento ao agendamento
+        date_of_expiration: expirationDate.toISOString(),
       },
     });
 
     return NextResponse.json({ url: result.init_point });
+
   } catch (error) {
-    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+    console.error(error);
+    return NextResponse.json(
+      { error: "Erro ao processar pagamento" },
+      { status: 500 }
+    );
   }
 }
