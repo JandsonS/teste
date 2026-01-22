@@ -15,101 +15,80 @@ export async function POST(request: Request) {
     const { title, date, time, clientName, clientPhone, method, paymentType, pricePaid, pricePending } = body;
     const nomeClienteLimpo = clientName.trim();
     
-    // ⚠️ CONFIRA SE ESSE LINK É O DA SUA VERCEL (SEM BARRA NO FINAL)
+    // ⚠️ MANTENHA O LINK DA SUA VERCEL AQUI
     const BASE_URL = "https://teste-drab-rho-60.vercel.app"; 
     
     const agora = new Date().getTime();
 
     // =================================================================================
-    // FASE 1: LEI DO CLIENTE (BLOQUEIO PESSOAL)
+    // FASE 1: LEI DO CLIENTE (EVITA DUPLICIDADE DE AGENDAMENTO)
     // =================================================================================
     const historicoCliente = await prisma.agendamento.findMany({ 
         where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } } 
     });
 
     for (const r of historicoCliente) {
-      if (r.status.includes('PAGO') || r.status.includes('SINAL') || r.status === 'CONFIRMADO') {
-           return NextResponse.json({ 
-             error: `🚫 Olá ${nomeClienteLimpo}, você já possui um agendamento confirmado (${r.servico}). Não é possível agendar dois serviços simultâneos.` 
-           }, { status: 409 });
-      }
+       // AQUI ESTÁ A MENSAGEM DETALHADA QUE VOCÊ PEDIU
+       // Verifica se ele já tem agendamento ativo (Confirmado/Pago/Pendente)
+       if (r.status === 'CONFIRMADO' || r.status.includes('PAGO') || r.status === 'PENDENTE') {
+           // Se for exatamente no mesmo dia, avisamos o horário específico
+           if (r.data === date) {
+                return NextResponse.json({ 
+                    error: `🚫 Olá ${nomeClienteLimpo.split(' ')[0]}, você já possui um agendamento confirmado para hoje (${r.data}) às ${r.horario}.` 
+                }, { status: 409 });
+           }
+           // Se você quiser impedir que ele tenha 2 agendamentos em dias diferentes, deixe assim.
+           // Se quiser permitir que ele agende hoje e amanhã, adicione "&& r.data === date" no if acima.
+       }
       
-      if (r.status === 'PENDENTE') {
-        const diff = (agora - new Date(r.createdAt).getTime()) / 1000 / 60;
-        
-        if (diff >= 2) {
-          await prisma.agendamento.delete({ where: { id: r.id } });
-        } 
-        else {
-          return NextResponse.json({ 
-            error: '⏳ Você já tem um procedimento pendente de pagamento. Por favor, finalize-o ou aguarde 2 minutos.' 
-          }, { status: 409 });
-        }
-      }
+       // Limpeza automática de pendentes velhos
+       if (r.status === 'PENDENTE') {
+          const diff = (agora - new Date(r.createdAt).getTime()) / 1000 / 60;
+          if (diff >= 2) {
+             await prisma.agendamento.delete({ where: { id: r.id } });
+          }
+       }
     }
 
     // =================================================================================
-    // FASE 2: LEI DO SERVIÇO (ISOLAMENTO DE CONTAINER)
+    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE (A CADEIRA ESTÁ LIVRE?)
     // =================================================================================
-    const servicoSolicitado = title.toLowerCase();
-    
-    let containerAlvo = "";
-    if (servicoSolicitado.includes('sobrancelha')) containerAlvo = 'sobrancelha';
-    else if (servicoSolicitado.includes('combo')) containerAlvo = 'combo';
-    else if (servicoSolicitado.includes('corte')) containerAlvo = 'corte';
-    else if (servicoSolicitado.includes('barba')) containerAlvo = 'barba';
-    else containerAlvo = servicoSolicitado; 
-
-    const vagasNoHorario = await prisma.agendamento.findMany({ 
-        where: { data: date, horario: time, status: { not: 'CANCELADO' } } 
-    });
-
-    const vagaOcupada = vagasNoHorario.filter(vaga => {
-         const servicoNoBanco = vaga.servico.toLowerCase();
-         
-         // REGRA DE OURO: Separar o "Combo" dos individuais
-         
-         if (containerAlvo === 'corte') {
-            // Se eu quero CORTE, trava se tiver CORTE, mas IGNORA se for COMBO.
-            // (Porque Combo é outro serviço independente para você)
-            return servicoNoBanco.includes('corte') && !servicoNoBanco.includes('combo'); 
-         }
-
-         if (containerAlvo === 'barba') {
-            // Se eu quero BARBA, trava se tiver BARBA, mas IGNORA se for COMBO.
-            return servicoNoBanco.includes('barba') && !servicoNoBanco.includes('combo');
-         }
-
-         if (containerAlvo === 'combo') {
-            // Se eu quero COMBO, só trava se tiver outro COMBO.
-            // Ignora se tiver Corte solto ou Barba solta.
-            return servicoNoBanco.includes('combo');
-         }
-         
-         // Para Sobrancelha e outros, segue normal
-         return servicoNoBanco.includes(containerAlvo);
-    });
-
-    for (const vaga of vagaOcupada) {
-      if (vaga.status.includes('PAGO') || vaga.status === 'CONFIRMADO') {
-        return NextResponse.json({ error: '❌ Este horário já foi reservado para este serviço.' }, { status: 409 });
-      }
-      if (vaga.status === 'PENDENTE') {
-        const diff = (agora - new Date(vaga.createdAt).getTime()) / 1000 / 60;
-        if (diff < 2) {
-          return NextResponse.json({ 
-            error: '⏳ Este horário está sendo reservado por favor escolha outro horário ou aguarde 2 minutos.' 
-          }, { status: 409 });
-        } else {
-          await prisma.agendamento.delete({ where: { id: vaga.id } });
+    // Buscamos QUALQUER agendamento ativo neste dia e horário.
+    const vagaOcupada = await prisma.agendamento.findFirst({
+        where: { 
+            data: date, 
+            horario: time, 
+            status: { not: 'CANCELADO' } 
         }
-      }
+    });
+
+    if (vagaOcupada) {
+        // Se já está pago/confirmado -> Horário Ocupado
+        if (vagaOcupada.status.includes('PAGO') || vagaOcupada.status === 'CONFIRMADO') {
+            return NextResponse.json({ 
+                error: '❌ Este horário acabou de ser reservado por outra pessoa.' 
+            }, { status: 409 });
+        }
+
+        // Se está pendente há menos de 2 minutos -> Horário "Segurado"
+        if (vagaOcupada.status === 'PENDENTE') {
+            const diff = (agora - new Date(vagaOcupada.createdAt).getTime()) / 1000 / 60;
+            if (diff < 2) {
+                return NextResponse.json({ 
+                    error: '⏳ Este horário está reservado temporariamente. Tente novamente em 2 minutos.' 
+                }, { status: 409 });
+            } else {
+                // Se passou de 2 min, derruba o antigo e deixa o novo entrar
+                await prisma.agendamento.delete({ where: { id: vagaOcupada.id } });
+            }
+        }
     }
 
     // =================================================================================
-    // FASE 3: CRIAÇÃO DO NOVO AGENDAMENTO
+    // FASE 3: CRIAR AGENDAMENTO
     // =================================================================================
     let nomeServico = paymentType === 'DEPOSIT' ? `${title} (Sinal Pago | Resta: R$ ${pricePending})` : `${title} (Integral)`;
+    
     const agendamento = await prisma.agendamento.create({
       data: { 
         cliente: nomeClienteLimpo, telefone: clientPhone, servico: nomeServico, 
@@ -118,7 +97,7 @@ export async function POST(request: Request) {
     });
 
     // =================================================================================
-    // FASE 4: MERCADO PAGO (CORRIGIDO)
+    // FASE 4: PREFERÊNCIA MERCADO PAGO
     // =================================================================================
     let excludedPaymentTypes: { id: string }[] = [];
     let installments = 12;
@@ -138,18 +117,13 @@ export async function POST(request: Request) {
     const preference = new Preference(client);
     const result = await preference.create({
       body: {
-        // 👇👇👇 AQUI ESTAVA FALTANDO! ESSA É A LINHA MÁGICA 👇👇👇
         external_reference: agendamento.id,
-        // 👆👆👆 SEM ISSO, O SISTEMA NÃO SABE QUEM PAGOU 👆👆👆
-
         items: [{ id: agendamento.id, title: title, unit_price: Number(pricePaid), quantity: 1 }],
         payer: { name: nomeClienteLimpo },
-        
         payment_methods: {
           excluded_payment_types: excludedPaymentTypes,
           installments: installments
         },
-
         back_urls: { success: `${BASE_URL}/sucesso?id=${agendamento.id}`, failure: `${BASE_URL}/`, pending: `${BASE_URL}/` },
         auto_return: 'approved',
         notification_url: `${BASE_URL}/api/webhook`,

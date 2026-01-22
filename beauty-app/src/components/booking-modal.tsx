@@ -54,11 +54,50 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     if (!date || !selectedTime || !name || !isPhoneValid) return; 
     setLoading(true);
     try {
-      const response = await fetch('/api/payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: serviceName, date: format(date, "dd/MM/yyyy"), time: selectedTime, clientName: name, clientPhone: phone, method: paymentMethod, price: numericPrice, paymentType, priceTotal: numericPrice, pricePaid: paymentType === 'FULL' ? numericPrice : depositValue, pricePending: paymentType === 'FULL' ? 0 : remainingValue }), });
+      const response = await fetch('/api/payment', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ 
+              title: serviceName, 
+              date: format(date, "dd/MM/yyyy"), 
+              time: selectedTime, 
+              clientName: name, 
+              clientPhone: phone, 
+              method: paymentMethod, 
+              price: numericPrice, 
+              paymentType, 
+              priceTotal: numericPrice, 
+              pricePaid: paymentType === 'FULL' ? numericPrice : depositValue, 
+              pricePending: paymentType === 'FULL' ? 0 : remainingValue 
+          }), 
+      });
       const data = await response.json();
-      if (data.error) { toast.error("Atenção", { description: data.error }); if (data.error.includes("reservado")) { setLockedSlots(prev => [...prev, selectedTime!]); setSelectedTime(null); } return; }
+      
+      // --- AQUI ESTÁ A ALTERAÇÃO ---
+      if (data.error) { 
+          toast.error(data.error, { 
+              duration: 8000, // 8 segundos
+              style: {
+                  background: '#27272a', // Fundo escuro
+                  color: '#fff',         // Texto branco
+                  border: '1px solid #3f3f46' 
+              },
+              description: "Verifique os dados e tente novamente."
+          }); 
+          
+          if (data.error.includes("reservado")) { 
+              setLockedSlots(prev => [...prev, selectedTime!]); 
+              setSelectedTime(null); 
+          } 
+          return; 
+      }
+      
       if (data.url) window.location.href = data.url; 
-    } catch { toast.error("Erro no Servidor"); } finally { setLoading(false); }
+    } catch { 
+        toast.error("Erro no Servidor"); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
   const calendarStyles = { 
@@ -143,8 +182,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 2 && (
             <div className="space-y-5 py-2">
                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"><CalendarDays size={20} /></div>
-                    <div><p className="text-xs text-zinc-500 uppercase font-bold">Resumo</p><p className="text-white font-medium capitalize text-sm">{date ? format(date, "dd 'de' MMMM", { locale: ptBR }) : ""} às {selectedTime}</p></div>
+                   <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"><CalendarDays size={20} /></div>
+                   <div><p className="text-xs text-zinc-500 uppercase font-bold">Resumo</p><p className="text-white font-medium capitalize text-sm">{date ? format(date, "dd 'de' MMMM", { locale: ptBR }) : ""} às {selectedTime}</p></div>
                </div>
                <div className="space-y-4">
                    <div className="space-y-2"><Label className="text-zinc-300 ml-1 text-xs">Nome Completo</Label><div className="relative"><User className="absolute left-3 top-3 text-zinc-500" size={18} /><Input placeholder="Seu nome..." className="pl-10 bg-zinc-900 border-zinc-800 text-white h-11 rounded-xl placeholder:text-zinc-600 focus:border-white transition-colors" value={name} onChange={(e) => setName(e.target.value)}/></div></div>
