@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AdminBookingCard } from "@/components/AdminBookingCard";
 import { Loader2, RefreshCw, CalendarDays, DollarSign, Users } from "lucide-react";
-import { format, addDays } from "date-fns"; // Importamos funções de data
+import { SITE_CONFIG } from "@/constants/info";
 
 interface Booking {
   id: string;
@@ -22,13 +22,10 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  // Definimos as datas de Hoje e Amanhã para comparar
-  const hojeStr = format(new Date(), "dd/MM/yyyy");
-  const amanhaStr = format(addDays(new Date(), 1), "dd/MM/yyyy");
-
   // Função que busca os dados
   const fetchBookings = async () => {
     try {
+      // Ajuste a rota se a sua for diferente, ex: '/api/admin/bookings' ou apenas '/api/admin'
       const res = await fetch("/api/admin", { 
         cache: "no-store" 
       });
@@ -39,8 +36,7 @@ export default function AdminPage() {
         const sorted = data.sort((a: Booking, b: Booking) => {
              if (a.status === 'PENDENTE' && b.status !== 'PENDENTE') return -1;
              if (a.status !== 'PENDENTE' && b.status === 'PENDENTE') return 1;
-             // Se empatar no status, ordena por horário
-             return a.horario.localeCompare(b.horario);
+             return 0;
         });
         setBookings(sorted);
         setLastUpdate(new Date());
@@ -56,19 +52,16 @@ export default function AdminPage() {
   useEffect(() => {
     fetchBookings(); // Busca na hora que abre
 
-    // Configura o relógio para buscar a cada 5 segundos
+    // Configura o relógio para buscar a cada 5 segundos (5000 ms)
     const interval = setInterval(() => {
       fetchBookings();
     }, 5000);
 
+    // Limpa o relógio quando fecha a página para não travar o PC
     return () => clearInterval(interval);
   }, []);
 
-  // Filtramos as listas separadas
-  const agendamentosHoje = bookings.filter(b => b.data === hojeStr);
-  const agendamentosAmanha = bookings.filter(b => b.data === amanhaStr);
-
-  // Cálculos Rápidos para o Dashboard (Geral)
+  // Cálculos Rápidos para o Dashboard
   const totalHoje = bookings.reduce((acc, curr) => acc + (curr.status !== 'CANCELADO' ? Number(curr.valor) : 0), 0);
   const pendentes = bookings.filter(b => b.status === 'PENDENTE').length;
 
@@ -106,7 +99,7 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-zinc-900/50 border border-white/5 p-5 rounded-2xl flex items-center gap-4">
                 <div className="w-12 h-12 bg-pink-500/10 rounded-full flex items-center justify-center text-pink-500"><CalendarDays size={24} /></div>
-                <div><p className="text-zinc-500 text-xs uppercase font-bold">Total na Tela</p><p className="text-2xl font-black text-white">{bookings.length}</p></div>
+                <div><p className="text-zinc-500 text-xs uppercase font-bold">Agendamentos</p><p className="text-2xl font-black text-white">{bookings.length}</p></div>
             </div>
             <div className="bg-zinc-900/50 border border-white/5 p-5 rounded-2xl flex items-center gap-4">
                 <div className="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center text-yellow-500"><Users size={24} /></div>
@@ -114,56 +107,36 @@ export default function AdminPage() {
             </div>
             <div className="bg-zinc-900/50 border border-white/5 p-5 rounded-2xl flex items-center gap-4">
                 <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-500"><DollarSign size={24} /></div>
-                <div><p className="text-zinc-500 text-xs uppercase font-bold">Faturamento (Geral)</p><p className="text-2xl font-black text-white">R$ {totalHoje.toFixed(2)}</p></div>
+                <div><p className="text-zinc-500 text-xs uppercase font-bold">Faturamento (Previsto)</p><p className="text-2xl font-black text-white">R$ {totalHoje.toFixed(2)}</p></div>
             </div>
         </div>
 
-        {/* LISTAS DIVIDIDAS: HOJE E AMANHÃ */}
-        {loading && bookings.length === 0 ? (
-           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-pink-500 w-10 h-10" /></div>
-        ) : (
-          <div className="space-y-12">
-            
-            {/* --- SEÇÃO HOJE --- */}
-            <div>
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
-                Hoje <span className="text-zinc-500 text-sm font-normal">({hojeStr})</span>
-              </h2>
-              
-              {agendamentosHoje.length === 0 ? (
-                <div className="text-center py-8 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
-                  <p className="text-zinc-500 text-sm">Nenhum agendamento para hoje.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {agendamentosHoje.map((booking) => (
-                    <AdminBookingCard key={booking.id} booking={booking} onUpdate={fetchBookings} />
-                  ))}
-                </div>
-              )}
+        {/* LISTA DE AGENDAMENTOS */}
+        <div>
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            Agenda do Dia
+          </h2>
+          
+          {loading && bookings.length === 0 ? (
+            <div className="flex justify-center py-20">
+              <Loader2 className="animate-spin text-pink-500 w-10 h-10" />
             </div>
-
-            {/* --- SEÇÃO AMANHÃ --- */}
-            <div>
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2 border-l-4 border-blue-500 pl-3">
-                Amanhã <span className="text-zinc-500 text-sm font-normal">({amanhaStr})</span>
-              </h2>
-              
-              {agendamentosAmanha.length === 0 ? (
-                <div className="text-center py-8 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
-                  <p className="text-zinc-500 text-sm">Nenhum agendamento para amanhã ainda.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {agendamentosAmanha.map((booking) => (
-                    <AdminBookingCard key={booking.id} booking={booking} onUpdate={fetchBookings} />
-                  ))}
-                </div>
-              )}
+          ) : bookings.length === 0 ? (
+            <div className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl">
+              <p className="text-zinc-500">Nenhum agendamento para hoje ainda.</p>
             </div>
-
-          </div>
-        )}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {bookings.map((booking) => (
+                <AdminBookingCard 
+                    key={booking.id} 
+                    booking={booking} 
+                    onUpdate={fetchBookings} // Se atualizar um status, recarrega a lista
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
       </div>
     </div>
