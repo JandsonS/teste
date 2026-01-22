@@ -125,10 +125,21 @@ export default function AdminDashboard() {
     return true; 
   });
 
-  // Função Auxiliar para Checar Pagamento
+  // --- LÓGICA DE TEXTO DE PAGAMENTO ---
   const isPaid = (status: string) => {
-      // Considera pago se for 'paid', 'PAGO' ou 'CONFIRMADO'
       return ['paid', 'PAGO', 'CONFIRMADO'].includes(status);
+  };
+
+  // Nova função para gerar o texto bonitinho
+  const getPaymentLabel = (status: string, method: string) => {
+      if (!isPaid(status)) return 'a receber';
+      
+      const m = method?.toUpperCase() || '';
+      if (m === 'PIX') return 'pago via pix';
+      if (m === 'CARTAO' || m === 'CREDIT_CARD') return 'pago via crédito';
+      if (m === 'DEBITO' || m === 'DEBIT_CARD') return 'pago via débito';
+      
+      return 'pago'; // Caso genérico
   };
 
   const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (isPaid(curr.status) ? (curr.pricePaid || 0) : 0), 0);
@@ -235,7 +246,7 @@ export default function AdminDashboard() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col relative"
               >
-                {/* BARRA DE STATUS (VERDE SE CONFIRMADO/PAGO) */}
+                {/* BARRA DE STATUS */}
                 <div className={`h-1 w-full ${isPaid(booking.status) ? 'bg-emerald-500' : 'bg-amber-500'}`} />
 
                 {/* BOTÃO DE CANCELAR */}
@@ -267,8 +278,9 @@ export default function AdminDashboard() {
                              <span className="text-[10px] text-zinc-500 font-bold uppercase">Valor</span>
                              <div className="flex items-baseline gap-1">
                                 <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
-                                <span className={`text-[10px] ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    {isPaid(booking.status) ? 'pago' : 'a receber'}
+                                <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                    {/* AQUI ESTÁ A MUDANÇA: Usamos a nova função */}
+                                    {getPaymentLabel(booking.status, booking.paymentMethod)}
                                 </span>
                              </div>
                         </div>
