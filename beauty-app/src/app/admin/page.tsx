@@ -1,324 +1,144 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { format, parseISO, isValid, isToday, isTomorrow, parse } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { toast } from "sonner";
-import { 
-  Loader2, LogOut, CalendarDays, User, Phone, 
-  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { motion, AnimatePresence } from "framer-motion";
-
-// --- ÍCONE OFICIAL DO WHATSAPP (SVG) ---
-function WhatsAppLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-    </svg>
-  );
-}
+import { AdminBookingCard } from "@/components/AdminBookingCard";
+import { Loader2, RefreshCw, CalendarDays, DollarSign, Users } from "lucide-react";
+import { SITE_CONFIG } from "@/constants/info";
 
 interface Booking {
   id: string;
-  clientName: string;
-  clientPhone: string;
-  serviceTitle: string;
-  bookingDate: string;
-  bookingTime: string;
+  cliente: string;
+  servico: string;
+  data: string;
+  horario: string;
   status: string;
-  paymentMethod: string;
-  pricePaid: number;
-  pricePending: number;
+  telefone: string;
+  valor: number;
+  metodoPagamento: string;
 }
 
-export default function AdminDashboard() {
+export default function AdminPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'all'>('today'); 
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const router = useRouter();
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  useEffect(() => {
-    fetchBookings();
-  }, []);
-
+  // Função que busca os dados
   const fetchBookings = async () => {
-    setLoading(true);
     try {
-      const res = await fetch("/api/admin/bookings");
-      if (res.status === 401) { router.push("/admin/login"); return; }
-      const data = await res.json();
-      if (!Array.isArray(data)) { setBookings([]); return; }
-
-      const sortedData = data.sort((a: Booking, b: Booking) => {
-        const dateA = parseSmartDate(a.bookingDate);
-        const dateB = parseSmartDate(b.bookingDate);
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        const timeA = a.bookingTime || "00:00";
-        const timeB = b.bookingTime || "00:00";
-        const dateTimeA = new Date(`${format(dateA, 'yyyy-MM-dd')}T${timeA}`);
-        const dateTimeB = new Date(`${format(dateB, 'yyyy-MM-dd')}T${timeB}`);
-        return dateTimeB.getTime() - dateTimeA.getTime();
+      // Ajuste a rota se a sua for diferente, ex: '/api/admin/bookings' ou apenas '/api/admin'
+      const res = await fetch("/api/admin", { 
+        cache: "no-store" 
       });
-
-      setBookings(sortedData);
+      
+      if (res.ok) {
+        const data = await res.json();
+        // Ordena: Pendentes primeiro, depois por horário
+        const sorted = data.sort((a: Booking, b: Booking) => {
+             if (a.status === 'PENDENTE' && b.status !== 'PENDENTE') return -1;
+             if (a.status !== 'PENDENTE' && b.status === 'PENDENTE') return 1;
+             return 0;
+        });
+        setBookings(sorted);
+        setLastUpdate(new Date());
+      }
     } catch (error) {
-      toast.error("Erro ao atualizar dados");
+      console.error("Erro ao buscar agendamentos", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteBooking = async (id: string) => {
-    if (!confirm("Tem certeza que deseja cancelar este agendamento?")) return;
+  // EFEITO "AO VIVO" (POLLING)
+  useEffect(() => {
+    fetchBookings(); // Busca na hora que abre
 
-    setDeletingId(id);
-    try {
-      const res = await fetch("/api/admin/bookings", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+    // Configura o relógio para buscar a cada 5 segundos (5000 ms)
+    const interval = setInterval(() => {
+      fetchBookings();
+    }, 5000);
 
-      if (res.ok) {
-        toast.success("Agendamento cancelado!");
-        setBookings((prev) => prev.filter((b) => b.id !== id));
-      } else {
-        toast.error("Erro ao cancelar.");
-      }
-    } catch (error) {
-      toast.error("Erro de conexão.");
-    } finally {
-      setDeletingId(null);
-    }
-  };
+    // Limpa o relógio quando fecha a página para não travar o PC
+    return () => clearInterval(interval);
+  }, []);
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/admin/login");
-  };
-
-  const parseSmartDate = (dateString: string): Date | null => {
-    if (!dateString) return null;
-    try {
-        let date = parseISO(dateString);
-        if (isValid(date)) return date;
-        date = parse(dateString, 'dd/MM/yyyy', new Date());
-        if (isValid(date)) return date;
-        return null;
-    } catch { return null; }
-  };
-
-  const filteredBookings = bookings.filter(booking => {
-    if (!booking.bookingDate) return false;
-    const date = parseSmartDate(booking.bookingDate);
-    if (!date) return false;
-    if (filter === 'today') return isToday(date);
-    if (filter === 'tomorrow') return isTomorrow(date);
-    return true; 
-  });
-
-  const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (curr.pricePaid || 0), 0);
-  const totalCount = filteredBookings.length;
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
-  };
-
-  const formatDateDisplay = (dateString: string) => {
-    const date = parseSmartDate(dateString);
-    if (!date) return "Data Pendente";
-    if (isToday(date)) return "Hoje";
-    if (isTomorrow(date)) return "Amanhã";
-    return format(date, "dd/MM", { locale: ptBR });
-  };
-
-  const getWhatsAppLink = (phone: string, name: string, date: string, time: string, service: string) => {
-    if (!phone) return "#";
-    const cleanPhone = phone.replace(/\D/g, '');
-    const message = `Olá ${name}, confirmando agendamento de *${service}* dia *${formatDateDisplay(date)}* às *${time}*.`;
-    return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
-  };
-
-  if (loading && bookings.length === 0) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="animate-spin text-white w-8 h-8" />
-      </div>
-    );
-  }
+  // Cálculos Rápidos para o Dashboard
+  const totalHoje = bookings.reduce((acc, curr) => acc + (curr.status !== 'CANCELADO' ? Number(curr.valor) : 0), 0);
+  const pendentes = bookings.filter(b => b.status === 'PENDENTE').length;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 p-4 md:p-8 overflow-x-hidden relative flex flex-col">
-      <div className="fixed inset-0 z-0 pointer-events-none">
-          <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-white/5 rounded-full blur-[120px] opacity-30" />
-      </div>
-
-      <header className="relative z-10 flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-zinc-900/50 backdrop-blur-xl p-4 md:p-6 rounded-3xl border border-white/5">
-        <div className="text-center md:text-left">
-          <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center justify-center md:justify-start gap-3">
-            <LayoutDashboard className="text-white" />
-            Painel Admin
-          </h1>
-          <p className="text-zinc-500 text-xs md:text-sm mt-1">Visão geral do negócio</p>
-        </div>
-        <div className="flex gap-2">
-            <Button onClick={() => fetchBookings()} variant="outline" size="sm" className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl h-10">
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Atualizar
-            </Button>
-            <Button onClick={handleLogout} variant="outline" size="sm" className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl h-10">
-              <LogOut size={14} /> Sair
-            </Button>
-        </div>
-      </header>
-
-      <main className="relative z-10 max-w-7xl mx-auto space-y-8 flex-1 w-full">
-        {/* CARDS DE RESUMO */}
-        <div className="grid grid-cols-2 gap-4">
-            <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
-                <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={48} /></div>
-                <p className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Faturamento ({filter === 'all' ? 'Total' : filter === 'today' ? 'Hoje' : 'Amanhã'})</p>
-                <p className="text-2xl md:text-4xl font-black text-white mt-2">{formatCurrency(totalRevenue)}</p>
-            </div>
-            <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
-                <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp size={48} /></div>
-                <p className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Agendamentos</p>
-                <div className="flex items-end gap-2">
-                    <p className="text-2xl md:text-4xl font-black text-white mt-2">{totalCount}</p>
-                    <span className="text-zinc-500 text-sm mb-1.5 font-medium">clientes</span>
-                </div>
-            </div>
-        </div>
-
-        {/* FILTROS */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <CalendarDays className="text-zinc-500" size={20} /> 
-                Agenda <span className="text-zinc-600">|</span> 
-                <span className="text-white capitalize">{filter === 'all' ? 'Completa' : filter === 'today' ? 'Hoje' : 'Amanhã'}</span>
-            </h2>
-            <div className="bg-zinc-900 p-1 rounded-xl border border-white/5 flex w-full md:w-auto">
-                <button onClick={() => setFilter('today')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filter === 'today' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Hoje</button>
-                <button onClick={() => setFilter('tomorrow')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filter === 'tomorrow' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Amanhã</button>
-                <button onClick={() => setFilter('all')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filter === 'all' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Todos</button>
-            </div>
-        </div>
+    <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
+      
+      <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LISTA DE CARDS */}
-        {filteredBookings.length === 0 ? (
-          <div className="text-center py-20 bg-zinc-900/30 rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col items-center animate-in fade-in zoom-in duration-500">
-            <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
-                <Filter className="text-zinc-500" size={24} />
-            </div>
-            <p className="text-zinc-300 font-medium">Nenhum agendamento para este período.</p>
-            <p className="text-zinc-600 text-sm mt-1">Altere o filtro acima para ver outros dias.</p>
+        {/* CABEÇALHO DO PAINEL */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/10 pb-6">
+          <div>
+            <h1 className="text-3xl font-black tracking-tighter text-white flex items-center gap-2">
+              Painel Administrativo
+            </h1>
+            <p className="text-zinc-400 text-sm mt-1">
+              Gerencie seus agendamentos em tempo real.
+            </p>
           </div>
-        ) : (
-          <motion.div layout className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-            <AnimatePresence>
-            {filteredBookings.map((booking) => (
-              <motion.div
-                layout
-                key={booking.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col relative"
-              >
-                <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
 
-                {/* BOTÃO DE CANCELAR */}
-                <button 
-                  onClick={() => handleDeleteBooking(booking.id)}
-                  disabled={deletingId === booking.id}
-                  className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20 group/cancel"
-                >
-                  {deletingId === booking.id ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <>
-                        <Trash2 size={12} className="group-hover/cancel:scale-110 transition-transform"/> 
-                        Cancelar
-                    </>
-                  )}
-                </button>
-                
-                <div className="p-5 space-y-4 flex-1 mt-2">
-                    <div className="flex justify-between items-start gap-3 pr-2">
-                        <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-white text-base truncate leading-tight pr-20">{booking.serviceTitle}</h3>
-                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
-                                {formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}
-                            </p>
-                        </div>
-                    </div>
+          <div className="flex items-center gap-3 bg-zinc-900/50 p-2 rounded-full border border-white/5 px-4">
+             <div className="relative">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping absolute top-0 left-0 opacity-75"></div>
+                <div className="w-2 h-2 bg-emerald-500 rounded-full relative z-10"></div>
+             </div>
+             <span className="text-xs text-zinc-500 font-mono">
+                Atualizado: {lastUpdate.toLocaleTimeString()}
+             </span>
+             <button onClick={() => { setLoading(true); fetchBookings(); }} className="p-1 hover:bg-white/10 rounded-full transition-colors" title="Forçar atualização">
+                <RefreshCw size={14} className={`text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
+             </button>
+          </div>
+        </div>
 
-                    <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
-                        <div className="flex items-center gap-3">
-                            <User size={14} className="text-zinc-500" />
-                            <p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Phone size={14} className="text-zinc-500" />
-                            <p className="text-zinc-400 text-xs font-mono">{booking.clientPhone}</p>
-                        </div>
-                    </div>
+        {/* CARDS DE RESUMO (KPIs) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-zinc-900/50 border border-white/5 p-5 rounded-2xl flex items-center gap-4">
+                <div className="w-12 h-12 bg-pink-500/10 rounded-full flex items-center justify-center text-pink-500"><CalendarDays size={24} /></div>
+                <div><p className="text-zinc-500 text-xs uppercase font-bold">Agendamentos</p><p className="text-2xl font-black text-white">{bookings.length}</p></div>
+            </div>
+            <div className="bg-zinc-900/50 border border-white/5 p-5 rounded-2xl flex items-center gap-4">
+                <div className="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center text-yellow-500"><Users size={24} /></div>
+                <div><p className="text-zinc-500 text-xs uppercase font-bold">Pendentes</p><p className="text-2xl font-black text-white">{pendentes}</p></div>
+            </div>
+            <div className="bg-zinc-900/50 border border-white/5 p-5 rounded-2xl flex items-center gap-4">
+                <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-500"><DollarSign size={24} /></div>
+                <div><p className="text-zinc-500 text-xs uppercase font-bold">Faturamento (Previsto)</p><p className="text-2xl font-black text-white">R$ {totalHoje.toFixed(2)}</p></div>
+            </div>
+        </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                        <div className="flex flex-col">
-                             <span className="text-[10px] text-zinc-500 font-bold uppercase">Valor</span>
-                             <div className="flex items-baseline gap-1">
-                                <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
-                                <span className={`text-[10px] ${booking.status === 'paid' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    {booking.status === 'paid' ? 'pago' : 'a receber'}
-                                </span>
-                             </div>
-                        </div>
-                        
-                        <a 
-                            href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 active:scale-95 group/btn"
-                        >
-                            <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" />
-                            <span className="text-xs font-bold uppercase tracking-wide">WhatsApp</span>
-                        </a>
-                    </div>
-                </div>
-              </motion.div>
-            ))}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </main>
+        {/* LISTA DE AGENDAMENTOS */}
+        <div>
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            Agenda do Dia
+          </h2>
+          
+          {loading && bookings.length === 0 ? (
+            <div className="flex justify-center py-20">
+              <Loader2 className="animate-spin text-pink-500 w-10 h-10" />
+            </div>
+          ) : bookings.length === 0 ? (
+            <div className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl">
+              <p className="text-zinc-500">Nenhum agendamento para hoje ainda.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {bookings.map((booking) => (
+                <AdminBookingCard 
+                    key={booking.id} 
+                    booking={booking} 
+                    onUpdate={fetchBookings} // Se atualizar um status, recarrega a lista
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* --- RODAPÉ CENTRALIZADO (FINAL E CORRIGIDO) --- */}
-      {/* Removemos qualquer md:flex-row ou md:justify-between para garantir que fique centralizado sempre */}
-      <footer className="relative z-10 w-full mt-20 pb-8 flex flex-col items-center justify-center gap-4 opacity-70 hover:opacity-100 transition-opacity border-t border-white/5 pt-8">
-        
-        {/* Nome do Estabelecimento (Centralizado) */}
-        <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase text-center">
-          © {new Date().getFullYear()} BARBEARIA TESTE
-        </p>
-
-        {/* Link de Ajuda (Centralizado logo abaixo) */}
-        <a 
-            href="https://wa.me/5500000000000" 
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white px-5 py-2 rounded-full transition-all text-xs font-bold uppercase border border-white/5 hover:border-white/20 shadow-sm"
-        >
-            <HelpCircle size={14} />
-            Precisa de Ajuda?
-        </a>
-
-      </footer>
-
+      </div>
     </div>
   );
 }
