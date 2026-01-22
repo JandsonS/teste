@@ -9,7 +9,8 @@ import {
   Smartphone, 
   Wallet, 
   AlertTriangle,
-  Check
+  Check,
+  MessageCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,21 +41,34 @@ export function AdminBookingCard({ booking, onUpdate }: AdminBookingCardProps) {
   // Limpa o nome do serviço
   const serviceNameClean = booking.servico.split('(')[0].trim();
 
+  // Função para abrir o WhatsApp
+  const handleOpenWhatsApp = () => {
+    // Remove tudo que não é número e adiciona o código do Brasil (55)
+    const cleanPhone = booking.telefone.replace(/\D/g, "");
+    const url = `https://wa.me/55${cleanPhone}`;
+    window.open(url, "_blank");
+  };
+
   const handleStatusUpdate = async (newStatus: string) => {
     setLoading(true);
     try {
+      // Estamos chamando a rota da API
       const res = await fetch("/api/admin/update-status", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: booking.id, status: newStatus }),
       });
 
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro na API");
+      }
       
-      toast.success("Status atualizado!");
-      onUpdate();
-    } catch {
-      toast.error("Erro ao atualizar.");
+      toast.success(`Status alterado para ${newStatus}!`);
+      onUpdate(); // Atualiza a lista na tela
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao atualizar status. Verifique se a API existe.");
     } finally {
       setLoading(false);
     }
@@ -80,14 +94,14 @@ export function AdminBookingCard({ booking, onUpdate }: AdminBookingCardProps) {
           <span className="text-lg font-bold text-white">{booking.horario}</span>
         </div>
         
-        {/* BOTÕES DE AÇÃO RÁPIDA (Substituindo o Dropdown) */}
-        <div className="flex items-center gap-1">
+        {/* BOTÕES DE AÇÃO RÁPIDA */}
+        <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5">
            {/* Confirmar (Verde) */}
            <button 
              onClick={() => handleStatusUpdate("CONFIRMADO")} 
              disabled={loading}
-             title="Confirmar Agendamento"
-             className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors border border-emerald-500/20"
+             title="Confirmar"
+             className="p-2 rounded-md hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-500 transition-all"
            >
              <CheckCircle2 size={18} />
            </button>
@@ -96,8 +110,8 @@ export function AdminBookingCard({ booking, onUpdate }: AdminBookingCardProps) {
            <button 
              onClick={() => handleStatusUpdate("CONCLUIDO")} 
              disabled={loading}
-             title="Marcar como Concluído"
-             className="p-2 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors border border-blue-500/20"
+             title="Concluir"
+             className="p-2 rounded-md hover:bg-blue-500/20 text-zinc-500 hover:text-blue-500 transition-all"
            >
              <Check size={18} />
            </button>
@@ -106,8 +120,8 @@ export function AdminBookingCard({ booking, onUpdate }: AdminBookingCardProps) {
            <button 
              onClick={() => handleStatusUpdate("CANCELADO")} 
              disabled={loading}
-             title="Cancelar Agendamento"
-             className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors border border-red-500/20"
+             title="Cancelar"
+             className="p-2 rounded-md hover:bg-red-500/20 text-zinc-500 hover:text-red-500 transition-all"
            >
              <XCircle size={18} />
            </button>
@@ -115,12 +129,22 @@ export function AdminBookingCard({ booking, onUpdate }: AdminBookingCardProps) {
       </div>
 
       {/* DADOS DO CLIENTE */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
            {booking.cliente}
         </h3>
-        <div className="flex items-center gap-4 text-xs text-zinc-400">
-           <span className="flex items-center gap-1"><Smartphone size={12}/> {booking.telefone}</span>
+        
+        {/* Botão do WhatsApp e Status */}
+        <div className="flex items-center justify-between">
+           <button 
+             onClick={handleOpenWhatsApp}
+             className="flex items-center gap-2 text-xs text-zinc-400 hover:text-green-400 transition-colors group px-2 py-1 -ml-2 rounded-md hover:bg-green-500/10"
+           >
+             <Smartphone size={14} className="group-hover:text-green-500"/> 
+             {booking.telefone}
+             <MessageCircle size={14} className="text-green-500 opacity-0 group-hover:opacity-100 transition-opacity -ml-1"/>
+           </button>
+
            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${currentStatusColor}`}>
               {booking.status}
            </span>
