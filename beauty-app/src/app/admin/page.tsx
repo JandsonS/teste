@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
-// --- ÍCONE OFICIAL DO WHATSAPP (SVG) ---
 function WhatsAppLogo({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -41,26 +40,19 @@ export default function AdminDashboard() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
 
-  // --- ATUALIZAÇÃO AO VIVO ---
+  // ATUALIZAÇÃO AUTOMÁTICA (LIVE)
   useEffect(() => {
-    fetchBookings(); // Busca inicial
-
-    // Configura o relógio para atualizar a cada 5 segundos
+    fetchBookings(); 
     const interval = setInterval(() => {
-        fetchBookings();
+        fetchBookings(true); // true = silent refresh
     }, 5000);
-
-    // Limpa o relógio quando sair da tela
     return () => clearInterval(interval);
   }, []);
 
-  const fetchBookings = async () => {
-    // Nota: Mantemos setLoading(true) apenas se quiser que o ícone gire a cada atualização.
-    // Se quiser atualização silenciosa, pode remover o setLoading daqui.
-    // Vou manter para você ver visualmente que está funcionando (o ícone vai girar).
-    setLoading(true); 
+  const fetchBookings = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const res = await fetch("/api/admin/bookings", { cache: "no-store" }); // Garante que não pegue cache
+      const res = await fetch("/api/admin/bookings", { cache: "no-store" });
       if (res.status === 401) { router.push("/admin/login"); return; }
       const data = await res.json();
       if (!Array.isArray(data)) { setBookings([]); return; }
@@ -79,16 +71,14 @@ export default function AdminDashboard() {
 
       setBookings(sortedData);
     } catch (error) {
-      // Opcional: Remover o toast de erro no loop automático para não floodar a tela se a net cair
       console.error("Erro ao atualizar dados"); 
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   const handleDeleteBooking = async (id: string) => {
     if (!confirm("Tem certeza que deseja cancelar este agendamento?")) return;
-
     setDeletingId(id);
     try {
       const res = await fetch("/api/admin/bookings", {
@@ -96,12 +86,10 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-
       if (res.ok) {
-        toast.success("Agendamento cancelado!");
-        // Atualiza a lista localmente para ser instantâneo
+        toast.success("Cancelado com sucesso!");
         setBookings((prev) => prev.filter((b) => b.id !== id));
-        fetchBookings(); // Força uma atualização do servidor
+        fetchBookings(true);
       } else {
         toast.error("Erro ao cancelar.");
       }
@@ -137,7 +125,13 @@ export default function AdminDashboard() {
     return true; 
   });
 
-  const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (curr.pricePaid || 0), 0);
+  // Função Auxiliar para Checar Pagamento
+  const isPaid = (status: string) => {
+      // Considera pago se for 'paid', 'PAGO' ou 'CONFIRMADO'
+      return ['paid', 'PAGO', 'CONFIRMADO'].includes(status);
+  };
+
+  const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (isPaid(curr.status) ? (curr.pricePaid || 0) : 0), 0);
   const totalCount = filteredBookings.length;
 
   const formatCurrency = (value: number) => {
@@ -159,7 +153,6 @@ export default function AdminDashboard() {
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
   };
 
-  // Loading inicial (só aparece se não tiver dados)
   if (loading && bookings.length === 0) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
@@ -193,7 +186,7 @@ export default function AdminDashboard() {
       </header>
 
       <main className="relative z-10 max-w-7xl mx-auto space-y-8 flex-1 w-full">
-        {/* CARDS DE RESUMO */}
+        {/* CARDS KPI */}
         <div className="grid grid-cols-2 gap-4">
             <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
                 <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={48} /></div>
@@ -224,14 +217,11 @@ export default function AdminDashboard() {
             </div>
         </div>
         
-        {/* LISTA DE CARDS */}
+        {/* LISTAGEM */}
         {filteredBookings.length === 0 ? (
           <div className="text-center py-20 bg-zinc-900/30 rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col items-center animate-in fade-in zoom-in duration-500">
-            <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
-                <Filter className="text-zinc-500" size={24} />
-            </div>
+            <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4"><Filter className="text-zinc-500" size={24} /></div>
             <p className="text-zinc-300 font-medium">Nenhum agendamento para este período.</p>
-            <p className="text-zinc-600 text-sm mt-1">Altere o filtro acima para ver outros dias.</p>
           </div>
         ) : (
           <motion.div layout className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
@@ -245,7 +235,8 @@ export default function AdminDashboard() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col relative"
               >
-                <div className={`h-1 w-full ${booking.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                {/* BARRA DE STATUS (VERDE SE CONFIRMADO/PAGO) */}
+                <div className={`h-1 w-full ${isPaid(booking.status) ? 'bg-emerald-500' : 'bg-amber-500'}`} />
 
                 {/* BOTÃO DE CANCELAR */}
                 <button 
@@ -253,14 +244,7 @@ export default function AdminDashboard() {
                   disabled={deletingId === booking.id}
                   className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20 group/cancel"
                 >
-                  {deletingId === booking.id ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <>
-                        <Trash2 size={12} className="group-hover/cancel:scale-110 transition-transform"/> 
-                        Cancelar
-                    </>
-                  )}
+                  {deletingId === booking.id ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} /> Cancelar</>}
                 </button>
                 
                 <div className="p-5 space-y-4 flex-1 mt-2">
@@ -274,14 +258,8 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
-                        <div className="flex items-center gap-3">
-                            <User size={14} className="text-zinc-500" />
-                            <p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Phone size={14} className="text-zinc-500" />
-                            <p className="text-zinc-400 text-xs font-mono">{booking.clientPhone}</p>
-                        </div>
+                        <div className="flex items-center gap-3"><User size={14} className="text-zinc-500" /><p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p></div>
+                        <div className="flex items-center gap-3"><Phone size={14} className="text-zinc-500" /><p className="text-zinc-400 text-xs font-mono">{booking.clientPhone}</p></div>
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t border-white/5">
@@ -289,16 +267,15 @@ export default function AdminDashboard() {
                              <span className="text-[10px] text-zinc-500 font-bold uppercase">Valor</span>
                              <div className="flex items-baseline gap-1">
                                 <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
-                                <span className={`text-[10px] ${booking.status === 'paid' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    {booking.status === 'paid' ? 'pago' : 'a receber'}
+                                <span className={`text-[10px] ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                    {isPaid(booking.status) ? 'pago' : 'a receber'}
                                 </span>
                              </div>
                         </div>
                         
                         <a 
                             href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 active:scale-95 group/btn"
                         >
                             <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" />
@@ -313,23 +290,10 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* --- RODAPÉ CENTRALIZADO --- */}
       <footer className="relative z-10 w-full mt-20 pb-8 flex flex-col items-center justify-center gap-4 opacity-70 hover:opacity-100 transition-opacity border-t border-white/5 pt-8">
-        <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase text-center">
-          © {new Date().getFullYear()} BARBEARIA TESTE
-        </p>
-
-        <a 
-            href="https://wa.me/5500000000000" 
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white px-5 py-2 rounded-full transition-all text-xs font-bold uppercase border border-white/5 hover:border-white/20 shadow-sm"
-        >
-            <HelpCircle size={14} />
-            Precisa de Ajuda?
-        </a>
+        <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase text-center">© {new Date().getFullYear()} BARBEARIA TESTE</p>
+        <a href="#" className="flex items-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white px-5 py-2 rounded-full transition-all text-xs font-bold uppercase border border-white/5 hover:border-white/20 shadow-sm"><HelpCircle size={14} />Precisa de Ajuda?</a>
       </footer>
-
     </div>
   );
 }

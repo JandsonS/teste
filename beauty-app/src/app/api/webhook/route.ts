@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import { PrismaClient } from "@prisma/client";
 
+// Evita múltiplas instâncias do Prisma no Hot Reload (Melhor prática Next.js)
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
 
@@ -15,58 +16,56 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
 
-    // 1. Validação simples para ignorar testes automáticos do MP
+    // 1. Ignora testes automáticos
     if (!body || (body.data?.id === "123456" || body.type === "test")) {
         return NextResponse.json({ received: true }, { status: 200 });
     }
 
     // 2. Identifica o ID do pagamento
     const paymentId = body.data?.id || body.id;
-    const action = body.action;
     const type = body.type;
+    const action = body.action;
 
-    // Só processamos notificações de pagamento reais
+    // Se não for pagamento ou atualização de status, ignora
     if (!paymentId || (type !== "payment" && action !== "payment.created" && action !== "payment.updated")) {
         return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    // 3. Consulta a API do Mercado Pago para ver o status real
+    // 3. Consulta a API do Mercado Pago (Segurança Total)
     const payment = new Payment(client);
     const paymentInfo = await payment.get({ id: paymentId });
 
     // 4. Se estiver APROVADO, atualiza o banco
     if (paymentInfo.status === "approved") {
-        // Pega o ID que enviamos no 'external_reference' no arquivo de pagamento
         const agendamentoId = paymentInfo.external_reference;
 
         if (agendamentoId) {
-            // Define o texto bonito para o Painel Administrativo
-            let statusDetalhado = "PAGO";
-            const metodo = paymentInfo.payment_type_id;
+            // Identifica o método para salvar no campo correto
+            let nomeMetodo = "OUTROS";
+            const metodoMP = paymentInfo.payment_type_id;
 
-            if (metodo === 'bank_transfer' || metodo === 'pix') {
-                statusDetalhado = "PAGO VIA PIX";
-            } else if (metodo === 'credit_card') {
-                statusDetalhado = "PAGO VIA CARTÃO";
-            } else if (metodo === 'debit_card') {
-                statusDetalhado = "PAGO VIA DÉBITO";
-            } else if (metodo === 'account_money') {
-                statusDetalhado = "PAGO (SALDO MP)";
+            if (metodoMP === 'bank_transfer' || metodoMP === 'pix') {
+                nomeMetodo = "PIX";
+            } else if (metodoMP === 'credit_card') {
+                nomeMetodo = "CARTAO";
+            } else if (metodoMP === 'debit_card') {
+                nomeMetodo = "DEBITO";
             }
 
-            // Atualiza no Prisma
+            // --- AQUI ESTÁ A CORREÇÃO ---
+            // Salvamos status como "CONFIRMADO" para o painel reconhecer e ficar VERDE.
+            // Salvamos o método (PIX, CARTAO) no campo metodoPagamento.
             await prisma.agendamento.update({
                 where: { id: agendamentoId },
                 data: { 
-                    status: statusDetalhado,
-                    // Se você tiver a coluna paymentId no seu schema.prisma, pode descomentar a linha abaixo:
-                    // paymentId: String(paymentId) 
+                    status: "CONFIRMADO", 
+                    metodoPagamento: nomeMetodo,
+                    // Se quiser salvar o valor exato pago pelo MP, descomente:
+                    // valor: paymentInfo.transaction_amount 
                 },
             });
 
-            console.log(`✅ Agendamento ${agendamentoId} confirmado! Status: ${statusDetalhado}`);
-        } else {
-            console.warn("⚠️ Pagamento aprovado sem ID do agendamento (external_reference vazio).");
+            console.log(`✅ Agendamento ${agendamentoId} confirmado! Método: ${nomeMetodo}`);
         }
     }
 
@@ -74,7 +73,6 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error("❌ Erro no Webhook:", error);
-    // Retorna 200 para evitar loop de erro com o Mercado Pago
     return NextResponse.json({ received: true }, { status: 200 });
   }
 }
