@@ -41,14 +41,26 @@ export default function AdminDashboard() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
 
+  // --- ATUALIZAÇÃO AO VIVO ---
   useEffect(() => {
-    fetchBookings();
+    fetchBookings(); // Busca inicial
+
+    // Configura o relógio para atualizar a cada 5 segundos
+    const interval = setInterval(() => {
+        fetchBookings();
+    }, 5000);
+
+    // Limpa o relógio quando sair da tela
+    return () => clearInterval(interval);
   }, []);
 
   const fetchBookings = async () => {
-    setLoading(true);
+    // Nota: Mantemos setLoading(true) apenas se quiser que o ícone gire a cada atualização.
+    // Se quiser atualização silenciosa, pode remover o setLoading daqui.
+    // Vou manter para você ver visualmente que está funcionando (o ícone vai girar).
+    setLoading(true); 
     try {
-      const res = await fetch("/api/admin/bookings");
+      const res = await fetch("/api/admin/bookings", { cache: "no-store" }); // Garante que não pegue cache
       if (res.status === 401) { router.push("/admin/login"); return; }
       const data = await res.json();
       if (!Array.isArray(data)) { setBookings([]); return; }
@@ -67,7 +79,8 @@ export default function AdminDashboard() {
 
       setBookings(sortedData);
     } catch (error) {
-      toast.error("Erro ao atualizar dados");
+      // Opcional: Remover o toast de erro no loop automático para não floodar a tela se a net cair
+      console.error("Erro ao atualizar dados"); 
     } finally {
       setLoading(false);
     }
@@ -86,7 +99,9 @@ export default function AdminDashboard() {
 
       if (res.ok) {
         toast.success("Agendamento cancelado!");
+        // Atualiza a lista localmente para ser instantâneo
         setBookings((prev) => prev.filter((b) => b.id !== id));
+        fetchBookings(); // Força uma atualização do servidor
       } else {
         toast.error("Erro ao cancelar.");
       }
@@ -144,6 +159,7 @@ export default function AdminDashboard() {
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
   };
 
+  // Loading inicial (só aparece se não tiver dados)
   if (loading && bookings.length === 0) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
@@ -297,16 +313,12 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* --- RODAPÉ CENTRALIZADO (FINAL E CORRIGIDO) --- */}
-      {/* Removemos qualquer md:flex-row ou md:justify-between para garantir que fique centralizado sempre */}
+      {/* --- RODAPÉ CENTRALIZADO --- */}
       <footer className="relative z-10 w-full mt-20 pb-8 flex flex-col items-center justify-center gap-4 opacity-70 hover:opacity-100 transition-opacity border-t border-white/5 pt-8">
-        
-        {/* Nome do Estabelecimento (Centralizado) */}
         <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase text-center">
           © {new Date().getFullYear()} BARBEARIA TESTE
         </p>
 
-        {/* Link de Ajuda (Centralizado logo abaixo) */}
         <a 
             href="https://wa.me/5500000000000" 
             target="_blank"
@@ -316,7 +328,6 @@ export default function AdminDashboard() {
             <HelpCircle size={14} />
             Precisa de Ajuda?
         </a>
-
       </footer>
 
     </div>
