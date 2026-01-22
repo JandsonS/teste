@@ -7,7 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { 
   Loader2, LogOut, CalendarDays, User, Phone, 
-  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle
+  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,7 +30,6 @@ interface Booking {
   status: string;
   paymentMethod: string;
   pricePaid: number;
-  pricePending: number;
 }
 
 export default function AdminDashboard() {
@@ -40,11 +39,10 @@ export default function AdminDashboard() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
 
-  // ATUALIZAÇÃO AUTOMÁTICA (LIVE)
   useEffect(() => {
     fetchBookings(); 
     const interval = setInterval(() => {
-        fetchBookings(true); // true = silent refresh
+        fetchBookings(true); 
     }, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -125,21 +123,29 @@ export default function AdminDashboard() {
     return true; 
   });
 
-  // --- LÓGICA DE TEXTO DE PAGAMENTO ---
   const isPaid = (status: string) => {
       return ['paid', 'PAGO', 'CONFIRMADO'].includes(status);
   };
 
-  // Nova função para gerar o texto bonitinho
   const getPaymentLabel = (status: string, method: string) => {
       if (!isPaid(status)) return 'a receber';
-      
       const m = method?.toUpperCase() || '';
       if (m === 'PIX') return 'pago via pix';
       if (m === 'CARTAO' || m === 'CREDIT_CARD') return 'pago via crédito';
       if (m === 'DEBITO' || m === 'DEBIT_CARD') return 'pago via débito';
-      
-      return 'pago'; // Caso genérico
+      return 'pago'; 
+  };
+
+  // --- NOVA FUNÇÃO: EXTRAIR O VALOR RESTANTE DO NOME ---
+  // Procura por "Resta: R$ X,XX" dentro do nome do serviço
+  const getRestante = (serviceTitle: string) => {
+      const match = serviceTitle.match(/Resta: (R\$ \s?[\d,.]+)/);
+      return match ? match[1] : null;
+  };
+  
+  // Limpa o nome do serviço para não ficar gigante no card
+  const cleanServiceName = (title: string) => {
+      return title.split('(')[0].trim();
   };
 
   const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (isPaid(curr.status) ? (curr.pricePaid || 0) : 0), 0);
@@ -197,7 +203,7 @@ export default function AdminDashboard() {
       </header>
 
       <main className="relative z-10 max-w-7xl mx-auto space-y-8 flex-1 w-full">
-        {/* CARDS KPI */}
+        {/* KPI CARDS */}
         <div className="grid grid-cols-2 gap-4">
             <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
                 <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={48} /></div>
@@ -228,7 +234,7 @@ export default function AdminDashboard() {
             </div>
         </div>
         
-        {/* LISTAGEM */}
+        {/* LISTAGEM DE CARDS */}
         {filteredBookings.length === 0 ? (
           <div className="text-center py-20 bg-zinc-900/30 rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col items-center animate-in fade-in zoom-in duration-500">
             <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4"><Filter className="text-zinc-500" size={24} /></div>
@@ -237,66 +243,82 @@ export default function AdminDashboard() {
         ) : (
           <motion.div layout className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             <AnimatePresence>
-            {filteredBookings.map((booking) => (
-              <motion.div
-                layout
-                key={booking.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col relative"
-              >
-                {/* BARRA DE STATUS */}
-                <div className={`h-1 w-full ${isPaid(booking.status) ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-
-                {/* BOTÃO DE CANCELAR */}
-                <button 
-                  onClick={() => handleDeleteBooking(booking.id)}
-                  disabled={deletingId === booking.id}
-                  className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20 group/cancel"
+            {filteredBookings.map((booking) => {
+              const restante = getRestante(booking.serviceTitle);
+              
+              return (
+                <motion.div
+                  layout
+                  key={booking.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col relative"
                 >
-                  {deletingId === booking.id ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} /> Cancelar</>}
-                </button>
-                
-                <div className="p-5 space-y-4 flex-1 mt-2">
-                    <div className="flex justify-between items-start gap-3 pr-2">
-                        <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-white text-base truncate leading-tight pr-20">{booking.serviceTitle}</h3>
-                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
-                                {formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}
-                            </p>
-                        </div>
-                    </div>
+                  {/* BARRA DE STATUS */}
+                  {/* Se tiver 'restante', a barra fica Amarela (Atenção), se não, Verde (Tudo Certo) */}
+                  <div className={`h-1 w-full ${!isPaid(booking.status) ? 'bg-zinc-700' : (restante ? 'bg-yellow-500' : 'bg-emerald-500')}`} />
 
-                    <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
-                        <div className="flex items-center gap-3"><User size={14} className="text-zinc-500" /><p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p></div>
-                        <div className="flex items-center gap-3"><Phone size={14} className="text-zinc-500" /><p className="text-zinc-400 text-xs font-mono">{booking.clientPhone}</p></div>
-                    </div>
+                  {/* BOTÃO CANCELAR */}
+                  <button 
+                    onClick={() => handleDeleteBooking(booking.id)}
+                    disabled={deletingId === booking.id}
+                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20 group/cancel"
+                  >
+                    {deletingId === booking.id ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} /> Cancelar</>}
+                  </button>
+                  
+                  <div className="p-5 space-y-4 flex-1 mt-2">
+                      <div className="flex justify-between items-start gap-3 pr-2">
+                          <div className="min-w-0 flex-1">
+                              {/* Nome do Serviço Limpo (Sem o texto do depósito) */}
+                              <h3 className="font-bold text-white text-base truncate leading-tight pr-20">{cleanServiceName(booking.serviceTitle)}</h3>
+                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
+                                  {formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}
+                              </p>
+                          </div>
+                      </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                        <div className="flex flex-col">
-                             <span className="text-[10px] text-zinc-500 font-bold uppercase">Valor</span>
-                             <div className="flex items-baseline gap-1">
-                                <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
-                                <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    {/* AQUI ESTÁ A MUDANÇA: Usamos a nova função */}
-                                    {getPaymentLabel(booking.status, booking.paymentMethod)}
-                                </span>
-                             </div>
-                        </div>
-                        
-                        <a 
-                            href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)}
-                            target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 active:scale-95 group/btn"
-                        >
-                            <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" />
-                            <span className="text-xs font-bold uppercase tracking-wide">WhatsApp</span>
-                        </a>
-                    </div>
-                </div>
-              </motion.div>
-            ))}
+                      <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
+                          <div className="flex items-center gap-3"><User size={14} className="text-zinc-500" /><p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p></div>
+                          <div className="flex items-center gap-3"><Phone size={14} className="text-zinc-500" /><p className="text-zinc-400 text-xs font-mono">{booking.clientPhone}</p></div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                          <div className="flex flex-col">
+                               <span className="text-[10px] text-zinc-500 font-bold uppercase">Financeiro</span>
+                               <div className="flex flex-col">
+                                  {/* Valor Pago (Sinal ou Total) */}
+                                  <div className="flex items-baseline gap-1">
+                                      <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
+                                      <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                          {getPaymentLabel(booking.status, booking.paymentMethod)}
+                                      </span>
+                                  </div>
+
+                                  {/* ALERTA DE RESTANTE (Só aparece se for depósito) */}
+                                  {restante && (
+                                    <div className="flex items-center gap-1 mt-1 animate-pulse">
+                                      <AlertTriangle size={10} className="text-red-500"/>
+                                      <span className="text-xs font-bold text-red-500">Falta: {restante}</span>
+                                    </div>
+                                  )}
+                               </div>
+                          </div>
+                          
+                          <a 
+                              href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)}
+                              target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 active:scale-95 group/btn"
+                          >
+                              <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" />
+                              <span className="text-xs font-bold uppercase tracking-wide">WhatsApp</span>
+                          </a>
+                      </div>
+                  </div>
+                </motion.div>
+              );
+            })}
             </AnimatePresence>
           </motion.div>
         )}

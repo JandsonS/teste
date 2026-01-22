@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Wallet, Loader2, Smartphone, CreditCard, QrCode, CalendarDays, Clock, User } from "lucide-react"
+import { Wallet, Loader2, Smartphone, CreditCard, QrCode, CalendarDays, Clock, User, FileText, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
@@ -23,11 +23,23 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD'>('PIX')
+  
+  // --- NOVO: ESTADO DOS TERMOS ---
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  // ---------------------------------
+
   const [busySlots, setBusySlots] = useState<string[]>([]) 
   const [lockedSlots, setLockedSlots] = useState<string[]>([]) 
   const [loadingSlots, setLoadingSlots] = useState(false)
 
-  useEffect(() => { if (!open) { setStep(1); setSelectedTime(null); } }, [open]);
+  // Reseta os passos quando fecha o modal
+  useEffect(() => { 
+      if (!open) { 
+          setStep(1); 
+          setSelectedTime(null); 
+          setAcceptedTerms(false); // Reseta o checkbox
+      } 
+  }, [open]);
 
   const formatPhone = (value: string) => value.replace(/\D/g, '').slice(0, 11).replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1');
   const isPhoneValid = phone.replace(/\D/g, '').length === 11;
@@ -51,6 +63,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   };
 
   const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
+    // --- NOVO: VALIDAÇÃO DOS TERMOS ---
+    if (!acceptedTerms) {
+        toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento para continuar." });
+        return;
+    }
+    // ----------------------------------
+
     if (!date || !selectedTime || !name || !isPhoneValid) return; 
     setLoading(true);
     try {
@@ -73,15 +92,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       });
       const data = await response.json();
       
-      // --- AQUI ESTÁ A ALTERAÇÃO ---
       if (data.error) { 
           toast.error(data.error, { 
-              duration: 8000, // 8 segundos
-              style: {
-                  background: '#27272a', // Fundo escuro
-                  color: '#fff',         // Texto branco
-                  border: '1px solid #3f3f46' 
-              },
+              duration: 8000, 
+              style: { background: '#27272a', color: '#fff', border: '1px solid #3f3f46' },
               description: "Verifique os dados e tente novamente."
           }); 
           
@@ -195,9 +209,42 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 3 && (
             <div className="py-2 space-y-4">
                 <div className="flex gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800"><button onClick={() => setPaymentMethod('PIX')} className={`flex-1 py-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white border border-zinc-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}><QrCode size={16} /> PIX</button><button onClick={() => setPaymentMethod('CARD')} className={`flex-1 py-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${paymentMethod === 'CARD' ? 'bg-zinc-800 text-white border border-zinc-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}><CreditCard size={16} /> Cartão</button></div>
+                
+                {/* --- CAIXA DE TERMOS E POLÍTICAS (NOVO) --- */}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="pt-0.5">
+                            <input 
+                                type="checkbox" 
+                                id="terms" 
+                                checked={acceptedTerms}
+                                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                                className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer accent-emerald-500"
+                            />
+                        </div>
+                        <label htmlFor="terms" className="text-xs text-zinc-400 cursor-pointer select-none">
+                            <span className="text-white font-bold block mb-1 flex items-center gap-1">
+                                <AlertCircle size={10} className="text-yellow-500"/> Política de Cancelamento
+                            </span>
+                            Li e concordo que o <b className="text-zinc-300">não comparecimento</b> não dá direito a reembolso. Remarcações devem ser feitas via WhatsApp com <b className="text-zinc-300">2h de antecedência</b>.
+                        </label>
+                    </div>
+                </div>
+                {/* ------------------------------------------- */}
+
                 <div className="grid grid-cols-1 gap-3">
                     {/* BOTÃO PAGAMENTO INTEGRAL */}
-                    <button onClick={() => handleCheckout('FULL')} disabled={loading} className="group flex items-center p-4 rounded-xl border bg-zinc-900 border-zinc-800 hover:border-white/50 hover:bg-zinc-800/80 text-left transition-all">
+                    <button 
+                        onClick={() => handleCheckout('FULL')} 
+                        disabled={loading || !acceptedTerms} // BLOQUEIA SE NÃO ACEITAR
+                        className={`
+                            group flex items-center p-4 rounded-xl border text-left transition-all
+                            ${!acceptedTerms 
+                                ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' 
+                                : 'bg-zinc-900 border-zinc-800 hover:border-white/50 hover:bg-zinc-800/80 cursor-pointer'
+                            }
+                        `}
+                    >
                         <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-white/20 flex items-center justify-center text-zinc-400 group-hover:text-white mr-3 transition-colors">
                             <Wallet size={18} />
                         </div>
@@ -212,7 +259,17 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     </button>
 
                     {/* BOTÃO RESERVA (SINAL) */}
-                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading} className="group flex items-center p-4 rounded-xl border bg-zinc-900 border-zinc-800 hover:border-white/50 hover:bg-zinc-800/80 text-left transition-all">
+                    <button 
+                        onClick={() => handleCheckout('DEPOSIT')} 
+                        disabled={loading || !acceptedTerms} // BLOQUEIA SE NÃO ACEITAR
+                        className={`
+                            group flex items-center p-4 rounded-xl border text-left transition-all
+                            ${!acceptedTerms 
+                                ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' 
+                                : 'bg-zinc-900 border-zinc-800 hover:border-white/50 hover:bg-zinc-800/80 cursor-pointer'
+                            }
+                        `}
+                    >
                         <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-white/20 flex items-center justify-center text-zinc-400 group-hover:text-white mr-3 transition-colors">
                             <Wallet size={18} />
                         </div>
