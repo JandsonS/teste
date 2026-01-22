@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AdminBookingCard } from "@/components/AdminBookingCard";
-import { Loader2, RefreshCw, CalendarDays, DollarSign, Users, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, RefreshCw, CalendarDays, DollarSign, Users, ChevronDown } from "lucide-react";
 import { format, addDays } from "date-fns"; 
 
 interface Booking {
@@ -17,44 +17,44 @@ interface Booking {
   metodoPagamento: string;
 }
 
-// --- COMPONENTE DE SEÇÃO EXPANSÍVEL (ACORDEÃO) ---
-function SectionGroup({ title, date, color, count, children, defaultOpen = true }: any) {
+// --- COMPONENTE DE SEÇÃO (COLUNA) ---
+// Agora ele age como um cabeçalho de coluna que pode recolher
+function SectionColumn({ title, date, color, count, children, defaultOpen = true }: any) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     
-    // Define a cor da borda/texto baseado na prop
     const colorClasses: any = {
-        emerald: "border-emerald-500 text-emerald-500",
-        blue: "border-blue-500 text-blue-500",
-        purple: "border-purple-500 text-purple-500",
+        emerald: "border-emerald-500 text-emerald-500 bg-emerald-500/5",
+        blue: "border-blue-500 text-blue-500 bg-blue-500/5",
+        purple: "border-purple-500 text-purple-500 bg-purple-500/5",
     };
-    const activeColor = colorClasses[color] || "border-zinc-500 text-zinc-500";
+    const activeStyle = colorClasses[color] || "border-zinc-500 text-zinc-500";
+    const borderColor = activeStyle.split(' ')[0];
 
     return (
-        <div className="mb-6">
+        <div className="flex flex-col gap-3 h-full">
+            {/* CABEÇALHO DA COLUNA */}
             <button 
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between p-4 bg-zinc-900/40 border border-white/5 rounded-xl hover:bg-zinc-900/60 transition-all group"
+                className={`w-full flex items-center justify-between p-4 border rounded-xl transition-all hover:opacity-90 ${activeStyle}`}
             >
-                <div className="flex items-center gap-3">
-                    <div className={`w-1 h-8 rounded-full ${activeColor.split(' ')[0]} bg-current shadow-[0_0_10px_currentColor] opacity-80`}></div>
-                    <div className="text-left">
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                            {title}
-                            {date && <span className="text-zinc-500 text-xs font-normal">({date})</span>}
-                        </h2>
-                        <p className="text-xs text-zinc-400 font-medium">
-                            {count} {count === 1 ? 'agendamento' : 'agendamentos'}
-                        </p>
-                    </div>
+                <div className="flex flex-col items-start">
+                    <h2 className="text-sm md:text-base font-bold flex items-center gap-2 uppercase tracking-wider">
+                        {title}
+                    </h2>
+                    {date && <span className="text-xs opacity-70 font-mono">({date})</span>}
                 </div>
-                <div className={`p-2 rounded-full bg-white/5 text-zinc-400 group-hover:text-white transition-all ${isOpen ? 'rotate-180' : ''}`}>
-                    <ChevronDown size={20} />
+                
+                <div className="flex items-center gap-3">
+                     <span className="text-xs font-bold bg-black/20 px-2 py-1 rounded-md">
+                        {count}
+                     </span>
+                     <ChevronDown size={16} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
                 </div>
             </button>
 
-            {/* CONTEÚDO EXPANSÍVEL */}
+            {/* LISTA DE CARTÕES (EXPANSÍVEL) */}
             {isOpen && (
-                <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
                     {children}
                 </div>
             )}
@@ -115,7 +115,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-[1400px] mx-auto space-y-8">
         
         {/* CABEÇALHO */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/10 pb-6">
@@ -123,7 +123,7 @@ export default function AdminPage() {
             <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white flex items-center gap-2">
               Painel Administrativo
             </h1>
-            <p className="text-zinc-400 text-xs md:text-sm mt-1">Gerencie seus agendamentos em tempo real.</p>
+            <p className="text-zinc-400 text-xs md:text-sm mt-1">Visão geral da agenda.</p>
           </div>
 
           <div className="flex items-center gap-3 bg-zinc-900/50 p-2 rounded-full border border-white/5 px-4 self-end md:self-auto">
@@ -136,7 +136,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* CARDS KPI (LADO A LADO NO MOBILE: GRID-COLS-2) */}
+        {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             <div className="bg-zinc-900/50 border border-white/5 p-4 rounded-2xl flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4 col-span-2 md:col-span-1">
                 <div className="w-10 h-10 bg-pink-500/10 rounded-full flex items-center justify-center text-pink-500"><CalendarDays size={20} /></div>
@@ -152,42 +152,40 @@ export default function AdminPage() {
             </div>
         </div>
 
-        {/* LISTAS COM ACORDEÃO (MODO EXPANSÍVEL) */}
+        {/* LAYOUT DE COLUNAS LADO A LADO (GRID) */}
         {loading && bookings.length === 0 ? (
            <div className="flex justify-center py-20"><Loader2 className="animate-spin text-pink-500 w-10 h-10" /></div>
         ) : (
-          <div className="space-y-4">
+          // AQUI É A MÁGICA: grid-cols-1 (Mobile) -> grid-cols-3 (PC)
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             
-            {/* 1. HOJE (SEMPRE ABERTO POR PADRÃO) */}
-            <SectionGroup title="Hoje" date={hojeStr} color="emerald" count={agendamentosHoje.length} defaultOpen={true}>
+            {/* COLUNA 1: HOJE */}
+            <SectionColumn title="Hoje" date={hojeStr} color="emerald" count={agendamentosHoje.length} defaultOpen={true}>
                 {agendamentosHoje.length === 0 ? (
-                    <div className="text-center py-8 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"><p className="text-zinc-500 text-sm">Sem agendamentos.</p></div>
+                    <div className="text-center py-6 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/20"><p className="text-zinc-500 text-xs">Vazio.</p></div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {agendamentosHoje.map((b) => <AdminBookingCard key={b.id} booking={b} onUpdate={fetchBookings} />)}
-                    </div>
+                    // Cartões um embaixo do outro na coluna
+                    agendamentosHoje.map((b) => <AdminBookingCard key={b.id} booking={b} onUpdate={fetchBookings} />)
                 )}
-            </SectionGroup>
+            </SectionColumn>
 
-            {/* 2. AMANHÃ */}
-            <SectionGroup title="Amanhã" date={amanhaStr} color="blue" count={agendamentosAmanha.length} defaultOpen={agendamentosAmanha.length > 0}>
+            {/* COLUNA 2: AMANHÃ */}
+            <SectionColumn title="Amanhã" date={amanhaStr} color="blue" count={agendamentosAmanha.length} defaultOpen={true}>
                 {agendamentosAmanha.length === 0 ? (
-                    <div className="text-center py-8 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"><p className="text-zinc-500 text-sm">Sem agendamentos.</p></div>
+                    <div className="text-center py-6 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/20"><p className="text-zinc-500 text-xs">Vazio.</p></div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {agendamentosAmanha.map((b) => <AdminBookingCard key={b.id} booking={b} onUpdate={fetchBookings} />)}
-                    </div>
+                    agendamentosAmanha.map((b) => <AdminBookingCard key={b.id} booking={b} onUpdate={fetchBookings} />)
                 )}
-            </SectionGroup>
+            </SectionColumn>
 
-            {/* 3. OUTROS */}
-            {agendamentosOutros.length > 0 && (
-                <SectionGroup title="Próximos Dias / Outros" color="purple" count={agendamentosOutros.length} defaultOpen={false}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {agendamentosOutros.map((b) => <AdminBookingCard key={b.id} booking={b} onUpdate={fetchBookings} />)}
-                    </div>
-                </SectionGroup>
-            )}
+            {/* COLUNA 3: OUTROS */}
+            <SectionColumn title="Próximos" date="Futuro" color="purple" count={agendamentosOutros.length} defaultOpen={true}>
+                 {agendamentosOutros.length === 0 ? (
+                    <div className="text-center py-6 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/20"><p className="text-zinc-500 text-xs">Vazio.</p></div>
+                ) : (
+                    agendamentosOutros.map((b) => <AdminBookingCard key={b.id} booking={b} onUpdate={fetchBookings} />)
+                )}
+            </SectionColumn>
 
           </div>
         )}
