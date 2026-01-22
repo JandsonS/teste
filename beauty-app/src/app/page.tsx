@@ -2,8 +2,8 @@
 
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { Clock, Instagram, MapPin, ChevronDown, CalendarDays, ArrowUpRight } from 'lucide-react';
-import { SERVICES, SITE_CONFIG } from '@/constants/info'; // Importando suas constantes
+import { Clock, Instagram, MapPin, ChevronDown, CalendarDays, ArrowUpRight, CheckCircle2, ShoppingBag, X } from 'lucide-react';
+import { SERVICES, SITE_CONFIG } from '@/constants/info'; 
 import { BookingModal } from "@/components/booking-modal"; 
 
 // --- ÍCONE DO WHATSAPP ---
@@ -18,6 +18,9 @@ function WhatsAppIcon({ className }: { className?: string }) {
 export default function Home() {
   const [showServices, setShowServices] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
+  
+  // --- ESTADO PARA MULTI-SELEÇÃO ---
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
   const toggleServices = () => {
     const newState = !showServices;
@@ -28,6 +31,20 @@ export default function Home() {
         }, 100);
     }
   };
+
+  // --- LÓGICA DE SELEÇÃO ---
+  const toggleSelection = (index: number) => {
+    if (selectedItems.includes(index)) {
+        setSelectedItems(selectedItems.filter((i) => i !== index));
+    } else {
+        setSelectedItems([...selectedItems, index]);
+    }
+  };
+
+  // Calcula Total e Nomes Combinados
+  const totalValue = selectedItems.reduce((acc, idx) => acc + SERVICES[idx].price, 0);
+  const combinedNames = selectedItems.map(idx => SERVICES[idx].title).join(" + ");
+  const formattedTotal = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const containerVariants: Variants = {
     hidden: { opacity: 0, height: 0 },
@@ -43,7 +60,7 @@ export default function Home() {
   const whatsappMessage = encodeURIComponent("Olá, estou precisando de ajuda com o agendamento online");
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-pink-500/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-pink-500/30 overflow-x-hidden pb-24"> {/* pb-24 para espaço do footer fixo */}
       
       <div className="fixed inset-0 z-0 pointer-events-none">
           <div className="absolute top-[-10%] left-[-10%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-pink-600/10 rounded-full blur-[80px] md:blur-[120px] opacity-40 animate-pulse" />
@@ -135,7 +152,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- SERVIÇOS (TOTALMENTE AUTOMÁTICO VIA info.ts) --- */}
+      {/* --- SERVIÇOS (MULTI-SELEÇÃO) --- */}
       <AnimatePresence>
         {showServices && (
             <motion.section 
@@ -149,62 +166,112 @@ export default function Home() {
                 <div className="flex flex-col items-center justify-center mb-12 gap-4 pt-8 border-t border-white/5">
                     <motion.div initial={{ width: 0 }} animate={{ width: 100 }} className="h-1 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full" />
                     <h2 className="text-2xl md:text-5xl font-bold text-white tracking-tight text-center">{SITE_CONFIG.text.servicesTitle}</h2>
-                    <p className="text-zinc-500 text-sm text-center max-w-lg">Selecione o procedimento desejado.</p>
+                    <p className="text-zinc-500 text-sm text-center max-w-lg">Selecione um ou mais procedimentos.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                 {SERVICES.map((service, index) => {
-                    // LÓGICA DE IMAGEM AUTOMÁTICA
-                    // Pega a imagem correspondente ao índice. Se acabar, recomeça do zero (loop).
                     const imageSrc = SITE_CONFIG.images.services && SITE_CONFIG.images.services.length > 0 
                         ? SITE_CONFIG.images.services[index % SITE_CONFIG.images.services.length] 
-                        : SITE_CONFIG.images.logo; // Fallback se não tiver imagens de serviço
-
-                    // LÓGICA DE PREÇO AUTOMÁTICO
-                    const formattedPrice = service.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                        : SITE_CONFIG.images.logo; 
+                    
+                    const isSelected = selectedItems.includes(index);
 
                     return (
                         <motion.div
                             key={index}
                             variants={itemVariants}
-                            className="group relative bg-zinc-900/40 backdrop-blur-md rounded-[2rem] border border-white/5 hover:border-pink-500/30 transition-all duration-300 overflow-hidden hover:shadow-2xl"
+                            onClick={() => toggleSelection(index)}
+                            className={`
+                                group relative rounded-[2rem] border transition-all duration-300 overflow-hidden hover:shadow-2xl cursor-pointer
+                                ${isSelected 
+                                    ? 'bg-zinc-800/80 border-emerald-500 ring-2 ring-emerald-500/50' 
+                                    : 'bg-zinc-900/40 border-white/5 hover:border-pink-500/30'
+                                }
+                            `}
                         >
-                            <div className="h-56 md:h-64 relative overflow-hidden">
+                            <div className="h-48 relative overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent z-10 opacity-90" />
                                 <img 
                                     src={imageSrc} 
                                     alt={service.title} 
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out grayscale group-hover:grayscale-0" 
+                                    className={`w-full h-full object-cover transition-transform duration-700 ease-out 
+                                        ${isSelected ? 'scale-110 grayscale-0' : 'grayscale group-hover:grayscale-0 group-hover:scale-105'}
+                                    `}
                                 />
-                                <div className="absolute top-4 right-4 z-20">
-                                    <span className="bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase text-white tracking-wider shadow-lg">PRESENCIAL</span>
+                                
+                                {/* CHECKBOX FLUTUANTE */}
+                                <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${isSelected ? 'scale-110' : 'scale-100 opacity-80'}`}>
+                                    <div className={`
+                                        w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md shadow-lg transition-colors
+                                        ${isSelected ? 'bg-emerald-500 text-black' : 'bg-black/50 border border-white/20 text-white group-hover:bg-white group-hover:text-black'}
+                                    `}>
+                                        {isSelected ? <CheckCircle2 size={18} /> : <div className="w-4 h-4 rounded-full border-2 border-current" />}
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="p-6 md:p-8 relative z-20 -mt-20">
-                                <h3 className="text-xl md:text-2xl font-bold text-white mb-2 drop-shadow-lg group-hover:text-pink-400 transition-colors">{service.title}</h3>
-                                <p className="text-xs md:text-sm text-zinc-300 mb-6 line-clamp-2 leading-relaxed h-8 md:h-10 drop-shadow-md opacity-80 group-hover:opacity-100">{service.description}</p>
+                            <div className="p-6 relative z-20 -mt-16">
+                                <h3 className={`text-xl font-bold mb-2 drop-shadow-lg transition-colors ${isSelected ? 'text-emerald-400' : 'text-white group-hover:text-pink-400'}`}>
+                                    {service.title}
+                                </h3>
+                                <p className="text-xs text-zinc-300 mb-4 line-clamp-2 leading-relaxed h-8 drop-shadow-md opacity-90">{service.description}</p>
                                 
-                                <div className="flex items-center justify-between mb-6 pb-6 border-b border-white/10">
-                                    <div className="flex items-center gap-2 text-zinc-300 text-[10px] md:text-xs uppercase font-bold tracking-wider bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
-                                        <Clock size={14} className="text-pink-500" /> {service.duration}
+                                <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                                    <div className="flex items-center gap-2 text-zinc-300 text-[10px] uppercase font-bold tracking-wider bg-white/5 px-2 py-1 rounded-lg">
+                                        <Clock size={12} className={isSelected ? "text-emerald-500" : "text-pink-500"} /> {service.duration}
                                     </div>
-                                    <div className="text-xl md:text-2xl font-bold text-white flex items-baseline gap-1">
+                                    <div className="text-lg font-bold text-white flex items-baseline gap-1">
                                         <span className="text-xs text-zinc-500 font-normal">R$</span>{service.price.toFixed(2)}
                                     </div>
                                 </div>
-                                
-                                <BookingModal serviceName={service.title} price={formattedPrice}>
-                                    <button className="w-full bg-white text-black hover:bg-pink-500 hover:text-white font-bold py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 text-xs md:text-sm uppercase tracking-wide">
-                                        {SITE_CONFIG.text.scheduleTitle} <MapPin size={14} />
-                                    </button>
-                                </BookingModal>
                             </div>
                         </motion.div>
                     );
                 })}
                 </div>
             </motion.section>
+        )}
+      </AnimatePresence>
+
+      {/* --- BARRA FLUTUANTE DE AGENDAMENTO (CARRINHO) --- */}
+      <AnimatePresence>
+        {selectedItems.length > 0 && (
+            <motion.div 
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                className="fixed bottom-4 left-4 right-4 z-50 max-w-lg mx-auto"
+            >
+                <div className="bg-zinc-900/90 backdrop-blur-xl border border-white/10 p-4 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 pl-2">
+                        <div className="bg-emerald-500/10 w-10 h-10 rounded-full flex items-center justify-center text-emerald-500 border border-emerald-500/20">
+                            <ShoppingBag size={20} />
+                        </div>
+                        <div>
+                            <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">{selectedItems.length} {selectedItems.length === 1 ? 'item' : 'itens'}</p>
+                            <p className="text-white font-black text-lg">{formattedTotal}</p>
+                        </div>
+                    </div>
+
+                    {/* AQUI CHAMAMOS O BOOKING MODAL COM OS DADOS SOMADOS */}
+                    <BookingModal serviceName={combinedNames} price={formattedTotal}>
+                        <button className="bg-white text-black hover:bg-emerald-400 font-bold py-3 px-6 rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2 text-sm">
+                            AGENDAR <ArrowUpRight size={16} />
+                        </button>
+                    </BookingModal>
+
+                    {/* Botão limpar */}
+                        <button 
+                             onClick={() => setSelectedItems([])} 
+                                 aria-label="Limpar seleção" // <--- CORREÇÃO AQUI
+                              title="Limpar seleção"      // <--- E AQUI (aparece ao passar o mouse)
+                         className="absolute -top-3 -right-3 bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 p-2 rounded-full border border-zinc-700 shadow-lg transition-colors"
+>
+    <X size={14} />
+</button>
+                </div>
+            </motion.div>
         )}
       </AnimatePresence>
 
