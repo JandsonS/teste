@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Clock, Instagram, MapPin, ChevronDown, CalendarDays, ArrowUpRight } from 'lucide-react';
-import { SERVICES, SITE_CONFIG } from '@/constants/info';
+import { SERVICES, SITE_CONFIG } from '@/constants/info'; // Importando suas constantes
 import { BookingModal } from "@/components/booking-modal"; 
 
 // --- ÍCONE DO WHATSAPP ---
@@ -53,15 +53,15 @@ export default function Home() {
       {/* --- HERO SECTION --- */}
       <section className={`relative transition-all duration-1000 ease-in-out ${showServices ? 'min-h-[40vh] py-12' : 'h-[100vh]'} flex flex-col items-center justify-center text-center px-4 overflow-hidden z-10`}>
         <div className="absolute inset-0 z-0">
-           <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/40 via-[#0a0a0a]/90 to-[#0a0a0a] z-10" />
-           <motion.img 
-             initial={{ scale: 1.1 }}
-             animate={{ scale: 1 }}
-             transition={{ duration: 10, repeat: Infinity, repeatType: "reverse" }}
-             src={SITE_CONFIG.images.heroBg} 
-             alt="Background" 
-             className="w-full h-full object-cover opacity-40"
-           />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/40 via-[#0a0a0a]/90 to-[#0a0a0a] z-10" />
+            <motion.img 
+              initial={{ scale: 1.1 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 10, repeat: Infinity, repeatType: "reverse" }}
+              src={SITE_CONFIG.images.heroBg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-40"
+            />
         </div>
         
         <div className="relative z-20 flex flex-col items-center space-y-6 max-w-4xl mx-auto w-full">
@@ -135,7 +135,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- SERVIÇOS --- */}
+      {/* --- SERVIÇOS (TOTALMENTE AUTOMÁTICO VIA info.ts) --- */}
       <AnimatePresence>
         {showServices && (
             <motion.section 
@@ -153,53 +153,65 @@ export default function Home() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                {SERVICES.map((service, index) => (
-                    <motion.div
-                        key={index}
-                        variants={itemVariants}
-                        className="group relative bg-zinc-900/40 backdrop-blur-md rounded-[2rem] border border-white/5 hover:border-pink-500/30 transition-all duration-300 overflow-hidden hover:shadow-2xl"
-                    >
-                        <div className="h-56 md:h-64 relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent z-10 opacity-90" />
-                            {SITE_CONFIG.images.services && SITE_CONFIG.images.services[index % SITE_CONFIG.images.services.length] && (
-                                <img src={SITE_CONFIG.images.services[index % SITE_CONFIG.images.services.length]} alt={service.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out grayscale group-hover:grayscale-0" />
-                            )}
-                            <div className="absolute top-4 right-4 z-20">
-                                <span className="bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase text-white tracking-wider shadow-lg">PRESENCIAL</span>
-                            </div>
-                        </div>
+                {SERVICES.map((service, index) => {
+                    // LÓGICA DE IMAGEM AUTOMÁTICA
+                    // Pega a imagem correspondente ao índice. Se acabar, recomeça do zero (loop).
+                    const imageSrc = SITE_CONFIG.images.services && SITE_CONFIG.images.services.length > 0 
+                        ? SITE_CONFIG.images.services[index % SITE_CONFIG.images.services.length] 
+                        : SITE_CONFIG.images.logo; // Fallback se não tiver imagens de serviço
 
-                        <div className="p-6 md:p-8 relative z-20 -mt-20">
-                            <h3 className="text-xl md:text-2xl font-bold text-white mb-2 drop-shadow-lg group-hover:text-pink-400 transition-colors">{service.title}</h3>
-                            <p className="text-xs md:text-sm text-zinc-300 mb-6 line-clamp-2 leading-relaxed h-8 md:h-10 drop-shadow-md opacity-80 group-hover:opacity-100">{service.description}</p>
-                            
-                            <div className="flex items-center justify-between mb-6 pb-6 border-b border-white/10">
-                                <div className="flex items-center gap-2 text-zinc-300 text-[10px] md:text-xs uppercase font-bold tracking-wider bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
-                                    <Clock size={14} className="text-pink-500" /> {service.duration}
-                                </div>
-                                <div className="text-xl md:text-2xl font-bold text-white flex items-baseline gap-1">
-                                    <span className="text-xs text-zinc-500 font-normal">R$</span>{service.price.toFixed(2)}
+                    // LÓGICA DE PREÇO AUTOMÁTICO
+                    const formattedPrice = service.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+                    return (
+                        <motion.div
+                            key={index}
+                            variants={itemVariants}
+                            className="group relative bg-zinc-900/40 backdrop-blur-md rounded-[2rem] border border-white/5 hover:border-pink-500/30 transition-all duration-300 overflow-hidden hover:shadow-2xl"
+                        >
+                            <div className="h-56 md:h-64 relative overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent z-10 opacity-90" />
+                                <img 
+                                    src={imageSrc} 
+                                    alt={service.title} 
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out grayscale group-hover:grayscale-0" 
+                                />
+                                <div className="absolute top-4 right-4 z-20">
+                                    <span className="bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase text-white tracking-wider shadow-lg">PRESENCIAL</span>
                                 </div>
                             </div>
-                            
-                            <BookingModal serviceName={service.title} price={`R$ ${service.price.toFixed(2)}`}>
-                                <button className="w-full bg-white text-black hover:bg-pink-500 hover:text-white font-bold py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 text-xs md:text-sm uppercase tracking-wide">
-                                    {SITE_CONFIG.text.scheduleTitle} <MapPin size={14} />
-                                </button>
-                            </BookingModal>
-                        </div>
-                    </motion.div>
-                ))}
+
+                            <div className="p-6 md:p-8 relative z-20 -mt-20">
+                                <h3 className="text-xl md:text-2xl font-bold text-white mb-2 drop-shadow-lg group-hover:text-pink-400 transition-colors">{service.title}</h3>
+                                <p className="text-xs md:text-sm text-zinc-300 mb-6 line-clamp-2 leading-relaxed h-8 md:h-10 drop-shadow-md opacity-80 group-hover:opacity-100">{service.description}</p>
+                                
+                                <div className="flex items-center justify-between mb-6 pb-6 border-b border-white/10">
+                                    <div className="flex items-center gap-2 text-zinc-300 text-[10px] md:text-xs uppercase font-bold tracking-wider bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
+                                        <Clock size={14} className="text-pink-500" /> {service.duration}
+                                    </div>
+                                    <div className="text-xl md:text-2xl font-bold text-white flex items-baseline gap-1">
+                                        <span className="text-xs text-zinc-500 font-normal">R$</span>{service.price.toFixed(2)}
+                                    </div>
+                                </div>
+                                
+                                <BookingModal serviceName={service.title} price={formattedPrice}>
+                                    <button className="w-full bg-white text-black hover:bg-pink-500 hover:text-white font-bold py-3 md:py-4 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 text-xs md:text-sm uppercase tracking-wide">
+                                        {SITE_CONFIG.text.scheduleTitle} <MapPin size={14} />
+                                    </button>
+                                </BookingModal>
+                            </div>
+                        </motion.div>
+                    );
+                })}
                 </div>
             </motion.section>
         )}
       </AnimatePresence>
 
-      {/* --- RODAPÉ PADRÃO (RESPONSIVO COM AJUSTE DE TÍTULO) --- */}
+      {/* --- RODAPÉ --- */}
       <footer className="bg-zinc-950/80 backdrop-blur-lg border-t border-white/5 pt-16 pb-10 relative z-10 mt-auto">
         <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
             
-            {/* Lado Esquerdo (Informações) - Alinhado à esquerda no PC */}
             <div className="text-center md:text-left flex flex-col items-center md:items-start">
                 <div className="flex items-center gap-3 text-white font-black text-2xl mb-4 tracking-tighter">
                     {SITE_CONFIG.name}
@@ -216,10 +228,8 @@ export default function Home() {
                 </div>
             </div>
 
-            {/* Lado Direito (Suporte) - Alinhado à direita no PC */}
             <div className="flex flex-col items-center md:items-end w-full">
                 <div className="w-full max-w-[320px]">
-                    {/* Título Centralizado em cima do cartão */}
                     <h4 className="text-white font-bold mb-4 text-xs md:text-sm uppercase tracking-wider text-center">
                         Precisa de Ajuda?
                     </h4>
