@@ -1,16 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Calendar, // Importei o ícone de calendário
-  Wallet, 
-  AlertTriangle,
-  Check,
-  MessageCircle
-} from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Calendar, AlertTriangle, Check, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface Booking {
@@ -33,15 +24,13 @@ interface AdminBookingCardProps {
 export function AdminBookingCard({ booking, onUpdate }: AdminBookingCardProps) {
   const [loading, setLoading] = useState(false);
 
-  // Extrai valor pendente
   const pendingAmountMatch = booking.servico.match(/Resta: (R\$ \d+[.,]\d+)/);
   const pendingAmount = pendingAmountMatch ? pendingAmountMatch[1] : null;
   const serviceNameClean = booking.servico.split('(')[0].trim();
 
   const handleOpenWhatsApp = () => {
     const cleanPhone = booking.telefone.replace(/\D/g, "");
-    const url = `https://wa.me/55${cleanPhone}`;
-    window.open(url, "_blank");
+    window.open(`https://wa.me/55${cleanPhone}`, "_blank");
   };
 
   const handleStatusUpdate = async (newStatus: string) => {
@@ -52,95 +41,92 @@ export function AdminBookingCard({ booking, onUpdate }: AdminBookingCardProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: booking.id, status: newStatus }),
       });
-
       if (!res.ok) throw new Error();
-      
-      toast.success(`Status atualizado!`);
+      toast.success(`Atualizado!`);
       onUpdate();
     } catch {
-      toast.error("Erro ao atualizar status.");
+      toast.error("Erro ao atualizar.");
     } finally {
       setLoading(false);
     }
   };
 
+  // Cores apenas para a borda lateral e texto do status
   const statusColors = {
-    PENDENTE: "border-yellow-500/50 bg-yellow-500/10 text-yellow-500",
-    CONFIRMADO: "border-emerald-500/50 bg-emerald-500/10 text-emerald-500",
-    CONCLUIDO: "border-blue-500/50 bg-blue-500/10 text-blue-500",
-    CANCELADO: "border-red-500/50 bg-red-500/10 text-red-500",
+    PENDENTE: "border-l-yellow-500",
+    CONFIRMADO: "border-l-emerald-500",
+    CONCLUIDO: "border-l-blue-500",
+    CANCELADO: "border-l-red-500",
   };
-  const currentStatusColor = statusColors[booking.status as keyof typeof statusColors] || "border-zinc-800 bg-zinc-900 text-zinc-400";
+  
+  const statusBadgeColors = {
+    PENDENTE: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20",
+    CONFIRMADO: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+    CONCLUIDO: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+    CANCELADO: "text-red-500 bg-red-500/10 border-red-500/20",
+  };
+
+  const borderLeftClass = statusColors[booking.status as keyof typeof statusColors] || "border-l-zinc-500";
+  const badgeClass = statusBadgeColors[booking.status as keyof typeof statusBadgeColors] || "text-zinc-400 bg-zinc-800";
 
   return (
-    <div className={`relative flex flex-col gap-4 p-4 rounded-xl border bg-zinc-900/50 backdrop-blur-sm transition-all hover:bg-zinc-900 group ${currentStatusColor.replace('text-', 'border-')}`}>
+    <div className={`relative flex flex-col gap-3 p-4 rounded-lg bg-zinc-900 border border-zinc-800 shadow-sm transition-all hover:border-zinc-700 hover:shadow-md border-l-4 ${borderLeftClass}`}>
       
-      {/* CABEÇALHO: DATA, HORA E AÇÕES */}
+      {/* LINHA 1: Data/Hora e Ações */}
       <div className="flex justify-between items-start">
-        <div className="flex flex-col gap-1">
-             {/* DATA (NOVO) */}
-             <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-medium uppercase tracking-wider">
+        <div className="flex flex-col">
+             <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-medium uppercase tracking-wider mb-1">
                 <Calendar size={10} />
                 {booking.data}
              </div>
-             
-             {/* HORA */}
-             <div className="flex items-center gap-2 bg-zinc-950/50 px-2 py-1 rounded-md border border-white/5 w-fit">
-                <Clock size={14} className="text-white" />
-                <span className="text-base font-bold text-white">{booking.horario}</span>
+             <div className="flex items-center gap-1.5 text-zinc-200">
+                <Clock size={14} className="text-zinc-500" />
+                <span className="text-sm font-bold font-mono">{booking.horario}</span>
              </div>
         </div>
         
-        {/* AÇÕES RÁPIDAS (Ícones menores para caber melhor) */}
-        <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5">
-           <button onClick={() => handleStatusUpdate("CONFIRMADO")} disabled={loading} title="Confirmar" className="p-1.5 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-500 transition-all"><CheckCircle2 size={16} /></button>
-           <button onClick={() => handleStatusUpdate("CONCLUIDO")} disabled={loading} title="Concluir" className="p-1.5 rounded hover:bg-blue-500/20 text-zinc-500 hover:text-blue-500 transition-all"><Check size={16} /></button>
-           <button onClick={() => handleStatusUpdate("CANCELADO")} disabled={loading} title="Cancelar/Deletar" className="p-1.5 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-500 transition-all"><XCircle size={16} /></button>
+        {/* Ações Minimalistas */}
+        <div className="flex items-center gap-1">
+           <button onClick={() => handleStatusUpdate("CONFIRMADO")} disabled={loading} title="Confirmar" className="p-1.5 rounded-md text-zinc-600 hover:text-emerald-500 hover:bg-zinc-800 transition-all"><CheckCircle2 size={16} /></button>
+           <button onClick={() => handleStatusUpdate("CONCLUIDO")} disabled={loading} title="Concluir" className="p-1.5 rounded-md text-zinc-600 hover:text-blue-500 hover:bg-zinc-800 transition-all"><Check size={16} /></button>
+           <button onClick={() => handleStatusUpdate("CANCELADO")} disabled={loading} title="Cancelar" className="p-1.5 rounded-md text-zinc-600 hover:text-red-500 hover:bg-zinc-800 transition-all"><XCircle size={16} /></button>
         </div>
       </div>
 
-      {/* DADOS DO CLIENTE */}
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-             <h3 className="text-lg font-bold text-white tracking-tight truncate max-w-[150px]" title={booking.cliente}>
-                {booking.cliente}
-             </h3>
-             <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${currentStatusColor}`}>
+      {/* LINHA 2: Cliente e Status */}
+      <div>
+        <div className="flex justify-between items-start mb-2">
+             <h3 className="text-base font-bold text-zinc-100 truncate pr-2">{booking.cliente}</h3>
+             <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${badgeClass}`}>
                 {booking.status}
              </span>
         </div>
         
-        {/* BOTÃO WHATSAPP (NOVO VISUAL) */}
+        {/* Botão WhatsApp Discreto */}
         <button 
              onClick={handleOpenWhatsApp}
-             className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-green-500/10 text-green-500 border border-green-500/20 py-2 rounded-lg hover:bg-green-500 hover:text-white transition-all active:scale-95"
+             className="w-full flex items-center justify-center gap-2 text-xs font-medium text-zinc-400 bg-zinc-950 border border-zinc-800 py-1.5 rounded hover:text-emerald-500 hover:border-emerald-500/30 transition-all"
         >
-             <MessageCircle size={14} />
+             <MessageCircle size={12} />
              {booking.telefone}
         </button>
       </div>
 
-      <div className="h-px w-full bg-white/5" />
+      <div className="h-px w-full bg-zinc-800" />
 
-      {/* FINANCEIRO */}
-      <div className="space-y-2">
-        <span className="text-xs font-medium text-zinc-300 block truncate">{serviceNameClean}</span>
+      {/* LINHA 3: Financeiro */}
+      <div className="flex justify-between items-center">
+        <span className="text-xs font-medium text-zinc-400 truncate max-w-[120px]" title={serviceNameClean}>{serviceNameClean}</span>
 
         {pendingAmount ? (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 flex items-center gap-3 animate-pulse">
-                <AlertTriangle size={16} className="text-red-500 shrink-0" />
-                <div className="flex flex-col leading-none">
-                    <span className="text-[9px] uppercase font-bold text-red-400">Receber no Local</span>
-                    <span className="text-sm font-black text-red-500">{pendingAmount}</span>
-                </div>
+            <div className="flex items-center gap-1.5 text-red-400 bg-red-500/5 px-2 py-1 rounded border border-red-500/10">
+                <AlertTriangle size={12} />
+                <span className="text-xs font-bold">{pendingAmount}</span>
             </div>
         ) : (
-            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-2 flex items-center gap-3">
-                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                <div className="flex flex-col leading-none">
-                    <span className="text-[9px] uppercase font-bold text-emerald-500/80">Pago Total</span>
-                    <span className="text-sm font-bold text-white">R$ {booking.valor.toFixed(2)}</span>
-                </div>
+            <div className="flex items-center gap-1.5 text-emerald-500 bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10">
+                <CheckCircle2 size={12} />
+                <span className="text-xs font-bold">R$ {booking.valor.toFixed(2)}</span>
             </div>
         )}
       </div>
