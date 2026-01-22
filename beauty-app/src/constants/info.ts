@@ -28,8 +28,8 @@ export const SITE_CONFIG = {
   // 6. IMAGENS
   images: {
     logo: "https://img.elo7.com.br/product/zoom/4E65BBF/logo-logotipos-logomarca-criar-marca-empresa-vendas-designer-logo-marca-espaco-de-beleza.jpg", 
-    heroBg: "https://t4.ftcdn.net/jpg/02/32/92/55/360_F_232925587_st4gM8b3TJHtjjddCIUNyVyFJmZqMmn4.jpg", 
-    services: [
+    heroBg: "https://img.elo7.com.br/product/zoom/4E65BBF/logo-logotipos-logomarca-criar-marca-empresa-vendas-designer-logo-marca-espaco-de-beleza.jpg", 
+    services: [ // Imagens para o carrossel de serviços
       "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop",
       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDqORRuhVUq1gBIpKrWxoKSeU2tCVcO1xjJA&s",
       "https://images.unsplash.com/photo-1621605815971-fbc98d665033?q=80&w=800&auto=format&fit=crop",
