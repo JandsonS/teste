@@ -91,7 +91,7 @@ export default function PricingPage() {
           transition={{ delay: 0.1 }}
           className="text-4xl md:text-5xl font-black tracking-tight text-white"
         >
-          Escolha o plano ideal para o seu<span className="text-emerald-500">Negócio</span>
+          Escolha o plano ideal para o seu <span className="text-emerald-500">Negócio</span>
         </motion.h1>
         <motion.p 
           initial={{ opacity: 0 }}
