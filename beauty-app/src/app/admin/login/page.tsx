@@ -24,15 +24,18 @@ export default function LoginPage() {
 
       if (res.ok) {
         toast.success("Bem-vindo de volta!");
-        router.push("/admin"); // Redireciona para o painel
-        router.refresh();
+        
+        // CORREÇÃO AQUI 👇
+        // Em vez de router.push, usamos isso para forçar o navegador a recarregar com o cookie
+        window.location.href = "/admin"; 
+        
       } else {
         toast.error("Senha incorreta.");
         setPassword("");
+        setLoading(false); // Só destrava se der erro
       }
     } catch (error) {
       toast.error("Erro ao conectar.");
-    } finally {
       setLoading(false);
     }
   };
