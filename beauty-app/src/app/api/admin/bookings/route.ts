@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-// Importe usando o caminho relativo manual que funcionou pra você
-import { prisma } from "../../../../lib/prisma";
+import { PrismaClient } from "@prisma/client";
+
+// Padrão Singleton do Prisma (Evita erro de muitas conexões no Next.js)
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 // --- BUSCAR AGENDAMENTOS (GET) ---
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token");
+    
+    // ⚠️ CORREÇÃO PRINCIPAL: O nome deve ser igual ao do login (admin_session)
+    const token = cookieStore.get("admin_session");
 
-    if (!token) {
+    // Verifica se o token existe e se o valor é "true" (como definimos no login)
+    if (!token || token.value !== "true") {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
@@ -23,13 +31,12 @@ export async function GET() {
       id: item.id,
       clientName: item.cliente,
       clientPhone: item.telefone || "Não informado",
-      serviceTitle: item.servico,
+      serviceTitle: item.servico, // Mantém o texto original para pegarmos o "Resta: R$..."
       bookingDate: item.data,
       bookingTime: item.horario,
-      status: item.status === 'CONFIRMADO' || item.status === 'PAGO' ? 'paid' : 'pending',
+      status: item.status, // Manda o status real (PENDENTE, PAGO, CONFIRMADO)
       paymentMethod: item.metodoPagamento || "PIX",
-      pricePaid: item.valor,
-      pricePending: 0,
+      pricePaid: Number(item.valor),
       createdAt: item.createdAt
     }));
 
@@ -44,25 +51,25 @@ export async function GET() {
 // --- DELETAR AGENDAMENTO (DELETE) ---
 export async function DELETE(request: Request) {
   try {
-    // 1. Segurança
     const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token");
+    const token = cookieStore.get("admin_session"); // ⚠️ CORREÇÃO AQUI TAMBÉM
 
-    if (!token) {
+    if (!token || token.value !== "true") {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    // 2. Pegar o ID que veio no corpo do pedido
     const { id } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: "ID não fornecido" }, { status: 400 });
     }
 
-    // 3. Deletar do banco
-    await prisma.agendamento.delete({
-      where: { id }
-    });
+    // Você pode optar por DELETAR de vez ou marcar como CANCELADO
+    // Se quiser apagar:
+    await prisma.agendamento.delete({ where: { id } });
+    
+    // Se quiser só marcar como cancelado (para histórico):
+    // await prisma.agendamento.update({ where: { id }, data: { status: "CANCELADO" } });
 
     return NextResponse.json({ success: true });
 

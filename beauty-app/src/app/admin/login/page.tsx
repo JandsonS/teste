@@ -55,7 +55,7 @@ export default function LoginPage() {
           <div className="space-y-2">
             <input
               type="password"
-              placeholder="Digite a senha mestra..."
+              placeholder="Digite a senha"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full h-12 px-4 bg-zinc-950 border border-zinc-800 rounded-xl text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none placeholder:text-zinc-600 text-center tracking-widest"
