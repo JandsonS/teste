@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Check, X, Zap, MessageCircle, ShieldCheck, Rocket } from "lucide-react";
 
 export default function PricingPage() {
-  const whatsappNumber = "5587999999999"; // Seu número
+  const whatsappNumber = "5587991537080"; // Seu número
   
   // ESTADO: Começa com 'Anual' selecionado
   const [activePlan, setActivePlan] = useState("Anual");
