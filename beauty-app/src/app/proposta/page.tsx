@@ -11,7 +11,7 @@ export default function PricingPage() {
   const [activePlan, setActivePlan] = useState("Anual");
 
   const handleContact = (plan: string, price: string) => {
-    const message = encodeURIComponent(`Olá! Tenho interesse no *${plan}* de *${price}*. Poderia me informar como podemos prosseguir com a contratação?`);
+    const message = encodeURIComponent(`Olá! Tenho interesse no plano *${plan}* de *${price}*. Poderia me informar como podemos prosseguir com a contratação?`);
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
 
