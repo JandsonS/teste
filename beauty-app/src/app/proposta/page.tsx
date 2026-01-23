@@ -11,14 +11,14 @@ export default function PricingPage() {
   const [activePlan, setActivePlan] = useState("Anual");
 
   const handleContact = (plan: string, price: string) => {
-    const message = encodeURIComponent(`Olá! Vi a proposta e tenho interesse no plano *${plan}* de *${price}*. Como podemos fechar?`);
+    const message = encodeURIComponent(`Olá! Tenho interesse no plano mensal de *${plan}* de *${price}*. Poderia me informar como podemos prosseguir com a contratação?`);
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
 
   const plans = [
     {
       name: "Mensal",
-      price: "R$50",
+      price: "R$ 50",
       period: "/mês",
       adesao: "R$ 100 adesão (única)",
       description: "Ideal para começar sem pesar no bolso.",
@@ -37,7 +37,7 @@ export default function PricingPage() {
     },
     {
       name: "Anual",
-      price: "R$500",
+      price: "R$ 500",
       period: "/ano",
       adesao: "Adesão Grátis",
       description: "Economia de 2 meses + Isenção da taxa de instalação.",
@@ -55,7 +55,7 @@ export default function PricingPage() {
     },
     {
       name: "Vitalício",
-      price: "R$1.500",
+      price: "R$ 1.500",
       period: "único",
       adesao: "Sem mensalidade",
       description: "Para quem quer ser dono do próprio sistema.",
