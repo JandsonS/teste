@@ -1,29 +1,66 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner"; // Supondo que você usa o sonner ou similar
-import { Bell } from "lucide-react";
+import { toast } from "sonner";
+import { Bell, BellOff } from "lucide-react"; // Certifique-se de ter lucide-react instalado
 
 export default function AdminNotificationListener() {
-  const [lastSeenId, setLastSeenId] = useState<string | null>(null);
+  // Estado do som (Lê do navegador ou começa Ativado)
+  const [isMuted, setIsMuted] = useState(false);
+  
+  // Refs para lógica interna
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [audioAllowed, setAudioAllowed] = useState(false);
+  const lastSeenIdRef = useRef<string | null>(null);
+  const isUnlockedRef = useRef(false); // Para saber se já destravamos o áudio
 
-  // 1. Inicializa o áudio
+  // 1. Carrega a preferência do usuário ao iniciar
   useEffect(() => {
+    const savedPreference = localStorage.getItem("admin_sound_muted");
+    if (savedPreference === "true") {
+      setIsMuted(true);
+    }
     audioRef.current = new Audio("/alert.mp3");
   }, []);
 
-  // 2. Função que toca o som (Navegadores bloqueiam som automático sem interação)
-  const playSound = () => {
-    if (audioRef.current) {
-      audioRef.current.play().catch((err) => {
-        console.log("O navegador bloqueou o som automático:", err);
-      });
+  // 2. Alternar Som (Botão)
+  const toggleMute = () => {
+    const newState = !isMuted;
+    setIsMuted(newState);
+    localStorage.setItem("admin_sound_muted", String(newState));
+
+    if (!newState) {
+      toast.success("Som ativado! 🔔");
+      // Toca um preview se ativar
+      audioRef.current?.play().catch(() => {});
+    } else {
+      toast.info("Som desativado 🔕");
     }
   };
 
-  // 3. O Loop de Verificação (Polling)
+  // 3. Destrava o Áudio (Auto-Unlock no primeiro clique)
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (isUnlockedRef.current) return;
+      
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => {});
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        isUnlockedRef.current = true; // Marcamos como destravado
+      }
+    };
+
+    // Adiciona ouvintes para destravar na primeira interação
+    document.addEventListener("click", unlockAudio);
+    document.addEventListener("touchstart", unlockAudio);
+
+    return () => {
+      document.removeEventListener("click", unlockAudio);
+      document.removeEventListener("touchstart", unlockAudio);
+    };
+  }, []);
+
+  // 4. Polling (Checagem de novos pedidos)
   useEffect(() => {
     const checkNewBookings = async () => {
       try {
@@ -32,57 +69,56 @@ export default function AdminNotificationListener() {
         
         const data = await res.json();
         
-        // Se for a primeira carga da página, apenas salva o ID atual
-        if (lastSeenId === null) {
-          setLastSeenId(data.lastId);
+        // Primeira carga: só sincroniza ID
+        if (lastSeenIdRef.current === null) {
+          lastSeenIdRef.current = data.lastId;
           return;
         }
 
-        // Se o ID que veio do banco é diferente do que eu tenho salvo...
-        if (data.lastId && data.lastId !== lastSeenId) {
-          // NOVO AGENDAMENTO DETECTADO!
-          setLastSeenId(data.lastId);
+        // Se ID mudou = NOVO PEDIDO
+        if (data.lastId && data.lastId !== lastSeenIdRef.current) {
+          lastSeenIdRef.current = data.lastId;
           
-          // Toca o som
-          playSound();
+          // Só toca se NÃO estiver mudo
+          if (!isMuted && audioRef.current) {
+            audioRef.current.play().catch((err) => console.error("Erro áudio:", err));
+          }
           
-          // Mostra alerta na tela
-          toast.success("🔔 Novo Agendamento Realizado!", {
-            duration: 5000,
+          // O Toast visual aparece de qualquer jeito
+          toast.success("Novo Agendamento! ✂️", {
+            description: "Atualize a página para ver detalhes.",
+            duration: Infinity,
             action: {
               label: "Ver",
-              onClick: () => window.location.reload() // Ou redirecionar
+              onClick: () => window.location.reload()
             }
           });
         }
       } catch (error) {
-        console.error("Erro ao checar notificações", error);
+        console.error("Erro polling:", error);
       }
     };
 
-    // Roda a cada 30 segundos
     const interval = setInterval(checkNewBookings, 30000);
-
-    // Roda uma vez imediatamente ao montar
     checkNewBookings();
 
     return () => clearInterval(interval);
-  }, [lastSeenId]);
+  }, [isMuted]); // Recria o efeito se o estado "mute" mudar
 
-  // UI: Botão discreto para habilitar som (necessário p/ navegadores modernos)
-  if (audioAllowed) return null; // Se já permitiu, fica invisível
-
+  // 5. Interface do Botão Flutuante (Bottom-Right)
   return (
     <button
-      onClick={() => {
-        setAudioAllowed(true);
-        playSound(); // Toca um som de teste
-        toast.success("Notificações sonoras ativadas!");
-      }}
-      className="fixed bottom-4 right-4 bg-emerald-500 text-black px-4 py-2 rounded-full text-sm font-bold shadow-lg z-50 flex items-center gap-2 hover:bg-emerald-400 transition-all animate-bounce"
+      onClick={toggleMute}
+      className={`
+        fixed bottom-5 right-5 z-50 p-3 rounded-full shadow-lg border transition-all duration-300 hover:scale-110
+        ${isMuted 
+          ? "bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white" // Estilo Desativado
+          : "bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20" // Estilo Ativado
+        }
+      `}
+      title={isMuted ? "Ativar notificações sonoras" : "Desativar notificações sonoras"}
     >
-      <Bell size={16} />
-      Ativar Som de Pedidos
+      {isMuted ? <BellOff size={20} /> : <Bell size={20} />}
     </button>
   );
 }
