@@ -99,7 +99,7 @@ export default function AdminNotificationListener() {
       }
     };
 
-    const interval = setInterval(checkNewBookings, 30000);
+    const interval = setInterval(checkNewBookings, 5000);
     checkNewBookings();
 
     return () => clearInterval(interval);
