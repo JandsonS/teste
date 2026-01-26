@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import { SITE_CONFIG } from "@/constants/info"; // Importamos sua configuração
+import { SITE_CONFIG } from "@/constants/info";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// AQUI ESTÁ A MUDANÇA:
-// O ícone agora obedece o link que você colocar em 'images.logo' no info.ts
 export const metadata: Metadata = {
   title: `${SITE_CONFIG.name} | Agendamento`,
   description: SITE_CONFIG.description,
+  // 👇 ADICIONEI ESTA LINHA (Obrigatória para o botão instalar aparecer)
+  manifest: "/manifest.json",
   icons: {
-    icon: SITE_CONFIG.images.logo, // <--- O PULO DO GATO ESTÁ AQUI
+    icon: SITE_CONFIG.images.logo,
     shortcut: SITE_CONFIG.images.logo,
     apple: SITE_CONFIG.images.logo,
   },
@@ -32,5 +32,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-  
