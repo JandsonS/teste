@@ -1,22 +1,23 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Ajuste o import do seu prisma
+import { prisma } from "@/lib/prisma"; // Confirme se o caminho do seu prisma é esse mesmo
 
-export const dynamic = "force-dynamic"; // Garante que não faça cache
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    // Busca apenas o agendamento mais recente criado
+    // Busca apenas o ID e Data. Removemos nomes de serviço para evitar erro de schema
     const latestBooking = await prisma.booking.findFirst({
       orderBy: {
-        createdAt: 'desc', // Pega o mais novo
+        createdAt: 'desc',
       },
       select: {
         id: true,
-        customerName: true,
-        serviceName: true, // Ou service: { select: { name: true } } dependendo do seu schema
+        createdAt: true,
+        customerName: true, // Se der erro, remova essa linha e deixe só o ID
       }
     });
 
+    // Se não tiver agendamento nenhum no banco, retorna null (não é erro)
     if (!latestBooking) {
         return NextResponse.json({ id: null });
     }
@@ -24,6 +25,8 @@ export async function GET() {
     return NextResponse.json(latestBooking);
     
   } catch (error) {
-    return NextResponse.json({ error: "Erro ao buscar" }, { status: 500 });
+    console.error("Erro API Notificação:", error);
+    // Retorna JSON mesmo no erro para não quebrar o frontend
+    return NextResponse.json({ id: null, error: "Falha ao buscar" }, { status: 200 });
   }
 }
