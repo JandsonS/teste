@@ -1,31 +1,29 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma"; // Ajuste o import do seu prisma
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const dynamic = "force-dynamic"; // Garante que não faça cache
 
 export async function GET() {
   try {
-    // Busca o último agendamento com os detalhes que precisamos
-    const lastBooking = await prisma.agendamento.findFirst({
-      orderBy: { createdAt: 'desc' },
-      select: { 
-        id: true, 
-        cliente: true,  // <--- Novo
-        servico: true,  // <--- Novo
-        data: true,     // <--- Novo
-        horario: true   // <--- Novo
+    // Busca apenas o agendamento mais recente criado
+    const latestBooking = await prisma.booking.findFirst({
+      orderBy: {
+        createdAt: 'desc', // Pega o mais novo
+      },
+      select: {
+        id: true,
+        customerName: true,
+        serviceName: true, // Ou service: { select: { name: true } } dependendo do seu schema
       }
     });
 
-    return NextResponse.json({ 
-      lastId: lastBooking?.id || null,
-      // Enviamos o objeto completo com os detalhes (ou null se não tiver)
-      details: lastBooking || null 
-    });
+    if (!latestBooking) {
+        return NextResponse.json({ id: null });
+    }
 
+    return NextResponse.json(latestBooking);
+    
   } catch (error) {
-    return NextResponse.json({ error: "Erro" }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao buscar" }, { status: 500 });
   }
 }
