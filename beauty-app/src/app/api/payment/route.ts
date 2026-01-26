@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
+import webPush from "web-push"; // <--- 1. Importação adicionada
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -28,7 +29,6 @@ export async function POST(request: Request) {
     });
 
     for (const r of historicoCliente) {
-       // AQUI ESTÁ A MENSAGEM DETALHADA QUE VOCÊ PEDIU
        // Verifica se ele já tem agendamento ativo (Confirmado/Pago/Pendente)
        if (r.status === 'CONFIRMADO' || r.status.includes('PAGO') || r.status === 'PENDENTE') {
            // Se for exatamente no mesmo dia, avisamos o horário específico
@@ -37,8 +37,6 @@ export async function POST(request: Request) {
                     error: `🚫 Olá ${nomeClienteLimpo.split(' ')[0]}, você já possui um agendamento confirmado para hoje (${r.data}) às ${r.horario}.` 
                 }, { status: 409 });
            }
-           // Se você quiser impedir que ele tenha 2 agendamentos em dias diferentes, deixe assim.
-           // Se quiser permitir que ele agende hoje e amanhã, adicione "&& r.data === date" no if acima.
        }
       
        // Limpeza automática de pendentes velhos
@@ -53,7 +51,6 @@ export async function POST(request: Request) {
     // =================================================================================
     // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE (A CADEIRA ESTÁ LIVRE?)
     // =================================================================================
-    // Buscamos QUALQUER agendamento ativo neste dia e horário.
     const vagaOcupada = await prisma.agendamento.findFirst({
         where: { 
             data: date, 
@@ -63,14 +60,12 @@ export async function POST(request: Request) {
     });
 
     if (vagaOcupada) {
-        // Se já está pago/confirmado -> Horário Ocupado
         if (vagaOcupada.status.includes('PAGO') || vagaOcupada.status === 'CONFIRMADO') {
             return NextResponse.json({ 
                 error: '❌ Este horário acabou de ser reservado por outra pessoa.' 
             }, { status: 409 });
         }
 
-        // Se está pendente há menos de 2 minutos -> Horário "Segurado"
         if (vagaOcupada.status === 'PENDENTE') {
             const diff = (agora - new Date(vagaOcupada.createdAt).getTime()) / 1000 / 60;
             if (diff < 2) {
@@ -78,7 +73,6 @@ export async function POST(request: Request) {
                     error: '⏳ Este horário está reservado temporariamente. Tente novamente em 2 minutos.' 
                 }, { status: 409 });
             } else {
-                // Se passou de 2 min, derruba o antigo e deixa o novo entrar
                 await prisma.agendamento.delete({ where: { id: vagaOcupada.id } });
             }
         }
@@ -95,6 +89,40 @@ export async function POST(request: Request) {
         data: date, horario: time, valor: Number(pricePaid), status: "PENDENTE", metodoPagamento: method 
       }
     });
+
+    // 👇👇👇 CÓDIGO DE NOTIFICAÇÃO PUSH INSERIDO AQUI 👇👇👇
+    try {
+      webPush.setVapidDetails(
+        process.env.VAPID_SUBJECT || "mailto:admin@admin.com", // Pode manter assim ou colocar seu email
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+        process.env.VAPID_PRIVATE_KEY!
+      );
+
+      const subscriptions = await prisma.pushSubscription.findMany();
+
+      const notificationPayload = JSON.stringify({
+        title: "Novo Agendamento! 💰",
+        body: `Cliente: ${agendamento.cliente} - ${agendamento.servico}`,
+        url: "/admin",
+        icon: "/logo.png"
+      });
+
+      await Promise.all(subscriptions.map(sub => {
+        return webPush.sendNotification({
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth }
+        }, notificationPayload).catch(err => {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            prisma.pushSubscription.delete({ where: { endpoint: sub.endpoint } }).catch(()=>{});
+          }
+          console.error("Erro envio individual:", err);
+        });
+      }));
+    } catch (pushError) {
+      console.error("Erro ao enviar Push:", pushError);
+      // O fluxo segue sem travar o pagamento
+    }
+    // 👆👆👆 FIM DO CÓDIGO DE NOTIFICAÇÃO 👆👆👆
 
     // =================================================================================
     // FASE 4: PREFERÊNCIA MERCADO PAGO
@@ -132,6 +160,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: result.init_point });
   } catch (error) {
+    console.error(error); // Adicionei para ver erros no console da Vercel
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
 }
