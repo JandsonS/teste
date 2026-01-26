@@ -1,15 +1,20 @@
 /** @type {import('next').NextConfig} */
-const withPWA = require("next-pwa")({
+const withPWA = require("@ducanh2912/next-pwa").default({
+// ... resto igual ...
   dest: "public",
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
+  // 👇 ISOLA ARQUIVOS QUE TRAVAM A VERCEL
+  buildExcludes: [/middleware-manifest.json$/],
 });
 
 const nextConfig = {
   reactStrictMode: true,
   
-  // 👇 ISSO AQUI SALVA A MEMÓRIA DO SERVIDOR
+  // 👇 O SEGREDO: ISSO ECONOMIZA MUITA MEMÓRIA
+  productionBrowserSourceMaps: false, 
+  
   eslint: {
     ignoreDuringBuilds: true,
   },
