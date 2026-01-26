@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
 import webPush from "web-push"; // <--- 1. Importação adicionada
+import { SITE_CONFIG } from "@/constants/info";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -106,12 +107,15 @@ export async function POST(request: Request) {
 
       const subscriptions = await prisma.pushSubscription.findMany();
 
-      const notificationPayload = JSON.stringify({
+       const notificationPayload = JSON.stringify({
         title: "Novo Agendamento! 💰",
         body: `Cliente: ${agendamento.cliente} - ${agendamento.servico}`,
         url: "/admin",
-        icon: "/logo.png"
-      });
+      
+      // ⚠️ AQUI ESTÁ A CORREÇÃO MÁGICA:
+      // Agora ele usa a mesma logo que está no seu Manifest
+      icon: SITE_CONFIG.images.logo || "/logo.png" 
+    });
 
       await Promise.all(subscriptions.map(sub => {
         return webPush.sendNotification({
