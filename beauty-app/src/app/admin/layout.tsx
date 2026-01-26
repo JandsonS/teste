@@ -1,5 +1,6 @@
 import AdminNotificationListener from "@/components/AdminNotificationListener";
-import InstallPrompt from "@/components/InstallPrompt"; // <--- 1. Importe o novo componente
+import InstallPrompt from "@/components/InstallPrompt";
+import AdminSettings from "@/components/AdminSettings"; // <--- 1. Importação Nova
 
 export default function AdminLayout({
   children,
@@ -8,12 +9,15 @@ export default function AdminLayout({
 }) {
   return (
     <>
-      {/* 2. Componente que toca o som de notificação */}
+      {/* Mantém a tela ligada (Invisível) */}
       <AdminNotificationListener />
       
-      {/* 3. Componente que oferece a instalação (App/PWA) */}
+      {/* Oferece instalação do App (PWA) */}
       <InstallPrompt /> 
       
+      {/* O Botão de Engrenagem Flutuante (Novo) */}
+      <AdminSettings />
+
       {/* Conteúdo da página */}
       <div className="min-h-screen bg-zinc-950">
         {children}
