@@ -1,4 +1,5 @@
-import AdminNotificationListener from "@/components/AdminNotificationListener"; // Importando o nosso componente "Ouvido"
+import AdminNotificationListener from "@/components/AdminNotificationListener";
+import InstallPrompt from "@/components/InstallPrompt"; // <--- 1. Importe o novo componente
 
 export default function AdminLayout({
   children,
@@ -7,12 +8,13 @@ export default function AdminLayout({
 }) {
   return (
     <>
-      {/* Este componente invisível fica aqui vigiando.
-        Como está dentro de /admin, só carrega quando você loga no painel.
-      */}
+      {/* 2. Componente que toca o som de notificação */}
       <AdminNotificationListener />
       
-      {/* Aqui carrega o conteúdo das páginas do admin (Dashboard, Login, etc) */}
+      {/* 3. Componente que oferece a instalação (App/PWA) */}
+      <InstallPrompt /> 
+      
+      {/* Conteúdo da página */}
       <div className="min-h-screen bg-zinc-950">
         {children}
       </div>

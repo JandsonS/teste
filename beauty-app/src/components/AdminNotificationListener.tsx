@@ -53,20 +53,23 @@ export default function AdminNotificationListener() {
   };
 
   // 4. Função de envio de Notificação Nativa (CORRIGIDA)
+ // ... resto do código anterior ...
+
   const sendSystemNotification = (cliente: string, servico: string) => {
     if (Notification.permission === "granted") {
       
-      // A CORREÇÃO ESTÁ AQUI:
-      // Chamamos a vibração separadamente para evitar o erro do TypeScript
-      if (navigator.vibrate) {
+      // 1. A vibração fica AQUI FORA (separada)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([200, 100, 200]);
       }
 
+      // 2. A criação da notificação fica LIMPA (sem vibrate dentro)
       const notif = new Notification(`Novo: ${cliente}`, {
         body: `${servico} - Toque para abrir`,
         icon: "/icon.png", 
-        tag: "novo-agendamento",
-        // removemos a linha 'vibrate' daqui de dentro
+        tag: "novo-agendamento"
+        // ❌ REMOVA A LINHA: vibrate: [200, 100, 200]
+        // Se ela estiver aqui dentro, o erro continua!
       });
 
       notif.onclick = () => {
