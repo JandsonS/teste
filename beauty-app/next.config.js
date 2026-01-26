@@ -12,21 +12,12 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 const nextConfig = {
   reactStrictMode: true,
   
-  // 👇 1. Desativa mapas de código (Economiza 40% de RAM)
+  // Desativa mapas de código para economizar memória
   productionBrowserSourceMaps: false, 
   
-  // 👇 2. Ignora verificações pesadas
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Ignora erros de TypeScript no build
   typescript: {
     ignoreBuildErrors: true,
-  },
-
-  // 👇 3. O SEGREDO: Força o modo "Single Thread" para não estourar a memória
-  experimental: {
-    workerThreads: false,
-    cpus: 1,
   },
 };
 
