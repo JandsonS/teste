@@ -4,7 +4,7 @@ self.addEventListener('push', function(event) {
   const options = {
     body: data.body,
     icon: '/logo.png', // Garanta que essa imagem existe
-    badge: '/logo.png',
+   // badge: '/logo.png',
     vibrate: [200, 100, 200],
     data: {
       url: '/admin'
