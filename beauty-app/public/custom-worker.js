@@ -37,8 +37,8 @@ self.addEventListener('push', function(event) {
     },
     
     actions: [
-      { action: 'open', title: '👀 Ver' },
-      { action: 'close', title: '✖ Fechar' }
+      { action: 'open', title: ' Ver' },
+      { action: 'close', title: ' Fechar' }
     ]
   };
 

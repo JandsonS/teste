@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       const notificationIcon = SITE_CONFIG.images.logo || "/logo.png";
 
       const notificationPayload = JSON.stringify({
-        title: "Novo Agendamento! 💰",
+        title: "Novo Agendamento! ",
         body: `Cliente: ${agendamento.cliente} - ${agendamento.servico}`,
         url: "/admin",
         // Envia a URL da logo (pode ser absoluta ou relativa, o worker tratará)
