@@ -15,12 +15,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { title, date, time, clientName, clientPhone, method, paymentType, pricePaid, pricePending } = body;
     // Formata para: "Jandson Silva" (Primeira letra de cada nome maiúscula)
-const nomeClienteLimpo = clientName
-  .trim()
-  .toLowerCase()
-  .split(' ')
-  .map((palavra: string) => palavra.charAt(0).toUpperCase() + palavra.slice(1))
-  .join(' ');
+      const nomeClienteLimpo = clientName
+        .trim()
+        .toLowerCase()
+        .split(' ')
+        .map((palavra: string) => palavra.charAt(0).toUpperCase() + palavra.slice(1))
+        .join(' ');
     
     // ⚠️ MANTENHA O LINK DA SUA VERCEL AQUI
     const BASE_URL = "https://teste-drab-rho-60.vercel.app"; 
