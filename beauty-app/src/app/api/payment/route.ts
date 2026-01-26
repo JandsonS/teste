@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
-import webPush from "web-push"; // <--- 1. Importação adicionada
-import { SITE_CONFIG } from "@/constants/info";
+import webPush from "web-push";
+import { SITE_CONFIG } from "@/constants/info"; // ✅ Importação do config confirmada
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -15,15 +15,16 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { title, date, time, clientName, clientPhone, method, paymentType, pricePaid, pricePending } = body;
-    // Formata para: "Jandson Silva" (Primeira letra de cada nome maiúscula)
-      const nomeClienteLimpo = clientName
+    
+    // Formatação do nome do cliente (Capitalize)
+    const nomeClienteLimpo = clientName
         .trim()
         .toLowerCase()
         .split(' ')
         .map((palavra: string) => palavra.charAt(0).toUpperCase() + palavra.slice(1))
         .join(' ');
     
-    // ⚠️ MANTENHA O LINK DA SUA VERCEL AQUI
+    // ⚠️ MANTENHA O LINK DA SUA VERCEL AQUI (Confira se está correto para produção)
     const BASE_URL = "https://teste-drab-rho-60.vercel.app"; 
     
     const agora = new Date().getTime();
@@ -97,25 +98,26 @@ export async function POST(request: Request) {
       }
     });
 
-    // 👇👇👇 CÓDIGO DE NOTIFICAÇÃO PUSH INSERIDO AQUI 👇👇👇
+    // 👇👇👇 CÓDIGO DE NOTIFICAÇÃO PUSH (INTEGRAÇÃO COM SITE_CONFIG) 👇👇👇
     try {
       webPush.setVapidDetails(
-        process.env.VAPID_SUBJECT || "mailto:admin@admin.com", // Pode manter assim ou colocar seu email
+        process.env.VAPID_SUBJECT || "mailto:admin@admin.com", 
         process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
         process.env.VAPID_PRIVATE_KEY!
       );
 
       const subscriptions = await prisma.pushSubscription.findMany();
 
-       const notificationPayload = JSON.stringify({
+      // ✅ LOGO DINÂMICA: Pega do arquivo de configuração info.ts
+      const notificationIcon = SITE_CONFIG.images.logo || "/logo.png";
+
+      const notificationPayload = JSON.stringify({
         title: "Novo Agendamento! 💰",
         body: `Cliente: ${agendamento.cliente} - ${agendamento.servico}`,
         url: "/admin",
-      
-      // ⚠️ AQUI ESTÁ A CORREÇÃO MÁGICA:
-      // Agora ele usa a mesma logo que está no seu Manifest
-      icon: SITE_CONFIG.images.logo || "/logo.png" 
-    });
+        // Envia a URL da logo (pode ser absoluta ou relativa, o worker tratará)
+        icon: notificationIcon 
+      });
 
       await Promise.all(subscriptions.map(sub => {
         return webPush.sendNotification({
@@ -170,7 +172,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: result.init_point });
   } catch (error) {
-    console.error(error); // Adicionei para ver erros no console da Vercel
+    console.error(error); 
     return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
 }
