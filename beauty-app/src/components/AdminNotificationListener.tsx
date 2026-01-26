@@ -1,97 +1,93 @@
 "use client";
-
-import { useEffect, useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Bell, BellOff } from "lucide-react";
 
 export default function AdminNotificationListener() {
-  const [permission, setPermission] = useState<NotificationPermission>("default");
-  const [enabled, setEnabled] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  
-  const [lastBookingId, setLastBookingId] = useState<string | null>(null);
+
+  const addLog = (msg: string) => setLogs(prev => [`> ${msg}`, ...prev]);
 
   useEffect(() => {
-    // CORREÇÃO 1: Agora aponta para o arquivo que existe na sua pasta
+    // Tenta carregar o áudio assim que abre
     audioRef.current = new Audio("/alert.mp3");
+    addLog("Componente montado. Buscando audio /alert.mp3...");
     
+    // Verifica permissão inicial
     if ("Notification" in window) {
-      setPermission(Notification.permission);
+      addLog(`Permissão atual: ${Notification.permission}`);
+    } else {
+      addLog("ERRO: Este navegador não suporta notificações.");
     }
   }, []);
 
-  const enableNotifications = async () => {
-    if ("Notification" in window) {
-      const result = await Notification.requestPermission();
-      setPermission(result);
-      
-      if (result === "granted") {
-        audioRef.current?.play().catch(() => {}); 
-        setEnabled(true);
-        toast.success("Notificações ativadas!");
-      }
+  // TESTE 1: SOM 🎵
+  const testSound = () => {
+    addLog("Tentando tocar som...");
+    if (!audioRef.current) return addLog("Erro: Audio não inicializado");
+    
+    audioRef.current.play()
+      .then(() => addLog("SUCESSO: O som deve estar tocando!"))
+      .catch((e) => addLog(`ERRO SOM: ${e.message}`));
+  };
+
+  // TESTE 2: NOTIFICAÇÃO VISUAL 🔔
+  const testNotification = async () => {
+    addLog("Tentando notificação visual...");
+    
+    if (Notification.permission !== "granted") {
+      addLog("Pedindo permissão...");
+      const permission = await Notification.requestPermission();
+      addLog(`Nova permissão: ${permission}`);
+      if (permission !== "granted") return;
+    }
+
+    try {
+      if (navigator.vibrate) navigator.vibrate([200]);
+      const n = new Notification("Teste de Notificação", {
+        body: "Se você leu isso, funcionou!",
+        icon: "/logo.png"
+      });
+      addLog("SUCESSO: Comando de notificação enviado.");
+    } catch (e: any) {
+      addLog(`ERRO NOTIF: ${e.message}`);
     }
   };
 
-  useEffect(() => {
-    // Se não tiver ativado pelo botão, não roda a verificação
-    if (!enabled && permission !== "granted") return;
-
-    const checkNewBookings = async () => {
-      try {
-        const res = await fetch("/api/admin/notifications/latest");
-        if (!res.ok) return;
-        
-        const data = await res.json();
-        
-        if (!lastBookingId) {
-          setLastBookingId(data.id);
-          return;
-        }
-
-        if (data.id && data.id !== lastBookingId) {
-          // 1. Toca o som (agora vai achar o arquivo!)
-          audioRef.current?.play().catch((e) => console.error("Erro som:", e));
-          
-          // 2. Notificação Visual
-          if (permission === "granted") {
-             if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
-             new Notification("Novo Agendamento! 💰", {
-              body: `Cliente: ${data.customerName || 'Novo Cliente'}`,
-              icon: "/logo.png", // CORREÇÃO 2: Usa sua logo.png
-              tag: "new-booking"
-            });
-          }
-
-          setLastBookingId(data.id);
-          toast.success("Novo agendamento recebido!");
-        }
-
-      } catch (error) {
-        console.error("Erro check:", error);
-      }
-    };
-
-    // Verifica a cada 15 segundos
-    checkNewBookings();
-    const interval = setInterval(checkNewBookings, 15000); 
-
-    return () => clearInterval(interval);
-  }, [enabled, lastBookingId, permission]);
-
-  // Mostra o botão se a permissão não foi dada ou se o "plantão" não foi ativado
-  if (enabled && permission === "granted") return null;
+  // TESTE 3: API (Ver se acha agendamentos) 🌐
+  const testApi = async () => {
+    addLog("Testando conexão com API...");
+    try {
+      const res = await fetch("/api/admin/notifications/latest");
+      addLog(`Status da API: ${res.status}`);
+      
+      if (!res.ok) throw new Error("API retornou erro");
+      
+      const data = await res.json();
+      addLog(`Dados recebidos: ${JSON.stringify(data)}`);
+    } catch (e: any) {
+      addLog(`ERRO API: ${e.message}`);
+    }
+  };
 
   return (
-    <div className="fixed top-4 right-4 z-50">
-      <button
-        onClick={enableNotifications}
-        className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-full shadow-xl font-bold animate-bounce"
-      >
-        <BellOff size={20} />
-        Ativar Som de Pedidos
-      </button>
+    <div className="fixed bottom-0 left-0 w-full bg-black/95 text-green-400 p-4 font-mono text-xs z-[9999] border-t-2 border-green-600 max-h-[50vh] overflow-y-auto">
+      <div className="flex gap-2 mb-3 flex-wrap">
+        <button onClick={testSound} className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded border border-gray-600 font-bold text-white">
+          1. Testar Som 🎵
+        </button>
+        <button onClick={testNotification} className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded border border-gray-600 font-bold text-white">
+          2. Testar Notif 🔔
+        </button>
+        <button onClick={testApi} className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded border border-gray-600 font-bold text-white">
+          3. Checar API 🌐
+        </button>
+      </div>
+      <div className="flex flex-col gap-1 opacity-90">
+        {logs.map((log, i) => (
+          <div key={i} className="border-b border-gray-800 pb-1">{log}</div>
+        ))}
+      </div>
     </div>
   );
 }
