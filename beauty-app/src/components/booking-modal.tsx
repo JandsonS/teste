@@ -229,7 +229,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
         <div className="flex-1">
             <div className="flex justify-between mb-1">
-                <p className="font-bold text-white text-sm">Garantir Vaga (Sinal 50%)</p>
+                <p className="font-bold text-white text-sm">Reservar Vaga (Sinal 50%)</p>
                 <span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span>
             </div>
                 <p className="text-[10px] text-zinc-400 leading-tight">
