@@ -7,7 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { 
   Loader2, LogOut, CalendarDays, User, Phone, 
-  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle, AlertTriangle
+  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle, AlertTriangle, Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,6 +38,10 @@ export default function AdminDashboard() {
   const [filter, setFilter] = useState<'today' | 'tomorrow' | 'all'>('today'); 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Estados para busca e filtro financeiro
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("todos");
 
   useEffect(() => {
     fetchBookings(); 
@@ -117,13 +121,25 @@ export default function AdminDashboard() {
     } catch { return null; }
   };
 
-  const filteredBookings = bookings.filter(booking => {
-    if (!booking.bookingDate) return false;
+  // LÓGICA DE FILTRAGEM UNIFICADA (Data + Busca + Status)
+  const finalFilteredBookings = bookings.filter(booking => {
     const date = parseSmartDate(booking.bookingDate);
     if (!date) return false;
-    if (filter === 'today') return isToday(date);
-    if (filter === 'tomorrow') return isTomorrow(date);
-    return true; 
+    
+    // 1. Filtro de Data
+    let matchesDate = true;
+    if (filter === 'today') matchesDate = isToday(date);
+    else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
+
+    // 2. Filtro de Busca por Nome
+    const matchesName = booking.clientName.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 3. Filtro por Status Financeiro
+    let matchesStatus = true;
+    if (statusFilter === "pago") matchesStatus = isPaid(booking.status);
+    else if (statusFilter === "pendente") matchesStatus = !isPaid(booking.status);
+
+    return matchesDate && matchesName && matchesStatus;
   });
 
   const isPaid = (status: string) => {
@@ -139,20 +155,17 @@ export default function AdminDashboard() {
       return 'pago'; 
   };
 
-  // --- NOVA FUNÇÃO: EXTRAIR O VALOR RESTANTE DO NOME ---
-  // Procura por "Resta: R$ X,XX" dentro do nome do serviço
   const getRestante = (serviceTitle: string) => {
       const match = serviceTitle.match(/Resta: (R\$ \s?[\d,.]+)/);
       return match ? match[1] : null;
   };
   
-  // Limpa o nome do serviço para não ficar gigante no card
   const cleanServiceName = (title: string) => {
       return title.split('(')[0].trim();
   };
 
-  const totalRevenue = filteredBookings.reduce((acc, curr) => acc + (isPaid(curr.status) ? (curr.pricePaid || 0) : 0), 0);
-  const totalCount = filteredBookings.length;
+  const totalRevenue = finalFilteredBookings.reduce((acc, curr) => acc + (isPaid(curr.status) ? (curr.pricePaid || 0) : 0), 0);
+  const totalCount = finalFilteredBookings.length;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -223,7 +236,41 @@ export default function AdminDashboard() {
             </div>
         </div>
 
-        {/* FILTROS */}
+        {/* BUSCA E FILTROS FINANCEIROS */}
+        <div className="flex flex-col md:flex-row gap-4 bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+            <div className="relative flex-1 group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-white transition-colors" size={18} />
+                <input 
+                    type="text"
+                    placeholder="Buscar por nome do cliente..."
+                    className="w-full bg-zinc-950/50 border border-zinc-800 focus:border-white/20 text-white rounded-xl pl-10 pr-4 py-3 text-sm transition-all outline-none"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            
+            <div className="flex gap-2 bg-zinc-950/30 p-1 rounded-xl border border-white/5">
+                {[
+                    { id: 'todos', label: 'Todos' },
+                    { id: 'pago', label: 'Pagos' },
+                    { id: 'pendente', label: 'Pendentes' }
+                ].map((s) => (
+                    <button
+                        key={s.id}
+                        onClick={() => setStatusFilter(s.id)}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                            statusFilter === s.id 
+                            ? "bg-white text-black shadow-lg" 
+                            : "text-zinc-500 hover:text-zinc-300"
+                        }`}
+                    >
+                        {s.label}
+                    </button>
+                ))}
+            </div>
+        </div>
+
+        {/* AGENDA HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <CalendarDays className="text-zinc-500" size={20} /> 
@@ -238,15 +285,15 @@ export default function AdminDashboard() {
         </div>
         
         {/* LISTAGEM DE CARDS */}
-        {filteredBookings.length === 0 ? (
+        {finalFilteredBookings.length === 0 ? (
           <div className="text-center py-20 bg-zinc-900/30 rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col items-center animate-in fade-in zoom-in duration-500">
             <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4"><Filter className="text-zinc-500" size={24} /></div>
-            <p className="text-zinc-300 font-medium">Nenhum agendamento para este período.</p>
+            <p className="text-zinc-300 font-medium">Nenhum agendamento encontrado.</p>
           </div>
         ) : (
           <motion.div layout className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             <AnimatePresence>
-            {filteredBookings.map((booking) => {
+            {finalFilteredBookings.map((booking) => {
               const restante = getRestante(booking.serviceTitle);
               
               return (
@@ -258,15 +305,12 @@ export default function AdminDashboard() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col relative"
                 >
-                  {/* BARRA DE STATUS */}
-                  {/* Se tiver 'restante', a barra fica Amarela (Atenção), se não, Verde (Tudo Certo) */}
                   <div className={`h-1 w-full ${!isPaid(booking.status) ? 'bg-zinc-700' : (restante ? 'bg-yellow-500' : 'bg-emerald-500')}`} />
 
-                  {/* BOTÃO CANCELAR */}
                   <button 
                     onClick={() => handleDeleteBooking(booking.id)}
                     disabled={deletingId === booking.id}
-                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20 group/cancel"
+                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20"
                   >
                     {deletingId === booking.id ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} /> Cancelar</>}
                   </button>
@@ -274,7 +318,6 @@ export default function AdminDashboard() {
                   <div className="p-5 space-y-4 flex-1 mt-2">
                       <div className="flex justify-between items-start gap-3 pr-2">
                           <div className="min-w-0 flex-1">
-                              {/* Nome do Serviço Limpo (Sem o texto do depósito) */}
                               <h3 className="font-bold text-white text-base truncate leading-tight pr-20">{cleanServiceName(booking.serviceTitle)}</h3>
                               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
                                   {formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}
@@ -291,15 +334,12 @@ export default function AdminDashboard() {
                           <div className="flex flex-col">
                                <span className="text-[10px] text-zinc-500 font-bold uppercase">Financeiro</span>
                                <div className="flex flex-col">
-                                  {/* Valor Pago (Sinal ou Total) */}
                                   <div className="flex items-baseline gap-1">
                                       <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
                                       <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
                                           {getPaymentLabel(booking.status, booking.paymentMethod)}
                                       </span>
                                   </div>
-
-                                  {/* ALERTA DE RESTANTE (Só aparece se for depósito) */}
                                   {restante && (
                                     <div className="flex items-center gap-1 mt-1 animate-pulse">
                                       <AlertTriangle size={10} className="text-red-500"/>
