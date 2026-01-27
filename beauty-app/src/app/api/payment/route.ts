@@ -4,9 +4,9 @@ import { PrismaClient } from '@prisma/client';
 import webPush from "web-push";
 import { SITE_CONFIG } from "@/constants/info";
 
+// Singleton do Prisma para evitar excesso de conexões
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
-
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN! });
@@ -17,10 +17,10 @@ export async function POST(request: Request) {
     const { 
       title, date, time, clientName, clientPhone, 
       method, paymentType, pricePaid, pricePending, 
-      isAdmin // 👈 Recebendo o sinal do Admin
+      isAdmin // Sinal vindo do seu Painel Admin
     } = body;
     
-    // Formatação do nome do cliente (Capitalize)
+    // 1. Limpeza e Formatação do Nome
     const nomeClienteLimpo = clientName
         .trim()
         .toLowerCase()
@@ -32,9 +32,10 @@ export async function POST(request: Request) {
     const agora = new Date().getTime();
 
     // =================================================================================
-    // FASE 1: LEI DO CLIENTE (Pula se for Admin)
+    // FASE DE VALIDAÇÃO (SÓ PARA CLIENTES)
     // =================================================================================
     if (!isAdmin) {
+        // --- Checagem de Duplicidade do Cliente ---
         const historicoCliente = await prisma.agendamento.findMany({ 
             where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } } 
         });
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
            if (r.status === 'CONFIRMADO' || r.status.includes('PAGO') || r.status === 'PENDENTE') {
                if (r.data === date) {
                     return NextResponse.json({ 
-                        error: `🚫 Olá ${nomeClienteLimpo.split(' ')[0]}, você já possui um agendamento confirmado para hoje (${r.data}) às ${r.horario}.` 
+                        error: `🚫 Olá ${nomeClienteLimpo.split(' ')[0]}, você já possui um agendamento para este dia.` 
                     }, { status: 409 });
                }
            }
@@ -51,16 +52,12 @@ export async function POST(request: Request) {
            if (r.status === 'PENDENTE') {
               const diff = (agora - new Date(r.createdAt).getTime()) / 1000 / 60;
               if (diff >= 2) {
-                  await prisma.agendamento.delete({ where: { id: r.id } });
+                  await prisma.agendamento.delete({ where: { id: r.id } }).catch(()=>{});
               }
            }
         }
-    }
 
-    // =================================================================================
-    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE (Pula se for Admin)
-    // =================================================================================
-    if (!isAdmin) {
+        // --- Checagem de Horário Ocupado ---
         const vagaOcupada = await prisma.agendamento.findFirst({
             where: { 
                 data: date, 
@@ -70,38 +67,22 @@ export async function POST(request: Request) {
         });
 
         if (vagaOcupada) {
-            if (vagaOcupada.status.includes('PAGO') || vagaOcupada.status === 'CONFIRMADO') {
-                return NextResponse.json({ 
-                    error: '❌ Este horário acabou de ser reservado por outra pessoa.' 
-                }, { status: 409 });
-            }
-
-            if (vagaOcupada.status === 'PENDENTE') {
-                const diff = (agora - new Date(vagaOcupada.createdAt).getTime()) / 1000 / 60;
-                if (diff < 2) {
-                    return NextResponse.json({ 
-                        error: '⏳ Este horário está reservado temporariamente. Tente novamente em 2 minutos.' 
-                    }, { status: 409 });
-                } else {
-                    await prisma.agendamento.delete({ where: { id: vagaOcupada.id } });
-                }
-            }
+            return NextResponse.json({ 
+                error: '❌ Este horário já foi reservado. Por favor, escolha outro.' 
+            }, { status: 409 });
         }
     }
 
     // =================================================================================
-    // FASE 3: CRIAR AGENDAMENTO / BLOQUEIO
+    // FASE DE CRIAÇÃO (ADMIN E CLIENTES)
     // =================================================================================
-    let nomeServico = paymentType === 'DEPOSIT' ? `${title} (Sinal Pago | Resta: R$ ${pricePending})` : `${title} (Integral)`;
+    let nomeServicoFinal = isAdmin ? `🚫 BLOQUEIO: ${title}` : (paymentType === 'DEPOSIT' ? `${title} (Sinal Pago | Resta: R$ ${pricePending})` : `${title} (Integral)`);
     
-    // Se for admin bloqueando, definimos um nome de serviço claro
-    if (isAdmin) nomeServico = title;
-
     const agendamento = await prisma.agendamento.create({
       data: { 
         cliente: nomeClienteLimpo, 
         telefone: clientPhone, 
-        servico: nomeServico, 
+        servico: nomeServicoFinal, 
         data: date, 
         horario: time, 
         valor: Number(pricePaid), 
@@ -110,13 +91,13 @@ export async function POST(request: Request) {
       }
     });
 
-    // Se for Admin, finalizamos aqui para não gerar cobrança no Mercado Pago
+    // Se for Admin, finalizamos aqui. Não gera cobrança nem envia notificações.
     if (isAdmin) {
-        return NextResponse.json({ success: true, message: "Horário bloqueado!" });
+        return NextResponse.json({ success: true, message: "Bloqueio realizado com sucesso!" });
     }
 
     // =================================================================================
-    // FASE 4: NOTIFICAÇÃO PUSH (Só para clientes comuns)
+    // FASE DE NOTIFICAÇÃO PUSH (SÓ CLIENTES)
     // =================================================================================
     try {
       webPush.setVapidDetails(
@@ -130,7 +111,7 @@ export async function POST(request: Request) {
 
       const notificationPayload = JSON.stringify({
         title: "Novo Agendamento! ✂️",
-        body: `Cliente: ${agendamento.cliente} - ${agendamento.servico}`,
+        body: `${agendamento.cliente} agendou ${title}`,
         url: "/admin",
         icon: notificationIcon 
       });
@@ -143,21 +124,15 @@ export async function POST(request: Request) {
           prisma.pushSubscription.delete({ where: { endpoint: sub.endpoint } }).catch(()=>{});
         });
       }));
-    } catch (pushError) {
-      console.error("Erro Push:", pushError);
-    }
+    } catch (e) { console.error("Push skip"); }
 
     // =================================================================================
-    // FASE 5: PREFERÊNCIA MERCADO PAGO
+    // FASE MERCADO PAGO (SÓ CLIENTES)
     // =================================================================================
     let excludedPaymentTypes: { id: string }[] = [];
-    let installments = 12;
-
     if (method === 'PIX') {
         excludedPaymentTypes = [{ id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }, { id: "prepaid_card" }, { id: "atm" }];
-        installments = 1;
-    } 
-    else if (method === 'CARD') {
+    } else if (method === 'CARD') {
         excludedPaymentTypes = [{ id: "bank_transfer" }, { id: "ticket" }, { id: "atm" }, { id: "digital_currency"}];
     }
 
@@ -169,9 +144,13 @@ export async function POST(request: Request) {
         payer: { name: nomeClienteLimpo },
         payment_methods: {
           excluded_payment_types: excludedPaymentTypes,
-          installments: installments
+          installments: method === 'PIX' ? 1 : 12
         },
-        back_urls: { success: `${BASE_URL}/sucesso?id=${agendamento.id}`, failure: `${BASE_URL}/`, pending: `${BASE_URL}/` },
+        back_urls: { 
+            success: `${BASE_URL}/sucesso?id=${agendamento.id}`, 
+            failure: `${BASE_URL}/`, 
+            pending: `${BASE_URL}/` 
+        },
         auto_return: 'approved',
         notification_url: `${BASE_URL}/api/webhook`,
       },
@@ -180,6 +159,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: result.init_point });
   } catch (error) {
     console.error(error); 
-    return NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno no servidor.' }, { status: 500 });
   }
 }
