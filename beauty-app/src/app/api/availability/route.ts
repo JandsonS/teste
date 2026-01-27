@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { BUSINESS_HOURS } from "@/constants/info"; // ✅ Importação garantida
+import { isToday, format, parse } from "date-fns";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -8,12 +10,12 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const date = searchParams.get('date');
+  const dateStr = searchParams.get('date'); // Formato dd/MM/yyyy vindo do modal
   const service = searchParams.get('service'); 
 
-  if (!date) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
+  if (!dateStr) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
 
-  // DEFINIÇÃO DO "CONTAINER" (O que eu estou procurando?)
+  // DEFINIÇÃO DO "CONTAINER" PARA CONFLITOS DE SERVIÇO
   let containerAlvo = "";
   if (service) {
       const s = service.toLowerCase();
@@ -25,39 +27,40 @@ export async function GET(request: Request) {
   }
 
   try {
+    // 1. GERAR GRADE DINÂMICA DO INFO.TS (start: 9, end: 19, etc)
+    const allSlots: string[] = [];
+    for (let hour = BUSINESS_HOURS.start; hour < BUSINESS_HOURS.end; hour++) {
+      allSlots.push(`${hour.toString().padStart(2, '0')}:00`);
+      allSlots.push(`${hour.toString().padStart(2, '0')}:30`);
+    }
+
+    // 2. BUSCAR AGENDAMENTOS NO BANCO
     const agendamentosDoDia = await prisma.agendamento.findMany({
-      where: { data: date, status: { not: 'CANCELADO' } },
+      where: { data: dateStr, status: { not: 'CANCELADO' } },
       select: { horario: true, servico: true, status: true, createdAt: true } 
     });
 
     const busySlots: string[] = [];   
     const lockedSlots: string[] = []; 
-    const agora = new Date().getTime();
+    const agoraMs = new Date().getTime();
 
+    // 3. LOGICA DE CONFLITO E OCUPAÇÃO
     agendamentosDoDia.forEach(agendamento => {
         const servicoNoBanco = agendamento.servico.toLowerCase();
-        
         let temConflito = false;
 
         if (containerAlvo === 'corte') {
-             // Só mostra ocupado se tiver CORTE e NÃO for COMBO
              if (servicoNoBanco.includes('corte') && !servicoNoBanco.includes('combo')) temConflito = true;
-        }
-        else if (containerAlvo === 'barba') {
-             // Só mostra ocupado se tiver BARBA e NÃO for COMBO
+        } else if (containerAlvo === 'barba') {
              if (servicoNoBanco.includes('barba') && !servicoNoBanco.includes('combo')) temConflito = true;
-        }
-        else if (containerAlvo === 'combo') {
-             // Só mostra ocupado se tiver COMBO
+        } else if (containerAlvo === 'combo') {
              if (servicoNoBanco.includes('combo')) temConflito = true;
-        }
-        else {
+        } else {
              if (servicoNoBanco.includes(containerAlvo)) temConflito = true;
         }
 
-        if (!temConflito) return; // Se não é o mesmo serviço exato, considera LIVRE.
+        if (!temConflito) return;
 
-        // --- STATUS ---
         if (agendamento.status.includes('PAGO') || 
             agendamento.status.includes('SINAL') || 
             agendamento.status === 'CONFIRMADO') {
@@ -66,16 +69,34 @@ export async function GET(request: Request) {
         }
 
         if (agendamento.status === 'PENDENTE') {
-            const diff = (agora - new Date(agendamento.createdAt).getTime()) / 1000 / 60;
+            const diff = (agoraMs - new Date(agendamento.createdAt).getTime()) / 1000 / 60;
             if (diff < 2) {
                 lockedSlots.push(agendamento.horario);
             }
         }
     });
 
-    return NextResponse.json({ busy: busySlots, locked: lockedSlots });
+    // 4. REGRA DE HORÁRIO RETROATIVO (Não permitir agendar o que já passou)
+    const dataSelecionada = parse(dateStr, 'dd/MM/yyyy', new Date());
+    const agora = new Date();
+    const horaAtualFormatada = format(agora, "HH:mm");
+
+    const finalAvailableSlots = allSlots.filter(slot => {
+      // Se a data for hoje, removemos o que for menor ou igual à hora atual
+      if (isToday(dataSelecionada)) {
+          return slot > horaAtualFormatada;
+      }
+      return true; // Se for dia futuro, todos os slots da grade são válidos
+    });
+
+    return NextResponse.json({ 
+        available: finalAvailableSlots, // Slots futuros permitidos
+        busy: busySlots, 
+        locked: lockedSlots 
+    });
 
   } catch (error) {
+    console.error("Erro disponibilidade:", error);
     return NextResponse.json({ error: 'Erro disponibilidade' }, { status: 500 });
   }
 }

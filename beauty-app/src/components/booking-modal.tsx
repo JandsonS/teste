@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { format, isValid } from "date-fns"
+import { format, isValid, isToday } from "date-fns" // ✅ Adicionado isToday
 import { ptBR } from "date-fns/locale"
-import { Wallet, Loader2, Smartphone, CreditCard, QrCode, CalendarDays, Clock, User, FileText, AlertCircle } from "lucide-react"
+import { Wallet, Loader2, Smartphone, CreditCard, QrCode, CalendarDays, Clock, User, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
@@ -23,21 +23,18 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD'>('PIX')
-  
-  // --- NOVO: ESTADO DOS TERMOS ---
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  // ---------------------------------
 
   const [busySlots, setBusySlots] = useState<string[]>([]) 
   const [lockedSlots, setLockedSlots] = useState<string[]>([]) 
   const [loadingSlots, setLoadingSlots] = useState(false)
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]); // ✅ Estado para horários dinâmicos
 
-  // Reseta os passos quando fecha o modal
   useEffect(() => { 
       if (!open) { 
           setStep(1); 
           setSelectedTime(null); 
-          setAcceptedTerms(false); // Reseta o checkbox
+          setAcceptedTerms(false);
       } 
   }, [open]);
 
@@ -47,13 +44,25 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const depositValue = numericPrice * 0.20 
   const remainingValue = numericPrice - depositValue 
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  const timeSlots = ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"]
 
+  // ✅ BUSCA DINÂMICA DE HORÁRIOS (Sincronizado com API/info.ts)
   useEffect(() => {
     if (!date || !isValid(date)) { setBusySlots([]); setLockedSlots([]); setSelectedTime(null); return; }
     setLoadingSlots(true); setBusySlots([]); setLockedSlots([]); setSelectedTime(null); 
-    const params = new URLSearchParams({ date: format(date, "dd/MM/yyyy"), service: serviceName });
-    fetch(`/api/availability?${params.toString()}`).then(res => res.json()).then(data => { if (data.busy) setBusySlots(data.busy); if (data.locked) setLockedSlots(data.locked); }).finally(() => setLoadingSlots(false));
+    
+    const params = new URLSearchParams({ 
+        date: format(date, "dd/MM/yyyy"), 
+        service: serviceName 
+    });
+
+    fetch(`/api/availability?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => { 
+            if (data.busy) setBusySlots(data.busy); 
+            if (data.available) setAvailableSlots(data.available); // ✅ Carrega a grade do info.ts
+            setLoadingSlots(false);
+        })
+        .catch(() => setLoadingSlots(false));
   }, [date, serviceName]);
 
   const handleTimeClick = (time: string) => {
@@ -63,12 +72,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   };
 
   const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
-    // --- NOVO: VALIDAÇÃO DOS TERMOS ---
     if (!acceptedTerms) {
         toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento para continuar." });
         return;
     }
-    // ----------------------------------
 
     if (!date || !selectedTime || !name || !isPhoneValid) return; 
     setLoading(true);
@@ -83,9 +90,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
               clientName: name, 
               clientPhone: phone, 
               method: paymentMethod, 
-              price: numericPrice, 
               paymentType, 
-              priceTotal: numericPrice, 
               pricePaid: paymentType === 'FULL' ? numericPrice : depositValue, 
               pricePending: paymentType === 'FULL' ? 0 : remainingValue 
           }), 
@@ -93,19 +98,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       const data = await response.json();
       
       if (data.error) { 
-          toast.error(data.error, { 
-              duration: 8000, 
-              style: { background: '#27272a', color: '#fff', border: '1px solid #3f3f46' },
-              description: "Verifique os dados e tente novamente."
-          }); 
-          
-          if (data.error.includes("reservado")) { 
-              setLockedSlots(prev => [...prev, selectedTime!]); 
-              setSelectedTime(null); 
-          } 
+          toast.error(data.error); 
           return; 
       }
-      
       if (data.url) window.location.href = data.url; 
     } catch { 
         toast.error("Erro no Servidor"); 
@@ -114,19 +109,11 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     }
   };
 
-  const calendarStyles = { 
-    caption: { color: '#fff', fontWeight: 'bold', textTransform: 'capitalize' as const }, 
-    head_cell: { color: '#a1a1aa' }, 
-    day: { color: '#e4e4e7' }, 
-    nav_button: { color: '#fff', backgroundColor: '#27272a', borderRadius: '8px' } 
-  };
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="w-[95vw] sm:max-w-[650px] max-h-[90vh] overflow-y-auto p-0 bg-zinc-950/95 backdrop-blur-xl text-white border-zinc-800 rounded-3xl shadow-2xl scrollbar-hide">
+      <DialogContent className="w-[95vw] sm:max-w-[650px] max-h-[90vh] overflow-y-auto p-0 bg-zinc-950/95 backdrop-blur-xl text-white border-zinc-800 rounded-3xl shadow-2xl">
         
-        {/* HEADER */}
         <div className="p-5 md:p-6 border-b border-white/10 bg-white/5">
           <DialogTitle className="text-xl md:text-2xl font-black tracking-tight flex items-center gap-2 text-white">
              <CalendarDays className="text-white" /> Agendar Horário
@@ -139,23 +126,12 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         <div className="p-4 md:p-6">
           {step === 1 && (
             <div className="flex flex-col md:flex-row gap-6">
-              
-              {/* CALENDÁRIO */}
               <div className="flex-1 flex justify-center">
                 <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-900/50 w-full flex justify-center">
-                    <style>{`
-                      .rdp { --rdp-cell-size: 36px; --rdp-accent-color: #ffffff; --rdp-background-color: transparent; margin: 0; } 
-                      .rdp-caption_label { font-size: 1rem; text-transform: capitalize; color: white; } 
-                      .rdp-day_selected:not([disabled]) { background-color: #ffffff; color: black; font-weight: bold; border-radius: 8px; box-shadow: 0 0 10px rgba(255,255,255,0.5); } 
-                      .rdp-day:hover:not([disabled]) { background-color: #27272a; border-radius: 8px; border: 1px solid #52525b; } 
-                      .rdp-button:focus { border: 2px solid #ffffff; } 
-                      @media (min-width: 640px) { .rdp { --rdp-cell-size: 42px; } }
-                    `}</style>
-                    <DayPicker mode="single" selected={date} onSelect={setDate} locale={ptBR} disabled={{ before: new Date() }} styles={calendarStyles} />
+                    <DayPicker mode="single" selected={date} onSelect={setDate} locale={ptBR} disabled={{ before: new Date() }} />
                 </div>
               </div>
 
-              {/* SELEÇÃO DE HORÁRIOS */}
               <div className="flex-1">
                 <Label className="mb-4 flex justify-between items-center text-white font-bold text-sm">
                     <span className="flex items-center gap-2"><Clock size={16} className="text-white"/> Horários Disponíveis</span>
@@ -163,8 +139,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 </Label>
                 
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
-                  {timeSlots.map((time) => {
-                    const isUnavailable = busySlots.includes(time) || lockedSlots.includes(time);
+                  {availableSlots.map((time) => { // ✅ Usando lista vinda da API
+                    const isUnavailable = busySlots.includes(time);
                     const isSelected = selectedTime === time;
                     
                     return (
@@ -172,22 +148,15 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                             key={time} 
                             disabled={isUnavailable} 
                             onClick={() => handleTimeClick(time)}
-                            className={`
-                                text-xs md:text-sm h-10 rounded-xl border transition-colors duration-200
-                                ${isSelected 
-                                    ? "bg-white text-black border-white" 
-                                    : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700 hover:text-white"
-                                }
-                                ${isUnavailable 
-                                    ? "opacity-25 cursor-not-allowed line-through bg-black border-transparent text-zinc-600" 
-                                    : ""
-                                }
-                            `}
+                            className={`text-xs md:text-sm h-10 rounded-xl border transition-all ${isSelected ? "bg-white text-black border-white" : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"} ${isUnavailable ? "opacity-25 cursor-not-allowed line-through bg-black" : ""}`}
                         >
                             {time}
                         </button>
                     )
                   })}
+                  {availableSlots.length === 0 && !loadingSlots && (
+                      <p className="col-span-full text-center text-zinc-500 text-xs py-10">Nenhum horário disponível para esta data.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -195,94 +164,45 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
           {step === 2 && (
             <div className="space-y-5 py-2">
-               <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex items-center gap-4">
-                   <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"><CalendarDays size={20} /></div>
-                   <div><p className="text-xs text-zinc-500 uppercase font-bold">Resumo</p><p className="text-white font-medium capitalize text-sm">{date ? format(date, "dd 'de' MMMM", { locale: ptBR }) : ""} às {selectedTime}</p></div>
-               </div>
-               <div className="space-y-4">
-                   <div className="space-y-2"><Label className="text-zinc-300 ml-1 text-xs">Nome Completo</Label><div className="relative"><User className="absolute left-3 top-3 text-zinc-500" size={18} /><Input placeholder="Seu nome..." className="pl-10 bg-zinc-900 border-zinc-800 text-white h-11 rounded-xl placeholder:text-zinc-600 focus:border-white transition-colors" value={name} onChange={(e) => setName(e.target.value)}/></div></div>
-                   <div className="space-y-2"><Label className="text-zinc-300 ml-1 text-xs">WhatsApp</Label><div className="relative"><Smartphone className="absolute left-3 top-3 text-zinc-500" size={18} /><Input type="tel" placeholder="(00) 00000-0000" className="pl-10 bg-zinc-900 border-zinc-800 text-white h-11 rounded-xl placeholder:text-zinc-600 focus:border-white transition-colors" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} maxLength={15} /></div></div>
-               </div>
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"><CalendarDays size={20} /></div>
+                    <div><p className="text-xs text-zinc-500 uppercase font-bold">Resumo</p><p className="text-white font-medium capitalize text-sm">{date ? format(date, "dd 'de' MMMM", { locale: ptBR }) : ""} às {selectedTime}</p></div>
+                </div>
+                <div className="space-y-4">
+                    <div className="space-y-2"><Label className="text-zinc-300 ml-1 text-xs">Nome Completo</Label><Input placeholder="Seu nome..." className="bg-zinc-900 border-zinc-800 text-white h-11 rounded-xl" value={name} onChange={(e) => setName(e.target.value)}/></div>
+                    <div className="space-y-2"><Label className="text-zinc-300 ml-1 text-xs">WhatsApp</Label><Input type="tel" placeholder="(00) 00000-0000" className="bg-zinc-900 border-zinc-800 text-white h-11 rounded-xl" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} maxLength={15} /></div>
+                </div>
             </div>
           )}
 
           {step === 3 && (
             <div className="py-2 space-y-4">
-                <div className="flex gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800"><button onClick={() => setPaymentMethod('PIX')} className={`flex-1 py-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white border border-zinc-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}><QrCode size={16} /> PIX</button><button onClick={() => setPaymentMethod('CARD')} className={`flex-1 py-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${paymentMethod === 'CARD' ? 'bg-zinc-800 text-white border border-zinc-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}><CreditCard size={16} /> Cartão</button></div>
+                <div className="flex gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800">
+                    <button onClick={() => setPaymentMethod('PIX')} className={`flex-1 py-3 rounded-lg font-bold text-xs ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white border-zinc-600 shadow-sm' : 'text-zinc-500'}`}>PIX</button>
+                    <button onClick={() => setPaymentMethod('CARD')} className={`flex-1 py-3 rounded-lg font-bold text-xs ${paymentMethod === 'CARD' ? 'bg-zinc-800 text-white border-zinc-600 shadow-sm' : 'text-zinc-500'}`}>Cartão</button>
+                </div>
                 
-                {/* --- CAIXA DE TERMOS E POLÍTICAS (NOVO) --- */}
                 <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
                     <div className="flex items-start gap-3">
-                        <div className="pt-0.5">
-                            <input 
-                                type="checkbox" 
-                                id="terms" 
-                                checked={acceptedTerms}
-                                onChange={(e) => setAcceptedTerms(e.target.checked)}
-                                className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer accent-emerald-500"
-                            />
-                        </div>
+                        <input type="checkbox" id="terms" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-emerald-500 mt-1 cursor-pointer" />
                         <label htmlFor="terms" className="text-xs text-zinc-400 cursor-pointer select-none">
-                            <span className="text-white font-bold block mb-1 flex items-center gap-1">
-                                <AlertCircle size={10} className="text-yellow-500"/> Política de Cancelamento
-                            </span>
-                            Li e concordo que o <b className="text-zinc-300">não comparecimento</b> não dá direito a reembolso. Remarcações devem ser feitas via WhatsApp com <b className="text-zinc-300">2h de antecedência</b>.
+                            <span className="text-white font-bold block mb-1 flex items-center gap-1"><AlertCircle size={10} className="text-yellow-500"/> Política de Cancelamento</span>
+                            Li e concordo que o não comparecimento não dá direito a reembolso. Remarcações com 2h de antecedência.
                         </label>
                     </div>
                 </div>
-                {/* ------------------------------------------- */}
 
                 <div className="grid grid-cols-1 gap-3">
-                    {/* BOTÃO PAGAMENTO INTEGRAL */}
-                    <button 
-                        onClick={() => handleCheckout('FULL')} 
-                        disabled={loading || !acceptedTerms} // BLOQUEIA SE NÃO ACEITAR
-                        className={`
-                            group flex items-center p-4 rounded-xl border text-left transition-all
-                            ${!acceptedTerms 
-                                ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' 
-                                : 'bg-zinc-900 border-zinc-800 hover:border-white/50 hover:bg-zinc-800/80 cursor-pointer'
-                            }
-                        `}
-                    >
-                        <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-white/20 flex items-center justify-center text-zinc-400 group-hover:text-white mr-3 transition-colors">
-                            <Wallet size={18} />
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-center mb-1">
-                                <p className="font-bold text-white text-sm">Pagamento Completo</p>
-                                <span className="font-bold text-white text-sm">{formatMoney(numericPrice)}</span>
-                            </div>
-                            <p className="text-[10px] text-zinc-400 leading-tight">Tudo pago agora. Nada a acertar no local.</p>
-                        </div>
-                        {loading && <Loader2 className="animate-spin w-4 h-4 ml-2 text-white"/>}
+                    <button onClick={() => handleCheckout('FULL')} disabled={loading || !acceptedTerms} className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale cursor-not-allowed' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}>
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3"><Wallet size={18} /></div>
+                        <div className="flex-1"><div className="flex justify-between mb-1"><p className="font-bold text-white text-sm">Pagamento Completo</p><span className="font-bold text-white text-sm">{formatMoney(numericPrice)}</span></div><p className="text-[10px] text-zinc-400">Tudo pago agora. Nada a acertar no local.</p></div>
+                        {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
                     </button>
 
-                    {/* BOTÃO RESERVA (SINAL) */}
-                    <button 
-                        onClick={() => handleCheckout('DEPOSIT')} 
-                        disabled={loading || !acceptedTerms} // BLOQUEIA SE NÃO ACEITAR
-                        className={`
-                            group flex items-center p-4 rounded-xl border text-left transition-all
-                            ${!acceptedTerms 
-                                ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' 
-                                : 'bg-zinc-900 border-zinc-800 hover:border-white/50 hover:bg-zinc-800/80 cursor-pointer'
-                            }
-                        `}
-                    >
-                        <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-white/20 flex items-center justify-center text-zinc-400 group-hover:text-white mr-3 transition-colors">
-                            <Wallet size={18} />
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-center mb-1">
-                                <p className="font-bold text-white text-sm">Reservar Vaga (Sinal 20%)</p>
-                                <span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span>
-                            </div>
-                            <p className="text-[10px] text-zinc-400 leading-tight">
-                                Pague {formatMoney(depositValue)} agora e o restante ({formatMoney(remainingValue)}) no estabelecimento.
-                            </p>
-                        </div>
-                        {loading && <Loader2 className="animate-spin w-4 h-4 ml-2 text-white"/>}
+                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading || !acceptedTerms} className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale cursor-not-allowed' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}>
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3"><Wallet size={18} /></div>
+                        <div className="flex-1"><div className="flex justify-between mb-1"><p className="font-bold text-white text-sm">Reservar Vaga (20%)</p><span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span></div><p className="text-[10px] text-zinc-400">Pague o sinal agora e o restante no local.</p></div>
+                        {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
                     </button>
                 </div>
             </div>
@@ -290,9 +210,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
         
         <DialogFooter className="p-4 md:p-6 bg-white/5 border-t border-white/5 flex flex-col sm:flex-row gap-3">
-          {step === 1 && (<div className="flex gap-3 w-full"><Button variant="ghost" onClick={() => setOpen(false)} className="flex-1 text-zinc-400 h-10 md:h-12 rounded-xl hover:bg-white/5 hover:text-white">Cancelar</Button><Button className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold h-10 md:h-12 rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button></div>)}
-          {step === 2 && (<div className="flex gap-3 w-full"><Button variant="ghost" onClick={() => setStep(1)} className="flex-1 text-zinc-400 h-10 md:h-12 rounded-xl hover:bg-white/5 hover:text-white">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-white text-black font-bold h-10 md:h-12 rounded-xl">Pagamento</Button></div>)}
-          {step === 3 && (<Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 h-10 hover:text-white">Voltar</Button>)}
+          {step === 1 && (<div className="flex gap-3 w-full"><Button variant="ghost" onClick={() => setOpen(false)} className="flex-1 text-zinc-400 rounded-xl hover:bg-white/5">Cancelar</Button><Button className="flex-1 bg-white text-black font-bold rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button></div>)}
+          {step === 2 && (<div className="flex gap-3 w-full"><Button variant="ghost" onClick={() => setStep(1)} className="flex-1 text-zinc-400 rounded-xl hover:bg-white/5">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-white text-black font-bold rounded-xl">Pagamento</Button></div>)}
+          {step === 3 && (<Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 h-10">Voltar</Button>)}
         </DialogFooter>
       </DialogContent>
     </Dialog>
