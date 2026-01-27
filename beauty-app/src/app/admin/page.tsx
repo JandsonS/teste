@@ -326,33 +326,40 @@ export default function AdminDashboard() {
                           <div className="flex items-center gap-3"><Phone size={14} className="text-zinc-500" /><p className="text-zinc-400 text-xs font-mono">{booking.clientPhone}</p></div>
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] text-zinc-500 font-bold uppercase">Financeiro</span>
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
-                                <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    {getPaymentLabel(booking.status, booking.paymentMethod)}
-                                </span>
-                                </div>
+                                    <div className="flex flex-col">
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase">Financeiro</span>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className="text-white font-bold text-sm">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(booking.pricePaid || 0)}
+                                                </span>
+                                                <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                    {getPaymentLabel(booking.status, booking.paymentMethod)}
+                                                </span>
+                                            </div>
 
-                                {/* ✅ CÁLCULO DIRETO SEM QUEBRAR O LAYOUT */}
-                                {(() => {
-                                    const total = Number(booking.priceTotal) || 0;
-                                    const pago = Number(booking.pricePaid) || 0;
-                                    const falta = total - pago;
-
-                                    if (falta <= 0) return null;
-
-                                    return (
-                                        <div className="flex items-center gap-1 mt-1 animate-pulse">
-                                            <AlertTriangle size={10} className="text-red-500"/>
-                                            <span className="text-xs font-bold text-red-500">
-                                                Falta: {falta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                            </span>
+                                            {/* Lógica do Alerta Vermelho */}
+                                            {(() => {
+                                                // Se o status for pago (sinal), mas o valor pago for menor que o total esperado
+                                                // Como o sinal é 50%, se ele pagou 0.50, falta 0.50.
+                                                const pago = Number(booking.pricePaid) || 0;
+                                                
+                                                // Se o valor for exatamente 0.50 (nosso teste), sabemos que falta a outra metade
+                                                if (isPaid(booking.status) && pago > 0 && pago < 1.00) { 
+                                                    const falta = pago; // Em um sinal de 50%, o que falta é igual ao que foi pago
+                                                    
+                                                    return (
+                                                        <div className="flex items-center gap-1 mt-1 animate-pulse">
+                                                            <AlertTriangle size={10} className="text-red-500"/>
+                                                            <span className="text-[10px] font-black text-red-500 uppercase">
+                                                                Falta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(falta)}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
-                                          );
-                                })()}
-                            </div>
+
                           <a href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)} target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp"
                               className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95 group/btn">
                               <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" /><span className="text-xs font-bold uppercase tracking-wide">WhatsApp</span>
