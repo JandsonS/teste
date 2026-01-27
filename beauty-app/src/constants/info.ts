@@ -44,8 +44,8 @@ export const BUSINESS_HOURS = {
   end: 18,
   // Adicione esta lista de pausas:
   pauses: [
-    { start: "12:00", end: "14:00" }, // Almoço de 2h
-    { start: "10:00", end: "10:30" }, // Pausa rápida
+    { start: "", end: "" }, // Almoço de 2h
+    { start: "", end: "" }, // Pausa rápida
   ]
 };
 

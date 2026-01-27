@@ -1,7 +1,17 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { BUSINESS_HOURS } from "@/constants/info"; 
 import { isToday, format, parse } from "date-fns";
+import * as Info from "@/constants/info"; // Importamos tudo como Info
+
+// 1. DEFINIÇÃO DE TIPAGEM (Resolve o erro "type never")
+interface BusinessHours {
+  start: number;
+  end: number;
+  pauses?: { start: string; end: string }[];
+}
+
+// Forçamos o TypeScript a reconhecer o formato correto
+const BUSINESS_HOURS = Info.BUSINESS_HOURS as BusinessHours;
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -16,13 +26,19 @@ export async function GET(request: Request) {
   try {
     const allSlots: string[] = [];
     
-    // 1. GERAÇÃO DA GRADE COM FILTRO DE PAUSA
+    // 2. GARANTE QUE PAUSES SEJA UM ARRAY (Mesmo se estiver vazio ou comentado)
+    const pauses = BUSINESS_HOURS.pauses || [];
+    
+    // 3. GERAÇÃO DA GRADE COM FILTRO DE PAUSA
     for (let hour = BUSINESS_HOURS.start; hour < BUSINESS_HOURS.end; hour++) {
-      const times = [`${hour.toString().padStart(2, '0')}:00`, `${hour.toString().padStart(2, '0')}:30` ];
+      const times = [
+        `${hour.toString().padStart(2, '0')}:00`, 
+        `${hour.toString().padStart(2, '0')}:30` 
+      ];
       
       times.forEach(slot => {
         // Verifica se o slot atual cai dentro de alguma pausa definida no info.ts
-        const isPaused = BUSINESS_HOURS.pauses.some(pause => {
+        const isPaused = pauses.some(pause => {
           return slot >= pause.start && slot < pause.end;
         });
 
@@ -38,12 +54,14 @@ export async function GET(request: Request) {
     });
     const busySlots = agendamentos.map(a => a.horario);
 
+    // 4. REGRA DE HORÁRIO RETROATIVO (Fuso de Brasília/Arcoverde)
     const dataSelecionada = parse(dateStr, 'dd/MM/yyyy', new Date());
     const agoraBrasilia = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
     const horaAtualFormatada = format(agoraBrasilia, "HH:mm");
 
     const finalAvailableSlots = allSlots.filter(slot => {
       if (isToday(dataSelecionada)) {
+          // Se for hoje, só mostra o que for maior que a hora atual (ex: 11:30 > 11:24)
           return slot > horaAtualFormatada;
       }
       return true;
@@ -55,6 +73,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
+    console.error("Erro na API:", error);
     return NextResponse.json({ error: 'Erro ao processar horários' }, { status: 500 });
   }
 }
