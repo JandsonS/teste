@@ -1,22 +1,29 @@
 /** @type {import('next').NextConfig} */
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
-  // ... suas outras configs ...
   workboxOptions: {
     disableDevLogs: true,
-    importScripts: ["/custom-worker.js"], // 👈 ADICIONE ISSO!
+    importScripts: ["/custom-worker.js"],
   },
 });
 
 const nextConfig = {
   reactStrictMode: true,
-  
-  // Desativa mapas de código para economizar memória
   productionBrowserSourceMaps: false, 
-  
-  // Ignora erros de TypeScript no build
   typescript: {
     ignoreBuildErrors: true,
+  },
+  // 👇 ADICIONE ESTE BLOCO DO WEBPACK AQUI 👇
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        fs: false,
+        net: false,
+        tls: false,
+        child_process: false,
+      };
+    }
+    return config;
   },
 };
 
