@@ -44,7 +44,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const formatPhone = (value: string) => value.replace(/\D/g, '').slice(0, 11).replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1');
   const isPhoneValid = phone.replace(/\D/g, '').length === 11;
   const numericPrice = useMemo(() => { if (!price) return 0; const c = price.replace('R$', '').trim(); return parseFloat(c.includes(',') ? c.replace(/\./g, '').replace(',', '.') : c); }, [price]);
-  const depositValue = numericPrice * 0.20 
+  const depositValue = numericPrice * 0.50 
   const remainingValue = numericPrice - depositValue 
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -229,11 +229,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
         <div className="flex-1">
             <div className="flex justify-between mb-1">
-                <p className="font-bold text-white text-sm">Reservar Vaga (Sinal 50%)</p>
+                <p className="font-bold text-white text-sm">Garantir Vaga (Sinal 50%)</p>
                 <span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span>
             </div>
-            <p className="text-[10px] text-zinc-400">Pague apenas o sinal para confirmar seu horário.</p>
-        </div>
+                <p className="text-[10px] text-zinc-400 leading-tight">
+                Pague {formatMoney(depositValue)} agora e o restante no estabelecimento.
+                </p>
+                </div>
         {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
         </button>
                 </div>
