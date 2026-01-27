@@ -1,5 +1,3 @@
-"use client";
-
 import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
