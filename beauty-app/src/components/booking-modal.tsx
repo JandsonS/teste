@@ -210,7 +210,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
         <div className="flex-1">
             <div className="flex justify-between mb-1">
-                <p className="font-bold text-white text-sm">Pagamento Antecipado</p>
+                <p className="font-bold text-white text-sm">Pagamento Integral</p>
                 <span className="font-bold text-white text-sm">{formatMoney(numericPrice)}</span>
             </div>
             <p className="text-[10px] text-zinc-400">Pague agora e evite filas no local.</p>
