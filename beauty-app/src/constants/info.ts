@@ -40,8 +40,8 @@ export const SITE_CONFIG = {
 
 
 export const BUSINESS_HOURS = {
-  start: 9, 
-  end: 19   
+  start: 8, 
+  end: 18,   
 };
 
 export const SERVICES = [
