@@ -15,14 +15,9 @@ self.addEventListener('push', function(event) {
     // ÍCONE GRANDE (Foto Lateral - Colorida)
     icon: imageIcon,
 
-    // 🔴 O SEGREDO DO SINO: 
-    // O Android EXIGE um ícone monocromático (branco transparente) aqui.
-    // Se você não tiver um ícone assim, deixe null/undefined.
-    // Tente 'undefined' para ele pegar o ícone do App instalado.
-    // badge: undefined, // <-- Apague ou comente a linha antiga
-    badge: origin + '/icon-badge.png', // <-- Adicione esta linha nova
+    
+    badge: origin + '/icon-badge.png', // <-- Imagem pequena (monocromática) para Android
 
-    // 🌊 FORÇAR MODO CASCATA (HEADS-UP) 🌊
     // 1. Vibração é OBRIGATÓRIA para descer na tela
     vibrate: [500, 100, 500, 100, 500],
     
@@ -51,6 +46,10 @@ self.addEventListener('push', function(event) {
   event.waitUntil(
     self.registration.showNotification(data.title, options)
   );
+  if ('setAppBadge' in navigator) {
+    // Coloca o número "1" no ícone do App na tela inicial
+    navigator.setAppBadge(1).catch(e => console.log("Sem suporte a badge"));
+}
 });
 
 self.addEventListener('notificationclick', function(event) {

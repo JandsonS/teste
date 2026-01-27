@@ -41,6 +41,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchBookings(); 
+    if ('clearAppBadge' in navigator) {
+        navigator.clearAppBadge().catch(() => {});
+    }
     const interval = setInterval(() => {
         fetchBookings(true); 
     }, 5000);
