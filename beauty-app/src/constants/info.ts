@@ -1,6 +1,6 @@
 export const SITE_CONFIG = {
   // 1. DADOS DA EMPRESA
-  name: "Sistema de Agendamento de Teste",
+  name: "Agendamento Online (Teste)",
   description: "Realce sua beleza única com nossos procedimentos exclusivos.",
   url: "https://teste-drab-rho-60.vercel.app", 
   
