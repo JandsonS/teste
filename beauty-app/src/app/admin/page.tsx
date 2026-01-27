@@ -7,8 +7,8 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { 
   Loader2, LogOut, CalendarDays, User, Phone, 
-  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle, AlertTriangle, Search, CalendarX, X,
-  CreditCard, Banknote, Receipt, ArrowUpCircle
+  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle, AlertTriangle, Search,
+  CreditCard, Banknote, ArrowUpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,10 +42,6 @@ export default function AdminDashboard() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
-
-  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
-  const [blockLoading, setBlockLoading] = useState(false);
-  const [blockData, setBlockData] = useState({ date: format(new Date(), 'yyyy-MM-dd'), time: "" });
 
   useEffect(() => {
     fetchBookings(); 
@@ -83,42 +79,6 @@ export default function AdminDashboard() {
       console.error("Erro ao atualizar dados"); 
     } finally {
       if (!silent) setLoading(false);
-    }
-  };
-
-  const handleBlockTime = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!blockData.time) return toast.error("Selecione um horário");
-    
-    setBlockLoading(true);
-    try {
-      const res = await fetch("/api/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientName: "⛔ HORÁRIO BLOQUEADO",
-          clientPhone: "00000000000",
-          serviceTitle: "BLOQUEIO ADMINISTRATIVO",
-          bookingDate: blockData.date,
-          bookingTime: blockData.time,
-          pricePaid: 0,
-          paymentMethod: "ADMIN",
-          status: "CONFIRMADO",
-          isAdmin: true,
-        }),
-      });
-
-      if (res.ok) {
-        toast.success("Horário bloqueado com sucesso!");
-        setIsBlockModalOpen(false);
-        fetchBookings(true);
-      } else {
-        toast.error("Este horário já está ocupado.");
-      }
-    } catch (error) {
-      toast.error("Erro ao realizar bloqueio.");
-    } finally {
-      setBlockLoading(false);
     }
   };
 
@@ -200,22 +160,16 @@ export default function AdminDashboard() {
       return title.split('(')[0].trim();
   };
 
-  // --- LÓGICA DO RELATÓRIO DE GANHOS ---
   const revenueStats = finalFilteredBookings.reduce((acc, curr) => {
     const value = curr.pricePaid || 0;
     const method = curr.paymentMethod?.toUpperCase() || '';
-    
     if (isPaid(curr.status)) {
         acc.total += value;
         if (method === 'PIX') acc.pix += value;
         else if (method.includes('CARD') || method.includes('CARTA')) acc.card += value;
         else acc.other += value;
     } else {
-        // Se não está pago mas está na lista filtrada, consideramos como "A Receber"
-        // (Exceto se for um bloqueio administrativo)
-        if (!curr.clientName.includes("BLOQUEADO")) {
-            acc.pending += value;
-        }
+        acc.pending += value;
     }
     return acc;
   }, { total: 0, pix: 0, card: 0, other: 0, pending: 0 });
@@ -261,17 +215,9 @@ export default function AdminDashboard() {
             <LayoutDashboard className="text-white" />
             Painel Admin
           </h1>
-          <p className="text-zinc-500 text-xs md:text-sm mt-1">Visão geral do negócio</p>
+          <p className="text-zinc-500 text-xs md:text-sm mt-1">Gestão de Agendamentos e Finanças</p>
         </div>
-        <div className="flex gap-2 flex-wrap justify-center">
-            <Button 
-                onClick={() => setIsBlockModalOpen(true)}
-                variant="outline" 
-                size="sm" 
-                className="border-red-900/50 bg-red-950/20 hover:bg-red-900/40 text-red-200 gap-2 rounded-xl h-10 px-4"
-            >
-                <CalendarX size={14} /> Bloquear Horário
-            </Button>
+        <div className="flex gap-2">
             <Button onClick={() => fetchBookings()} variant="outline" size="sm" className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl h-10">
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Atualizar
             </Button>
@@ -282,10 +228,8 @@ export default function AdminDashboard() {
       </header>
 
       <main className="relative z-10 max-w-7xl mx-auto space-y-6 flex-1 w-full">
-        
-        {/* DASHBOARD FINANCEIRO (RELATÓRIO DE GANHOS) */}
+        {/* DASHBOARD FINANCEIRO */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Card Principal de Faturamento */}
             <div className="md:col-span-2 bg-zinc-900/80 border border-zinc-800 p-6 rounded-3xl flex flex-col justify-between relative overflow-hidden group shadow-2xl">
                 <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity"><Wallet size={80} /></div>
                 <div>
@@ -293,79 +237,42 @@ export default function AdminDashboard() {
                     <p className="text-3xl md:text-5xl font-black text-white mt-2 tabular-nums">{formatCurrency(revenueStats.total)}</p>
                 </div>
                 <div className="flex items-center gap-4 mt-6 pt-6 border-t border-white/5">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                        <span className="text-zinc-400 text-[10px] font-bold uppercase">{totalCount} Clientes</span>
-                    </div>
-                    {revenueStats.pending > 0 && (
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                            <span className="text-amber-500/80 text-[10px] font-bold uppercase">{formatCurrency(revenueStats.pending)} Pendente</span>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" /><span className="text-zinc-400 text-[10px] font-bold uppercase">{totalCount} Clientes</span></div>
+                    {revenueStats.pending > 0 && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /><span className="text-amber-500/80 text-[10px] font-bold uppercase">{formatCurrency(revenueStats.pending)} Pendente</span></div>}
                 </div>
             </div>
-
-            {/* Sub-cards de Métodos */}
             <div className="grid grid-cols-1 gap-4 md:col-span-2">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-zinc-900/50 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
                         <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500"><WhatsAppLogo className="w-5 h-5" /></div>
-                        <div>
-                            <p className="text-zinc-500 text-[9px] font-bold uppercase">Via PIX</p>
-                            <p className="text-lg font-black text-white">{formatCurrency(revenueStats.pix)}</p>
-                        </div>
+                        <div><p className="text-zinc-500 text-[9px] font-bold uppercase">Via PIX</p><p className="text-lg font-black text-white">{formatCurrency(revenueStats.pix)}</p></div>
                     </div>
                     <div className="bg-zinc-900/50 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
                         <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500"><CreditCard size={20} /></div>
-                        <div>
-                            <p className="text-zinc-500 text-[9px] font-bold uppercase">No Cartão</p>
-                            <p className="text-lg font-black text-white">{formatCurrency(revenueStats.card)}</p>
-                        </div>
+                        <div><p className="text-zinc-500 text-[9px] font-bold uppercase">No Cartão</p><p className="text-lg font-black text-white">{formatCurrency(revenueStats.card)}</p></div>
                     </div>
                 </div>
                 <div className="bg-zinc-900/50 border border-white/5 p-4 rounded-2xl flex items-center justify-between px-6">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-zinc-500/10 rounded-xl text-zinc-400"><Banknote size={20} /></div>
-                        <div>
-                            <p className="text-zinc-500 text-[9px] font-bold uppercase">Outros / Dinheiro</p>
-                            <p className="text-lg font-black text-white">{formatCurrency(revenueStats.other)}</p>
-                        </div>
-                    </div>
+                    <div className="flex items-center gap-4"><div className="p-3 bg-zinc-500/10 rounded-xl text-zinc-400"><Banknote size={20} /></div><div><p className="text-zinc-500 text-[9px] font-bold uppercase">Outros / Dinheiro</p><p className="text-lg font-black text-white">{formatCurrency(revenueStats.other)}</p></div></div>
                     <ArrowUpCircle className="text-zinc-800" size={24} />
                 </div>
             </div>
         </div>
 
-        {/* BUSCA E FILTROS FINANCEIROS */}
+        {/* BUSCA E FILTROS */}
         <div className="flex flex-col md:flex-row gap-4 bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
             <div className="relative flex-1 group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-white transition-colors" size={18} />
                 <input 
-                    type="text"
-                    title="Buscar por nome"
-                    placeholder="Buscar por nome do cliente..."
+                    type="text" title="Buscar por nome" placeholder="Buscar por nome do cliente..."
                     className="w-full bg-zinc-950/50 border border-zinc-800 focus:border-white/20 text-white rounded-xl pl-10 pr-4 py-3 text-sm transition-all outline-none"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
-            
             <div className="flex gap-2 bg-zinc-950/30 p-1 rounded-xl border border-white/5">
-                {[
-                    { id: 'todos', label: 'Todos' },
-                    { id: 'pago', label: 'Pagos' },
-                    { id: 'pendente', label: 'Pendentes' }
-                ].map((s) => (
-                    <button
-                        key={s.id}
-                        onClick={() => setStatusFilter(s.id)}
-                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                            statusFilter === s.id 
-                            ? "bg-white text-black shadow-lg" 
-                            : "text-zinc-500 hover:text-zinc-300"
-                        }`}
-                    >
+                {[{ id: 'todos', label: 'Todos' }, { id: 'pago', label: 'Pagos' }, { id: 'pendente', label: 'Pendentes' }].map((s) => (
+                    <button key={s.id} onClick={() => setStatusFilter(s.id)}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${statusFilter === s.id ? "bg-white text-black shadow-lg" : "text-zinc-500 hover:text-zinc-300"}`}>
                         {s.label}
                     </button>
                 ))}
@@ -375,9 +282,7 @@ export default function AdminDashboard() {
         {/* AGENDA HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <CalendarDays className="text-zinc-500" size={20} /> 
-                Agenda <span className="text-zinc-600">|</span> 
-                <span className="text-white capitalize">{filter === 'all' ? 'Completa' : filter === 'today' ? 'Hoje' : 'Amanhã'}</span>
+                <CalendarDays className="text-zinc-500" size={20} /> Agenda <span className="text-zinc-600">|</span> <span className="text-white capitalize">{filter === 'all' ? 'Completa' : filter === 'today' ? 'Hoje' : 'Amanhã'}</span>
             </h2>
             <div className="bg-zinc-900 p-1 rounded-xl border border-white/5 flex w-full md:w-auto">
                 <button onClick={() => setFilter('today')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filter === 'today' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Hoje</button>
@@ -388,7 +293,7 @@ export default function AdminDashboard() {
         
         {/* LISTAGEM DE CARDS */}
         {finalFilteredBookings.length === 0 ? (
-          <div className="text-center py-20 bg-zinc-900/30 rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col items-center animate-in fade-in zoom-in duration-500">
+          <div className="text-center py-20 bg-zinc-900/30 rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col items-center">
             <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4"><Filter className="text-zinc-500" size={24} /></div>
             <p className="text-zinc-300 font-medium">Nenhum agendamento encontrado.</p>
           </div>
@@ -397,83 +302,40 @@ export default function AdminDashboard() {
             <AnimatePresence>
             {finalFilteredBookings.map((booking) => {
               const restante = getRestante(booking.serviceTitle);
-              const isBlocked = booking.clientName.includes("BLOQUEADO");
-              
               return (
-                <motion.div
-                  layout
-                  key={booking.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className={`bg-zinc-950/80 backdrop-blur-md rounded-2xl border overflow-hidden hover:border-white/20 transition-all group shadow-lg flex flex-col relative ${isBlocked ? 'border-red-900/30 opacity-80' : 'border-white/5'}`}
+                <motion.div layout key={booking.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                  className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all shadow-lg flex flex-col relative"
                 >
-                  <div className={`h-1 w-full ${isBlocked ? 'bg-red-600' : (!isPaid(booking.status) ? 'bg-zinc-700' : (restante ? 'bg-yellow-500' : 'bg-emerald-500'))}`} />
-
-                  <button 
-                    onClick={() => handleDeleteBooking(booking.id)}
-                    disabled={deletingId === booking.id}
-                    title="Remover agendamento"
-                    aria-label="Remover agendamento"
-                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20"
-                  >
-                    {deletingId === booking.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} {isBlocked ? 'Liberar' : 'Cancelar'}
+                  <div className={`h-1 w-full ${!isPaid(booking.status) ? 'bg-zinc-700' : (restante ? 'bg-yellow-500' : 'bg-emerald-500')}`} />
+                  <button onClick={() => handleDeleteBooking(booking.id)} disabled={deletingId === booking.id} title="Remover agendamento"
+                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20">
+                    {deletingId === booking.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Cancelar
                   </button>
-                  
                   <div className="p-5 space-y-4 flex-1 mt-2">
                       <div className="flex justify-between items-start gap-3 pr-2">
                           <div className="min-w-0 flex-1">
-                              <h3 className={`font-bold text-base truncate leading-tight pr-20 ${isBlocked ? 'text-red-400' : 'text-white'}`}>
-                                {isBlocked ? "🚫 HORÁRIO BLOQUEADO" : cleanServiceName(booking.serviceTitle)}
-                              </h3>
-                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
-                                  {formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}
-                              </p>
+                              <h3 className="font-bold text-white text-base truncate leading-tight pr-20">{cleanServiceName(booking.serviceTitle)}</h3>
+                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">{formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}</p>
                           </div>
                       </div>
-
-                      {!isBlocked ? (
-                        <>
-                          <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
-                              <div className="flex items-center gap-3"><User size={14} className="text-zinc-500" /><p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p></div>
-                              <div className="flex items-center gap-3"><Phone size={14} className="text-zinc-500" /><p className="text-zinc-400 text-xs font-mono">{booking.clientPhone}</p></div>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                              <div className="flex flex-col">
-                                  <span className="text-[10px] text-zinc-500 font-bold uppercase">Financeiro</span>
-                                  <div className="flex flex-col">
-                                      <div className="flex items-baseline gap-1">
-                                          <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
-                                          <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                              {getPaymentLabel(booking.status, booking.paymentMethod)}
-                                          </span>
-                                      </div>
-                                      {restante && (
-                                        <div className="flex items-center gap-1 mt-1 animate-pulse">
-                                          <AlertTriangle size={10} className="text-red-500"/>
-                                          <span className="text-xs font-bold text-red-500">Falta: {restante}</span>
-                                        </div>
-                                      )}
-                                  </div>
+                      <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
+                          <div className="flex items-center gap-3"><User size={14} className="text-zinc-500" /><p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p></div>
+                          <div className="flex items-center gap-3"><Phone size={14} className="text-zinc-500" /><p className="text-zinc-400 text-xs font-mono">{booking.clientPhone}</p></div>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                          <div className="flex flex-col">
+                              <span className="text-[10px] text-zinc-500 font-bold uppercase">Financeiro</span>
+                              <div className="flex items-baseline gap-1">
+                                  <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
+                                  <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>{getPaymentLabel(booking.status, booking.paymentMethod)}</span>
                               </div>
-                              
-                              <a 
-                                  href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)}
-                                  target="_blank" rel="noopener noreferrer"
-                                  title="Enviar WhatsApp"
-                                  className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 active:scale-95 group/btn"
-                              >
-                                  <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" />
-                                  <span className="text-xs font-bold uppercase tracking-wide">WhatsApp</span>
-                              </a>
+                              {restante && <div className="flex items-center gap-1 mt-1 animate-pulse"><AlertTriangle size={10} className="text-red-500"/><span className="text-xs font-bold text-red-500">Falta: {restante}</span></div>}
                           </div>
-                        </>
-                      ) : (
-                        <div className="bg-red-500/5 p-4 rounded-xl border border-red-500/10 flex items-center justify-center">
-                           <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest text-center">Nenhum cliente pode agendar neste horário</p>
-                        </div>
-                      )}
+                          <a href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)} target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp"
+                              className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95 group/btn">
+                              <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" /><span className="text-xs font-bold uppercase tracking-wide">WhatsApp</span>
+                          </a>
+                      </div>
                   </div>
                 </motion.div>
               );
@@ -483,88 +345,9 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      <AnimatePresence>
-        {isBlockModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setIsBlockModalOpen(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-md bg-zinc-900 border border-white/10 p-6 rounded-3xl shadow-2xl"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-500/20 rounded-lg"><CalendarX className="text-red-500" size={20} /></div>
-                  <h3 className="text-xl font-bold text-white">Bloquear Horário</h3>
-                </div>
-                <button 
-                  onClick={() => setIsBlockModalOpen(false)} 
-                  title="Fechar"
-                  aria-label="Fechar modal"
-                  className="text-zinc-500 hover:text-white transition-colors"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-
-              <form onSubmit={handleBlockTime} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="block-date" className="text-xs font-bold text-zinc-500 uppercase ml-1">Data do Bloqueio</label>
-                  <input 
-                    id="block-date"
-                    title="Selecione a data"
-                    type="date"
-                    required
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white outline-none focus:border-red-500/50 transition-all"
-                    value={blockData.date}
-                    onChange={(e) => setBlockData({...blockData, date: e.target.value})}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="block-time" className="text-xs font-bold text-zinc-500 uppercase ml-1">Horário (HH:MM)</label>
-                  <input 
-                    id="block-time"
-                    title="Selecione o horário"
-                    type="time"
-                    required
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white outline-none focus:border-red-500/50 transition-all"
-                    value={blockData.time}
-                    onChange={(e) => setBlockData({...blockData, time: e.target.value})}
-                  />
-                </div>
-
-                <div className="pt-4 flex gap-3">
-                  <Button 
-                    type="button" 
-                    onClick={() => setIsBlockModalOpen(false)}
-                    variant="outline" 
-                    className="flex-1 rounded-xl h-12 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-white"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={blockLoading}
-                    className="flex-1 rounded-xl h-12 bg-red-600 hover:bg-red-500 text-white font-bold"
-                  >
-                    {blockLoading ? <Loader2 className="animate-spin" size={18} /> : "Bloquear Agora"}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <footer className="relative z-10 w-full mt-20 pb-8 flex flex-col items-center justify-center gap-4 opacity-70 hover:opacity-100 transition-opacity border-t border-white/5 pt-8">
+      <footer className="relative z-10 w-full mt-20 pb-8 flex flex-col items-center justify-center gap-4 opacity-70 border-t border-white/5 pt-8">
         <p className="text-zinc-400 font-bold tracking-widest text-xs uppercase text-center">© {new Date().getFullYear()} BARBEARIA TESTE</p>
-        <a href="#" title="Ajuda" className="flex items-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white px-5 py-2 rounded-full transition-all text-xs font-bold uppercase border border-white/5 hover:border-white/20 shadow-sm"><HelpCircle size={14} />Precisa de Ajuda?</a>
+        <a href="#" title="Ajuda" className="flex items-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white px-5 py-2 rounded-full transition-all text-xs font-bold uppercase border border-white/5 shadow-sm"><HelpCircle size={14} />Precisa de Ajuda?</a>
       </footer>
     </div>
   );
