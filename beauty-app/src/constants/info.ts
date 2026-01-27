@@ -52,7 +52,7 @@ export const BUSINESS_HOURS = {
 export const SERVICES = [
   {
     title: "Corte de Cabelo (Teste)",
-    price: 1.00, 
+    price: 30.00, 
     duration: "45 min",
     description: "Corte moderno com finalização."
   },
