@@ -325,7 +325,14 @@ export default function AdminDashboard() {
                                   <span className="text-white font-bold text-sm">{formatCurrency(booking.pricePaid)}</span>
                                   <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>{getPaymentLabel(booking.status, booking.paymentMethod)}</span>
                               </div>
-                              {restante && <div className="flex items-center gap-1 mt-1 animate-pulse"><AlertTriangle size={10} className="text-red-500"/><span className="text-xs font-bold text-red-500">Falta: {restante}</span></div>}
+                              {restante && (
+                                <div className="flex items-center gap-1 mt-1 animate-pulse">
+                                  <AlertTriangle size={10} className="text-red-500"/>
+                                  <span className="text-xs font-bold text-red-500">
+                                    Falta: {Number(restante).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                  </span>
+                                </div>
+                              )}
                           </div>
                           <a href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)} target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp"
                               className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95 group/btn">
