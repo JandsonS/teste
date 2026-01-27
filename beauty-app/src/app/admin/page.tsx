@@ -7,7 +7,8 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { 
   Loader2, LogOut, CalendarDays, User, Phone, 
-  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle, AlertTriangle, Search, CalendarX, X
+  LayoutDashboard, RefreshCw, Wallet, TrendingUp, Filter, Trash2, HelpCircle, AlertTriangle, Search, CalendarX, X,
+  CreditCard, Banknote, Receipt, ArrowUpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -198,7 +199,26 @@ export default function AdminDashboard() {
       return title.split('(')[0].trim();
   };
 
-  const totalRevenue = finalFilteredBookings.reduce((acc, curr) => acc + (isPaid(curr.status) ? (curr.pricePaid || 0) : 0), 0);
+  // --- LÓGICA DO RELATÓRIO DE GANHOS ---
+  const revenueStats = finalFilteredBookings.reduce((acc, curr) => {
+    const value = curr.pricePaid || 0;
+    const method = curr.paymentMethod?.toUpperCase() || '';
+    
+    if (isPaid(curr.status)) {
+        acc.total += value;
+        if (method === 'PIX') acc.pix += value;
+        else if (method.includes('CARD') || method.includes('CARTA')) acc.card += value;
+        else acc.other += value;
+    } else {
+        // Se não está pago mas está na lista filtrada, consideramos como "A Receber"
+        // (Exceto se for um bloqueio administrativo)
+        if (!curr.clientName.includes("BLOQUEADO")) {
+            acc.pending += value;
+        }
+    }
+    return acc;
+  }, { total: 0, pix: 0, card: 0, other: 0, pending: 0 });
+
   const totalCount = finalFilteredBookings.length;
 
   const formatCurrency = (value: number) => {
@@ -260,23 +280,63 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <main className="relative z-10 max-w-7xl mx-auto space-y-8 flex-1 w-full">
-        <div className="grid grid-cols-2 gap-4">
-            <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
-                <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={48} /></div>
-                <p className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Faturamento ({filter === 'all' ? 'Total' : filter === 'today' ? 'Hoje' : 'Amanhã'})</p>
-                <p className="text-2xl md:text-4xl font-black text-white mt-2">{formatCurrency(totalRevenue)}</p>
+      <main className="relative z-10 max-w-7xl mx-auto space-y-6 flex-1 w-full">
+        
+        {/* DASHBOARD FINANCEIRO (RELATÓRIO DE GANHOS) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Card Principal de Faturamento */}
+            <div className="md:col-span-2 bg-zinc-900/80 border border-zinc-800 p-6 rounded-3xl flex flex-col justify-between relative overflow-hidden group shadow-2xl">
+                <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity"><Wallet size={80} /></div>
+                <div>
+                    <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em]">Faturamento Líquido ({filter === 'all' ? 'Total' : filter === 'today' ? 'Hoje' : 'Amanhã'})</p>
+                    <p className="text-3xl md:text-5xl font-black text-white mt-2 tabular-nums">{formatCurrency(revenueStats.total)}</p>
+                </div>
+                <div className="flex items-center gap-4 mt-6 pt-6 border-t border-white/5">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                        <span className="text-zinc-400 text-[10px] font-bold uppercase">{totalCount} Clientes</span>
+                    </div>
+                    {revenueStats.pending > 0 && (
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                            <span className="text-amber-500/80 text-[10px] font-bold uppercase">{formatCurrency(revenueStats.pending)} Pendente</span>
+                        </div>
+                    )}
+                </div>
             </div>
-            <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
-                <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp size={48} /></div>
-                <p className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Agendamentos</p>
-                <div className="flex items-end gap-2">
-                    <p className="text-2xl md:text-4xl font-black text-white mt-2">{totalCount}</p>
-                    <span className="text-zinc-500 text-sm mb-1.5 font-medium">clientes</span>
+
+            {/* Sub-cards de Métodos */}
+            <div className="grid grid-cols-1 gap-4 md:col-span-2">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-zinc-900/50 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
+                        <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500"><WhatsAppLogo className="w-5 h-5" /></div>
+                        <div>
+                            <p className="text-zinc-500 text-[9px] font-bold uppercase">Via PIX</p>
+                            <p className="text-lg font-black text-white">{formatCurrency(revenueStats.pix)}</p>
+                        </div>
+                    </div>
+                    <div className="bg-zinc-900/50 border border-white/5 p-4 rounded-2xl flex items-center gap-4">
+                        <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500"><CreditCard size={20} /></div>
+                        <div>
+                            <p className="text-zinc-500 text-[9px] font-bold uppercase">No Cartão</p>
+                            <p className="text-lg font-black text-white">{formatCurrency(revenueStats.card)}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-zinc-900/50 border border-white/5 p-4 rounded-2xl flex items-center justify-between px-6">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-zinc-500/10 rounded-xl text-zinc-400"><Banknote size={20} /></div>
+                        <div>
+                            <p className="text-zinc-500 text-[9px] font-bold uppercase">Outros / Dinheiro</p>
+                            <p className="text-lg font-black text-white">{formatCurrency(revenueStats.other)}</p>
+                        </div>
+                    </div>
+                    <ArrowUpCircle className="text-zinc-800" size={24} />
                 </div>
             </div>
         </div>
 
+        {/* BUSCA E FILTROS FINANCEIROS */}
         <div className="flex flex-col md:flex-row gap-4 bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
             <div className="relative flex-1 group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-white transition-colors" size={18} />
@@ -311,7 +371,8 @@ export default function AdminDashboard() {
             </div>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        {/* AGENDA HEADER */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <CalendarDays className="text-zinc-500" size={20} /> 
                 Agenda <span className="text-zinc-600">|</span> 
@@ -324,6 +385,7 @@ export default function AdminDashboard() {
             </div>
         </div>
         
+        {/* LISTAGEM DE CARDS */}
         {finalFilteredBookings.length === 0 ? (
           <div className="text-center py-20 bg-zinc-900/30 rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col items-center animate-in fade-in zoom-in duration-500">
             <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mb-4"><Filter className="text-zinc-500" size={24} /></div>
@@ -350,6 +412,8 @@ export default function AdminDashboard() {
                   <button 
                     onClick={() => handleDeleteBooking(booking.id)}
                     disabled={deletingId === booking.id}
+                    title="Remover agendamento"
+                    aria-label="Remover agendamento"
                     className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-white/10 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400 text-zinc-500 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 backdrop-blur-sm z-20"
                   >
                     {deletingId === booking.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} {isBlocked ? 'Liberar' : 'Cancelar'}
@@ -396,6 +460,7 @@ export default function AdminDashboard() {
                               <a 
                                   href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)}
                                   target="_blank" rel="noopener noreferrer"
+                                  title="Enviar WhatsApp"
                                   className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 active:scale-95 group/btn"
                               >
                                   <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" />
