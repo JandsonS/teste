@@ -180,7 +180,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                         <input type="checkbox" id="terms" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-emerald-500 mt-1 cursor-pointer" />
                         <label htmlFor="terms" className="text-xs text-zinc-400 cursor-pointer select-none">
                             <span className="text-white font-bold block mb-1 flex items-center gap-1"><AlertCircle size={10} className="text-yellow-500"/> Política de Cancelamento</span>
-                            Li e concordo com os termos de agendamento.
+                            Li e concordo que cancelamentos ou remarcações devem ser feitos com no mínimo 2 horas de antecedência. Em caso de não comparecimento sem aviso prévio via Whatsapp, o valor da reserva (sinal) não será reembolsado, visando cobrir os custos do horário reservado e a impossibilidade de atender outro cliente.
                         </label>
                     </div>
                 </div>
