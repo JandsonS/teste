@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       const notificationIcon = SITE_CONFIG.images.logo || "/logo.png";
 
       const notificationPayload = JSON.stringify({
-        title: "Novo Agendamento! ✂️",
+        title: "Novo Agendamento!",
         body: `${agendamento.cliente} agendou ${title}`,
         url: "/admin",
         icon: notificationIcon 
