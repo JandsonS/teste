@@ -103,7 +103,8 @@ export default function AdminDashboard() {
           bookingTime: blockData.time,
           pricePaid: 0,
           paymentMethod: "ADMIN",
-          status: "CONFIRMADO"
+          status: "CONFIRMADO",
+          isAdmin: true,
         }),
       });
 

@@ -1,8 +1,10 @@
+"use client";
+
 import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
 import webPush from "web-push";
-import { SITE_CONFIG } from "@/constants/info"; // ✅ Importação do config confirmada
+import { SITE_CONFIG } from "@/constants/info";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -14,7 +16,11 @@ const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN!
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, date, time, clientName, clientPhone, method, paymentType, pricePaid, pricePending } = body;
+    const { 
+      title, date, time, clientName, clientPhone, 
+      method, paymentType, pricePaid, pricePending, 
+      isAdmin // 👈 Recebendo o sinal do Admin
+    } = body;
     
     // Formatação do nome do cliente (Capitalize)
     const nomeClienteLimpo = clientName
@@ -24,81 +30,96 @@ export async function POST(request: Request) {
         .map((palavra: string) => palavra.charAt(0).toUpperCase() + palavra.slice(1))
         .join(' ');
     
-    // ⚠️ MANTENHA O LINK DA SUA VERCEL AQUI (Confira se está correto para produção)
     const BASE_URL = "https://teste-drab-rho-60.vercel.app"; 
-    
     const agora = new Date().getTime();
 
     // =================================================================================
-    // FASE 1: LEI DO CLIENTE (EVITA DUPLICIDADE DE AGENDAMENTO)
+    // FASE 1: LEI DO CLIENTE (Pula se for Admin)
     // =================================================================================
-    const historicoCliente = await prisma.agendamento.findMany({ 
-        where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } } 
-    });
+    if (!isAdmin) {
+        const historicoCliente = await prisma.agendamento.findMany({ 
+            where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } } 
+        });
 
-    for (const r of historicoCliente) {
-       // Verifica se ele já tem agendamento ativo (Confirmado/Pago/Pendente)
-       if (r.status === 'CONFIRMADO' || r.status.includes('PAGO') || r.status === 'PENDENTE') {
-           // Se for exatamente no mesmo dia, avisamos o horário específico
-           if (r.data === date) {
-                return NextResponse.json({ 
-                    error: `🚫 Olá ${nomeClienteLimpo.split(' ')[0]}, você já possui um agendamento confirmado para hoje (${r.data}) às ${r.horario}.` 
-                }, { status: 409 });
+        for (const r of historicoCliente) {
+           if (r.status === 'CONFIRMADO' || r.status.includes('PAGO') || r.status === 'PENDENTE') {
+               if (r.data === date) {
+                    return NextResponse.json({ 
+                        error: `🚫 Olá ${nomeClienteLimpo.split(' ')[0]}, você já possui um agendamento confirmado para hoje (${r.data}) às ${r.horario}.` 
+                    }, { status: 409 });
+               }
            }
-       }
-      
-       // Limpeza automática de pendentes velhos
-       if (r.status === 'PENDENTE') {
-          const diff = (agora - new Date(r.createdAt).getTime()) / 1000 / 60;
-          if (diff >= 2) {
-             await prisma.agendamento.delete({ where: { id: r.id } });
-          }
-       }
+          
+           if (r.status === 'PENDENTE') {
+              const diff = (agora - new Date(r.createdAt).getTime()) / 1000 / 60;
+              if (diff >= 2) {
+                  await prisma.agendamento.delete({ where: { id: r.id } });
+              }
+           }
+        }
     }
 
     // =================================================================================
-    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE (A CADEIRA ESTÁ LIVRE?)
+    // FASE 2: VERIFICAÇÃO DE DISPONIBILIDADE (Pula se for Admin)
     // =================================================================================
-    const vagaOcupada = await prisma.agendamento.findFirst({
-        where: { 
-            data: date, 
-            horario: time, 
-            status: { not: 'CANCELADO' } 
-        }
-    });
+    if (!isAdmin) {
+        const vagaOcupada = await prisma.agendamento.findFirst({
+            where: { 
+                data: date, 
+                horario: time, 
+                status: { not: 'CANCELADO' } 
+            }
+        });
 
-    if (vagaOcupada) {
-        if (vagaOcupada.status.includes('PAGO') || vagaOcupada.status === 'CONFIRMADO') {
-            return NextResponse.json({ 
-                error: '❌ Este horário acabou de ser reservado por outra pessoa.' 
-            }, { status: 409 });
-        }
-
-        if (vagaOcupada.status === 'PENDENTE') {
-            const diff = (agora - new Date(vagaOcupada.createdAt).getTime()) / 1000 / 60;
-            if (diff < 2) {
+        if (vagaOcupada) {
+            if (vagaOcupada.status.includes('PAGO') || vagaOcupada.status === 'CONFIRMADO') {
                 return NextResponse.json({ 
-                    error: '⏳ Este horário está reservado temporariamente. Tente novamente em 2 minutos.' 
+                    error: '❌ Este horário acabou de ser reservado por outra pessoa.' 
                 }, { status: 409 });
-            } else {
-                await prisma.agendamento.delete({ where: { id: vagaOcupada.id } });
+            }
+
+            if (vagaOcupada.status === 'PENDENTE') {
+                const diff = (agora - new Date(vagaOcupada.createdAt).getTime()) / 1000 / 60;
+                if (diff < 2) {
+                    return NextResponse.json({ 
+                        error: '⏳ Este horário está reservado temporariamente. Tente novamente em 2 minutos.' 
+                    }, { status: 409 });
+                } else {
+                    await prisma.agendamento.delete({ where: { id: vagaOcupada.id } });
+                }
             }
         }
     }
 
     // =================================================================================
-    // FASE 3: CRIAR AGENDAMENTO
+    // FASE 3: CRIAR AGENDAMENTO / BLOQUEIO
     // =================================================================================
     let nomeServico = paymentType === 'DEPOSIT' ? `${title} (Sinal Pago | Resta: R$ ${pricePending})` : `${title} (Integral)`;
     
+    // Se for admin bloqueando, definimos um nome de serviço claro
+    if (isAdmin) nomeServico = title;
+
     const agendamento = await prisma.agendamento.create({
       data: { 
-        cliente: nomeClienteLimpo, telefone: clientPhone, servico: nomeServico, 
-        data: date, horario: time, valor: Number(pricePaid), status: "PENDENTE", metodoPagamento: method 
+        cliente: nomeClienteLimpo, 
+        telefone: clientPhone, 
+        servico: nomeServico, 
+        data: date, 
+        horario: time, 
+        valor: Number(pricePaid), 
+        status: isAdmin ? "CONFIRMADO" : "PENDENTE", 
+        metodoPagamento: method 
       }
     });
 
-    // 👇👇👇 CÓDIGO DE NOTIFICAÇÃO PUSH (INTEGRAÇÃO COM SITE_CONFIG) 👇👇👇
+    // Se for Admin, finalizamos aqui para não gerar cobrança no Mercado Pago
+    if (isAdmin) {
+        return NextResponse.json({ success: true, message: "Horário bloqueado!" });
+    }
+
+    // =================================================================================
+    // FASE 4: NOTIFICAÇÃO PUSH (Só para clientes comuns)
+    // =================================================================================
     try {
       webPush.setVapidDetails(
         process.env.VAPID_SUBJECT || "mailto:admin@admin.com", 
@@ -107,15 +128,12 @@ export async function POST(request: Request) {
       );
 
       const subscriptions = await prisma.pushSubscription.findMany();
-
-      // ✅ LOGO DINÂMICA: Pega do arquivo de configuração info.ts
       const notificationIcon = SITE_CONFIG.images.logo || "/logo.png";
 
       const notificationPayload = JSON.stringify({
-        title: "Novo Agendamento! ",
+        title: "Novo Agendamento! ✂️",
         body: `Cliente: ${agendamento.cliente} - ${agendamento.servico}`,
         url: "/admin",
-        // Envia a URL da logo (pode ser absoluta ou relativa, o worker tratará)
         icon: notificationIcon 
       });
 
@@ -123,35 +141,26 @@ export async function POST(request: Request) {
         return webPush.sendNotification({
           endpoint: sub.endpoint,
           keys: { p256dh: sub.p256dh, auth: sub.auth }
-        }, notificationPayload).catch(err => {
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            prisma.pushSubscription.delete({ where: { endpoint: sub.endpoint } }).catch(()=>{});
-          }
-          console.error("Erro envio individual:", err);
+        }, notificationPayload).catch(() => {
+          prisma.pushSubscription.delete({ where: { endpoint: sub.endpoint } }).catch(()=>{});
         });
       }));
     } catch (pushError) {
-      console.error("Erro ao enviar Push:", pushError);
-      // O fluxo segue sem travar o pagamento
+      console.error("Erro Push:", pushError);
     }
-    // 👆👆👆 FIM DO CÓDIGO DE NOTIFICAÇÃO 👆👆👆
 
     // =================================================================================
-    // FASE 4: PREFERÊNCIA MERCADO PAGO
+    // FASE 5: PREFERÊNCIA MERCADO PAGO
     // =================================================================================
     let excludedPaymentTypes: { id: string }[] = [];
     let installments = 12;
 
     if (method === 'PIX') {
-        excludedPaymentTypes = [
-            { id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }, { id: "prepaid_card" }, { id: "atm" }
-        ];
+        excludedPaymentTypes = [{ id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }, { id: "prepaid_card" }, { id: "atm" }];
         installments = 1;
     } 
     else if (method === 'CARD') {
-        excludedPaymentTypes = [
-            { id: "bank_transfer" }, { id: "ticket" }, { id: "atm" }, { id: "digital_currency"}
-        ];
+        excludedPaymentTypes = [{ id: "bank_transfer" }, { id: "ticket" }, { id: "atm" }, { id: "digital_currency"}];
     }
 
     const preference = new Preference(client);
