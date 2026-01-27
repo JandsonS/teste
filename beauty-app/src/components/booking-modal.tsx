@@ -184,7 +184,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             <span className="text-white font-bold block mb-1 flex items-center gap-1">
                 <AlertCircle size={10} className="text-yellow-500"/> Política de Agendamento
             </span>
-            Concordo que o não comparecimento sem aviso prévio implica na perda do sinal. 
+            Concordo que o não comparecimento sem aviso prévio implica na perda da vaga. 
             Remarcações devem ser feitas com 2h de antecedência via 
             <a 
                 href="https://wa.me/5581989015555?text=Olá, gostaria de solicitar uma remarcação/cancelamento." 
@@ -229,7 +229,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
         <div className="flex-1">
             <div className="flex justify-between mb-1">
-                <p className="font-bold text-white text-sm">Garantir Vaga (Sinal 20%)</p>
+                <p className="font-bold text-white text-sm">Reservar Vaga (Sinal 50%)</p>
                 <span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span>
             </div>
             <p className="text-[10px] text-zinc-400">Pague apenas o sinal para confirmar seu horário.</p>
