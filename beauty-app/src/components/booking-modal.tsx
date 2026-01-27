@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { format, isValid, isToday } from "date-fns" // ✅ Adicionado isToday
+import { format, isValid, isToday } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Wallet, Loader2, Smartphone, CreditCard, QrCode, CalendarDays, Clock, User, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
@@ -28,7 +28,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([]) 
   const [lockedSlots, setLockedSlots] = useState<string[]>([]) 
   const [loadingSlots, setLoadingSlots] = useState(false)
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]); // ✅ Estado para horários dinâmicos
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+
+  // Função para deixar a primeira letra maiúscula (ex: Janeiro)
+  const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
   useEffect(() => { 
       if (!open) { 
@@ -45,7 +48,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const remainingValue = numericPrice - depositValue 
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-  // ✅ BUSCA DINÂMICA DE HORÁRIOS (Sincronizado com API/info.ts)
   useEffect(() => {
     if (!date || !isValid(date)) { setBusySlots([]); setLockedSlots([]); setSelectedTime(null); return; }
     setLoadingSlots(true); setBusySlots([]); setLockedSlots([]); setSelectedTime(null); 
@@ -59,7 +61,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         .then(res => res.json())
         .then(data => { 
             if (data.busy) setBusySlots(data.busy); 
-            if (data.available) setAvailableSlots(data.available); // ✅ Carrega a grade do info.ts
+            if (data.available) setAvailableSlots(data.available); 
             setLoadingSlots(false);
         })
         .catch(() => setLoadingSlots(false));
@@ -67,16 +69,14 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
   const handleTimeClick = (time: string) => {
     if (busySlots.includes(time)) { toast.error("Horário Indisponível"); return; }
-    if (lockedSlots.includes(time)) { toast.error("Aguarde um momento", { description: "Horário em reserva." }); return; }
     setSelectedTime(time);
   };
 
   const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
     if (!acceptedTerms) {
-        toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento para continuar." });
+        toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." });
         return;
     }
-
     if (!date || !selectedTime || !name || !isPhoneValid) return; 
     setLoading(true);
     try {
@@ -96,17 +96,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           }), 
       });
       const data = await response.json();
-      
-      if (data.error) { 
-          toast.error(data.error); 
-          return; 
-      }
+      if (data.error) { toast.error(data.error); return; }
       if (data.url) window.location.href = data.url; 
-    } catch { 
-        toast.error("Erro no Servidor"); 
-    } finally { 
-        setLoading(false); 
-    }
+    } catch { toast.error("Erro no Servidor"); } finally { setLoading(false); }
   };
 
   return (
@@ -128,6 +120,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             <div className="flex flex-col md:flex-row gap-6">
               <div className="flex-1 flex justify-center">
                 <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-900/50 w-full flex justify-center">
+                    <style>{`
+                      .rdp-caption_label { text-transform: capitalize !important; color: white; font-weight: bold; }
+                    `}</style>
                     <DayPicker mode="single" selected={date} onSelect={setDate} locale={ptBR} disabled={{ before: new Date() }} />
                 </div>
               </div>
@@ -138,25 +133,17 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     {loadingSlots && <Loader2 className="animate-spin w-4 h-4 text-white"/>}
                 </Label>
                 
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
-                  {availableSlots.map((time) => { // ✅ Usando lista vinda da API
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1">
+                  {availableSlots.map((time) => {
                     const isUnavailable = busySlots.includes(time);
                     const isSelected = selectedTime === time;
-                    
                     return (
-                        <button 
-                            key={time} 
-                            disabled={isUnavailable} 
-                            onClick={() => handleTimeClick(time)}
-                            className={`text-xs md:text-sm h-10 rounded-xl border transition-all ${isSelected ? "bg-white text-black border-white" : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"} ${isUnavailable ? "opacity-25 cursor-not-allowed line-through bg-black" : ""}`}
-                        >
+                        <button key={time} disabled={isUnavailable} onClick={() => handleTimeClick(time)}
+                            className={`text-xs md:text-sm h-10 rounded-xl border transition-all ${isSelected ? "bg-white text-black border-white" : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"} ${isUnavailable ? "opacity-25 cursor-not-allowed line-through bg-black" : ""}`}>
                             {time}
                         </button>
                     )
                   })}
-                  {availableSlots.length === 0 && !loadingSlots && (
-                      <p className="col-span-full text-center text-zinc-500 text-xs py-10">Nenhum horário disponível para esta data.</p>
-                  )}
                 </div>
               </div>
             </div>
@@ -166,7 +153,13 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             <div className="space-y-5 py-2">
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"><CalendarDays size={20} /></div>
-                    <div><p className="text-xs text-zinc-500 uppercase font-bold">Resumo</p><p className="text-white font-medium capitalize text-sm">{date ? format(date, "dd 'de' MMMM", { locale: ptBR }) : ""} às {selectedTime}</p></div>
+                    <div>
+                        <p className="text-xs text-zinc-500 uppercase font-bold">Resumo</p>
+                        <p className="text-white font-medium text-sm">
+                            {/* ✅ DATA CAPITALIZADA AQUI */}
+                            {date ? capitalize(format(date, "dd 'de' MMMM", { locale: ptBR })) : ""} às {selectedTime}
+                        </p>
+                    </div>
                 </div>
                 <div className="space-y-4">
                     <div className="space-y-2"><Label className="text-zinc-300 ml-1 text-xs">Nome Completo</Label><Input placeholder="Seu nome..." className="bg-zinc-900 border-zinc-800 text-white h-11 rounded-xl" value={name} onChange={(e) => setName(e.target.value)}/></div>
@@ -178,8 +171,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 3 && (
             <div className="py-2 space-y-4">
                 <div className="flex gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800">
-                    <button onClick={() => setPaymentMethod('PIX')} className={`flex-1 py-3 rounded-lg font-bold text-xs ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white border-zinc-600 shadow-sm' : 'text-zinc-500'}`}>PIX</button>
-                    <button onClick={() => setPaymentMethod('CARD')} className={`flex-1 py-3 rounded-lg font-bold text-xs ${paymentMethod === 'CARD' ? 'bg-zinc-800 text-white border-zinc-600 shadow-sm' : 'text-zinc-500'}`}>Cartão</button>
+                    <button onClick={() => setPaymentMethod('PIX')} className={`flex-1 py-3 rounded-lg font-bold text-xs ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500'}`}>PIX</button>
+                    <button onClick={() => setPaymentMethod('CARD')} className={`flex-1 py-3 rounded-lg font-bold text-xs ${paymentMethod === 'CARD' ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500'}`}>Cartão</button>
                 </div>
                 
                 <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
@@ -187,22 +180,20 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                         <input type="checkbox" id="terms" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-emerald-500 mt-1 cursor-pointer" />
                         <label htmlFor="terms" className="text-xs text-zinc-400 cursor-pointer select-none">
                             <span className="text-white font-bold block mb-1 flex items-center gap-1"><AlertCircle size={10} className="text-yellow-500"/> Política de Cancelamento</span>
-                            Li e concordo que o não comparecimento não dá direito a reembolso. Remarcações com 2h de antecedência.
+                            Li e concordo com os termos de agendamento.
                         </label>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
-                    <button onClick={() => handleCheckout('FULL')} disabled={loading || !acceptedTerms} className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale cursor-not-allowed' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}>
+                    <button onClick={() => handleCheckout('FULL')} disabled={loading || !acceptedTerms} className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}>
                         <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3"><Wallet size={18} /></div>
-                        <div className="flex-1"><div className="flex justify-between mb-1"><p className="font-bold text-white text-sm">Pagamento Completo</p><span className="font-bold text-white text-sm">{formatMoney(numericPrice)}</span></div><p className="text-[10px] text-zinc-400">Tudo pago agora. Nada a acertar no local.</p></div>
-                        {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
+                        <div className="flex-1"><div className="flex justify-between mb-1"><p className="font-bold text-white text-sm">Pagamento Completo</p><span className="font-bold text-white text-sm">{formatMoney(numericPrice)}</span></div><p className="text-[10px] text-zinc-400">Tudo pago agora.</p></div>
                     </button>
 
-                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading || !acceptedTerms} className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale cursor-not-allowed' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}>
+                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading || !acceptedTerms} className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}>
                         <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3"><Wallet size={18} /></div>
-                        <div className="flex-1"><div className="flex justify-between mb-1"><p className="font-bold text-white text-sm">Reservar Vaga (20%)</p><span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span></div><p className="text-[10px] text-zinc-400">Pague o sinal agora e o restante no local.</p></div>
-                        {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
+                        <div className="flex-1"><div className="flex justify-between mb-1"><p className="font-bold text-white text-sm">Reservar (Sinal 20%)</p><span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span></div><p className="text-[10px] text-zinc-400">Pague o sinal agora e o resto no local.</p></div>
                     </button>
                 </div>
             </div>
@@ -210,8 +201,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
         
         <DialogFooter className="p-4 md:p-6 bg-white/5 border-t border-white/5 flex flex-col sm:flex-row gap-3">
-          {step === 1 && (<div className="flex gap-3 w-full"><Button variant="ghost" onClick={() => setOpen(false)} className="flex-1 text-zinc-400 rounded-xl hover:bg-white/5">Cancelar</Button><Button className="flex-1 bg-white text-black font-bold rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button></div>)}
-          {step === 2 && (<div className="flex gap-3 w-full"><Button variant="ghost" onClick={() => setStep(1)} className="flex-1 text-zinc-400 rounded-xl hover:bg-white/5">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-white text-black font-bold rounded-xl">Pagamento</Button></div>)}
+          {step === 1 && (<div className="flex gap-3 w-full"><Button variant="ghost" onClick={() => setOpen(false)} className="flex-1 text-zinc-400 rounded-xl">Cancelar</Button><Button className="flex-1 bg-white text-black font-bold rounded-xl" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button></div>)}
+          {step === 2 && (<div className="flex gap-3 w-full"><Button variant="ghost" onClick={() => setStep(1)} className="flex-1 text-zinc-400 rounded-xl">Voltar</Button><Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-white text-black font-bold rounded-xl">Pagamento</Button></div>)}
           {step === 3 && (<Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 h-10">Voltar</Button>)}
         </DialogFooter>
       </DialogContent>
