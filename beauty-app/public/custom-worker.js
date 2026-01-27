@@ -1,9 +1,8 @@
 self.addEventListener('push', function(event) {
   const data = event.data ? event.data.json() : { title: 'Novo Agendamento', body: 'Verifique o painel!', icon: '/logo.png' };
-  
   const origin = self.location.origin;
-  
-  // Tratamento da Imagem
+
+  // 1. TRATAMENTO DA IMAGEM (PERFIL)
   let imageIcon = data.icon; 
   if (imageIcon && !imageIcon.startsWith('http')) {
     const cleanPath = imageIcon.startsWith('/') ? imageIcon : '/' + imageIcon;
@@ -13,32 +12,39 @@ self.addEventListener('push', function(event) {
   const options = {
     body: data.body,
     
-    // ÍCONE GRANDE (Foto do lado direito)
+    // ÍCONE GRANDE (Foto Lateral - Colorida)
     icon: imageIcon,
+
+    // 🔴 O SEGREDO DO SINO: 
+    // O Android EXIGE um ícone monocromático (branco transparente) aqui.
+    // Se você não tiver um ícone assim, deixe null/undefined.
+    // Tente 'undefined' para ele pegar o ícone do App instalado.
+    // badge: undefined, // <-- Apague ou comente a linha antiga
+    badge: origin + '/icon-badge.png', // <-- Adicione esta linha nova
+
+    // 🌊 FORÇAR MODO CASCATA (HEADS-UP) 🌊
+    // 1. Vibração é OBRIGATÓRIA para descer na tela
+    vibrate: [500, 100, 500, 100, 500],
     
-    // BADGE: O ícone pequeno da barra de status.
-    // DICA DE OURO: Se você deixar 'undefined', o Android tenta usar o ícone do App.
-    // Se você colocar uma imagem colorida aqui, ele transforma em quadrado branco ou sino.
-    badge: undefined, 
+    // 2. Prioridade máxima
+    priority: 'high', // Tentativa para navegadores antigos
+
+    // 3. O TRUQUE DO NOVO CANAL
+    // Mudamos a tag para 'urgente' para tentar resetar a prioridade no Android
+    tag: 'agendamento-urgente-' + Date.now(), 
     
-    // 🌊 MODO CASCATA (HEADS-UP) 🌊
-    // Para descer na tela, PRECISA vibrar e ter prioridade máxima
-    vibrate: [500, 100, 500, 100, 500], // Vibração longa e irritante para chamar atenção
-    priority: 'high',
-    
-    // 👻 MODO SUSPENSO (Some sozinha)
+    // 4. Som
+    renotify: true,
+
+    // 5. MODO FANTASMA (Aparece e some sozinha depois de 5-10s)
     requireInteraction: false, 
-    
-    // Agrupamento inteligente
-    tag: 'booking-' + Date.now(), // Cria uma tag única para cada notificação (evita agrupar)
-    renotify: true, // Toca o som SEMPRE
-    
+
     data: {
       url: data.url || '/admin'
     },
     
     actions: [
-      { action: 'open', title: '👀 Ver Detalhes' }
+      { action: 'open', title: 'Ver Detalhes' }
     ]
   };
 
@@ -49,7 +55,6 @@ self.addEventListener('push', function(event) {
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  // ... (mesmo código de abrir janela anterior) ...
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (var i = 0; i < clientList.length; i++) {
