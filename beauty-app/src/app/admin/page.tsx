@@ -324,35 +324,35 @@ export default function AdminDashboard() {
                       <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
                          <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-3">
-                            <User size={14} className="text-zinc-500" />
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p>
-                              
-                              {/* Lógica das Etiquetas de Reserva vs Integral */}
-                              {(() => {
-                                  const pago = Number(booking.pricePaid) || 0;
-                                  const total = Number(booking.priceTotal) || 0;
+                                <User size={14} className="text-zinc-500" />
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-zinc-300 text-sm font-medium truncate">{booking.clientName}</p>
                                   
-                                  // Se o valor pago for menor que o total, é apenas uma reserva (sinal)
-                                  if (pago > 0 && pago < total) {
-                                      return (
-                                          <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-[9px] font-black text-amber-500 uppercase tracking-tighter">
-                                              Reserva de Vaga
-                                          </span>
-                                      );
-                                  } 
-                                  // Se o valor pago for igual ou maior que o total, é pagamento completo
-                                  if (pago >= total && total > 0) {
-                                      return (
-                                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black text-emerald-500 uppercase tracking-tighter">
-                                              Agendamento Integral
-                                          </span>
-                                      );
-                                  }
-                                  return null;
-                              })()}
-                            </div>
-                          </div>
+                                  {/* Identificação Visual de Reserva vs Integral */}
+                                  {(() => {
+                                      const pago = Number(booking.pricePaid) || 0;
+                                      
+                                      // Se pagou 0.50 (seu sinal de 50%), força a etiqueta de Reserva
+                                      if (pago > 0 && pago <= 0.50) {
+                                          return (
+                                              <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-[9px] font-black text-amber-500 uppercase tracking-tighter animate-pulse">
+                                                  Reserva de Vaga (50%)
+                                              </span>
+                                          );
+                                      } 
+                                      
+                                      // Se pagou o valor cheio (1.00 ou mais), mostra Integral
+                                      if (pago >= 1.0) {
+                                          return (
+                                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black text-emerald-500 uppercase tracking-tighter">
+                                                  Agendamento Integral
+                                              </span>
+                                          );
+                                      }
+                                      return null;
+                                  })()}
+                                </div>
+                              </div>
 
                           <div className="flex items-center gap-3">
                             <Phone size={14} className="text-zinc-500" />
