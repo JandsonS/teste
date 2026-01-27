@@ -252,10 +252,6 @@ export default function AdminDashboard() {
                         <div><p className="text-zinc-500 text-[9px] font-bold uppercase">No Cartão</p><p className="text-lg font-black text-white">{formatCurrency(revenueStats.card)}</p></div>
                     </div>
                 </div>
-                <div className="bg-zinc-900/50 border border-white/5 p-4 rounded-2xl flex items-center justify-between px-6">
-                    <div className="flex items-center gap-4"><div className="p-3 bg-zinc-500/10 rounded-xl text-zinc-400"><Banknote size={20} /></div><div><p className="text-zinc-500 text-[9px] font-bold uppercase">Outros / Dinheiro</p><p className="text-lg font-black text-white">{formatCurrency(revenueStats.other)}</p></div></div>
-                    <ArrowUpCircle className="text-zinc-800" size={24} />
-                </div>
             </div>
         </div>
 
