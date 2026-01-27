@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { BUSINESS_HOURS } from "@/constants/info"; // ✅ Importação do seu arquivo enviado
+import { BUSINESS_HOURS } from "@/constants/info"; 
 import { isToday, format, parse } from "date-fns";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -14,34 +14,34 @@ export async function GET(request: Request) {
   if (!dateStr) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
 
   try {
-    // 1. GERA A GRADE DINÂMICA (Baseada no seu start: 8 e end: 18)
+    // 1. GERAÇÃO DA GRADE COMPLETA (Baseada no seu info.ts: 8 às 18)
     const allSlots: string[] = [];
     for (let hour = BUSINESS_HOURS.start; hour < BUSINESS_HOURS.end; hour++) {
       allSlots.push(`${hour.toString().padStart(2, '0')}:00`);
       allSlots.push(`${hour.toString().padStart(2, '0')}:30`);
     }
 
-    // 2. BUSCA AGENDAMENTOS EXISTENTES
+    // 2. BUSCA OCUPADOS NO BANCO
     const agendamentos = await prisma.agendamento.findMany({
       where: { data: dateStr, status: { not: 'CANCELADO' } },
       select: { horario: true }
     });
     const busySlots = agendamentos.map(a => a.horario);
 
-    // 3. REGRA DE HORÁRIO PASSADO
+    // 3. FILTRO DE HORÁRIOS PASSADOS (Lógica de Arcoverde/Brasília)
     const dataSelecionada = parse(dateStr, 'dd/MM/yyyy', new Date());
-    const agora = new Date();
-    // Ajuste para fuso de Brasília (UTC-3) se necessário
-    const horaAtualFormatada = format(agora, "HH:mm");
+    
+    // Forçamos o fuso horário de Brasília para evitar erro em servidores (Vercel usa UTC)
+    const agoraBrasilia = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+    const horaAtualFormatada = format(agoraBrasilia, "HH:mm");
 
     const finalAvailableSlots = allSlots.filter(slot => {
-      const jaPassou = slot <= horaAtualFormatada;
-      
-      // Se a data for hoje, removemos o que já passou
+      // Se for hoje, o slot TEM que ser maior que a hora atual
+      // Ex: Se agora é 10:54, 11:00 é > que 10:54 (Verdadeiro, então fica)
       if (isToday(dataSelecionada)) {
-          return !jaPassou;
+          return slot > horaAtualFormatada;
       }
-      return true; // Dias futuros mostram a grade cheia
+      return true; // Se for amanhã, mostra tudo
     });
 
     return NextResponse.json({ 
