@@ -170,31 +170,72 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
           {step === 3 && (
             <div className="py-2 space-y-4">
-                <div className="flex gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800">
-                    <button onClick={() => setPaymentMethod('PIX')} className={`flex-1 py-3 rounded-lg font-bold text-xs ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500'}`}>PIX</button>
-                    <button onClick={() => setPaymentMethod('CARD')} className={`flex-1 py-3 rounded-lg font-bold text-xs ${paymentMethod === 'CARD' ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500'}`}>Cartão</button>
-                </div>
-                
-                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                        <input type="checkbox" id="terms" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-emerald-500 mt-1 cursor-pointer" />
-                        <label htmlFor="terms" className="text-xs text-zinc-400 cursor-pointer select-none">
-                            <span className="text-white font-bold block mb-1 flex items-center gap-1"><AlertCircle size={10} className="text-yellow-500"/> Política de Cancelamento</span>
-                            Li e concordo que cancelamentos ou remarcações devem ser feitos com no mínimo 2 horas de antecedência. Em caso de não comparecimento sem aviso prévio via Whatsapp, o valor da reserva (sinal) não será reembolsado, visando cobrir os custos do horário reservado e a impossibilidade de atender outro cliente.
-                        </label>
-                    </div>
-                </div>
+                {/* --- SEÇÃO DE TERMOS COM LINK PARA WHATSAPP --- */}
+<div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+    <div className="flex items-start gap-3">
+        <input 
+            type="checkbox" 
+            id="terms" 
+            checked={acceptedTerms} 
+            onChange={(e) => setAcceptedTerms(e.target.checked)} 
+            className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-emerald-500 mt-1 cursor-pointer" 
+        />
+        <label htmlFor="terms" className="text-xs text-zinc-400 cursor-pointer select-none">
+            <span className="text-white font-bold block mb-1 flex items-center gap-1">
+                <AlertCircle size={10} className="text-yellow-500"/> Política de Agendamento
+            </span>
+            Concordo que o não comparecimento sem aviso prévio implica na perda do sinal. 
+            Remarcações devem ser feitas com 2h de antecedência via 
+            <a 
+                href="https://wa.me/5581989015555?text=Olá, gostaria de solicitar uma remarcação/cancelamento." 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-emerald-500 font-bold underline ml-1 hover:text-emerald-400"
+            >
+                WhatsApp clicando aqui.
+            </a>
+        </label>
+    </div>
+</div>
 
-                <div className="grid grid-cols-1 gap-3">
-                    <button onClick={() => handleCheckout('FULL')} disabled={loading || !acceptedTerms} className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}>
-                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3"><Wallet size={18} /></div>
-                        <div className="flex-1"><div className="flex justify-between mb-1"><p className="font-bold text-white text-sm">Pagamento Completo</p><span className="font-bold text-white text-sm">{formatMoney(numericPrice)}</span></div><p className="text-[10px] text-zinc-400">Tudo pago agora.</p></div>
-                    </button>
+<div className="grid grid-cols-1 gap-3 mt-4">
+    {/* BOTAO PAGAMENTO INTEGRAL */}
+    <button 
+        onClick={() => handleCheckout('FULL')} 
+        disabled={loading || !acceptedTerms}
+        className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale cursor-not-allowed' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}
+    >
+        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3">
+            <Wallet size={18} />
+        </div>
+        <div className="flex-1">
+            <div className="flex justify-between mb-1">
+                <p className="font-bold text-white text-sm">Pagamento Antecipado</p>
+                <span className="font-bold text-white text-sm">{formatMoney(numericPrice)}</span>
+            </div>
+            <p className="text-[10px] text-zinc-400">Pague agora e evite filas no local.</p>
+        </div>
+        {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
+    </button>
 
-                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading || !acceptedTerms} className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}>
-                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3"><Wallet size={18} /></div>
-                        <div className="flex-1"><div className="flex justify-between mb-1"><p className="font-bold text-white text-sm">Reservar (Sinal 20%)</p><span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span></div><p className="text-[10px] text-zinc-400">Pague o sinal agora e o resto no local.</p></div>
-                    </button>
+    {/* BOTAO GARANTIR VAGA (SINAL) */}
+    <button 
+        onClick={() => handleCheckout('DEPOSIT')} 
+        disabled={loading || !acceptedTerms}
+        className={`group flex items-center p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 grayscale cursor-not-allowed' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}
+    >
+        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mr-3">
+            <Wallet size={18} />
+        </div>
+        <div className="flex-1">
+            <div className="flex justify-between mb-1">
+                <p className="font-bold text-white text-sm">Garantir Vaga (Sinal 20%)</p>
+                <span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span>
+            </div>
+            <p className="text-[10px] text-zinc-400">Pague apenas o sinal para confirmar seu horário.</p>
+        </div>
+        {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
+        </button>
                 </div>
             </div>
           )}
