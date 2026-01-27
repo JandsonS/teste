@@ -14,34 +14,39 @@ export async function GET(request: Request) {
   if (!dateStr) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
 
   try {
-    // 1. GERAÇÃO DA GRADE COMPLETA (Baseada no seu info.ts: 8 às 18)
     const allSlots: string[] = [];
+    
+    // 1. GERAÇÃO DA GRADE COM FILTRO DE PAUSA
     for (let hour = BUSINESS_HOURS.start; hour < BUSINESS_HOURS.end; hour++) {
-      allSlots.push(`${hour.toString().padStart(2, '0')}:00`);
-      allSlots.push(`${hour.toString().padStart(2, '0')}:30`);
+      const times = [`${hour.toString().padStart(2, '0')}:00`, `${hour.toString().padStart(2, '0')}:30` ];
+      
+      times.forEach(slot => {
+        // Verifica se o slot atual cai dentro de alguma pausa definida no info.ts
+        const isPaused = BUSINESS_HOURS.pauses.some(pause => {
+          return slot >= pause.start && slot < pause.end;
+        });
+
+        if (!isPaused) {
+          allSlots.push(slot);
+        }
+      });
     }
 
-    // 2. BUSCA OCUPADOS NO BANCO
     const agendamentos = await prisma.agendamento.findMany({
       where: { data: dateStr, status: { not: 'CANCELADO' } },
       select: { horario: true }
     });
     const busySlots = agendamentos.map(a => a.horario);
 
-    // 3. FILTRO DE HORÁRIOS PASSADOS (Lógica de Arcoverde/Brasília)
     const dataSelecionada = parse(dateStr, 'dd/MM/yyyy', new Date());
-    
-    // Forçamos o fuso horário de Brasília para evitar erro em servidores (Vercel usa UTC)
     const agoraBrasilia = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
     const horaAtualFormatada = format(agoraBrasilia, "HH:mm");
 
     const finalAvailableSlots = allSlots.filter(slot => {
-      // Se for hoje, o slot TEM que ser maior que a hora atual
-      // Ex: Se agora é 10:54, 11:00 é > que 10:54 (Verdadeiro, então fica)
       if (isToday(dataSelecionada)) {
           return slot > horaAtualFormatada;
       }
-      return true; // Se for amanhã, mostra tudo
+      return true;
     });
 
     return NextResponse.json({ 

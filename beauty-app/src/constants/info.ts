@@ -40,8 +40,13 @@ export const SITE_CONFIG = {
 
 
 export const BUSINESS_HOURS = {
-  start: 9, 
-  end: 17.5,   
+  start: 8, 
+  end: 18,
+  // Adicione esta lista de pausas:
+  pauses: [
+    { start: "12:00", end: "14:00" }, // Almoço de 2h
+    { start: "10:00", end: "10:30" }, // Pausa rápida
+  ]
 };
 
 export const SERVICES = [
