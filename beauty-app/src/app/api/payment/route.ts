@@ -17,9 +17,19 @@ export async function POST(request: Request) {
     const { 
       title, date, time, clientName, clientPhone, 
       method, paymentType, pricePaid, pricePending, 
-      isAdmin // Sinal vindo do seu Painel Admin
+      isAdmin 
     } = body;
+
+    const businessConfig = await prisma.configuracao.findFirst();
+    const percentualSinal = businessConfig?.porcentagemSinal || 50;
+    const valorServicoTotal = 1.0; // Valor base do seu serviço (mude conforme necessário)
+    const valorFinalParaCobranca = paymentType === 'DEPOSIT' 
+      ? Number((valorServicoTotal * (percentualSinal / 100)).toFixed(2))
+      : valorServicoTotal;
+
+    const valorRestaNoLocal = valorServicoTotal - valorFinalParaCobranca;
     
+
     // 1. Limpeza e Formatação do Nome
     const nomeClienteLimpo = clientName
         .trim()
@@ -85,7 +95,7 @@ export async function POST(request: Request) {
         servico: nomeServicoFinal, 
         data: date, 
         horario: time, 
-        valor: Number(pricePaid), 
+        valor: valorFinalParaCobranca,
         status: isAdmin ? "CONFIRMADO" : "PENDENTE", 
         metodoPagamento: method 
       }
@@ -94,6 +104,7 @@ export async function POST(request: Request) {
     // Se for Admin, finalizamos aqui. Não gera cobrança nem envia notificações.
     if (isAdmin) {
         return NextResponse.json({ success: true, message: "Bloqueio realizado com sucesso!" });
+        if (isAdmin) return NextResponse.json({ success: true });
     }
 
     // =================================================================================
@@ -140,7 +151,7 @@ export async function POST(request: Request) {
     const result = await preference.create({
       body: {
         external_reference: agendamento.id,
-        items: [{ id: agendamento.id, title: title, unit_price: Number(pricePaid), quantity: 1 }],
+        items: [{ id: agendamento.id, title: title, unit_price: valorFinalParaCobranca, quantity: 1 }],
         payer: { name: nomeClienteLimpo },
         payment_methods: {
           excluded_payment_types: excludedPaymentTypes,

@@ -47,6 +47,19 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const depositValue = numericPrice * 0.50 
   const remainingValue = numericPrice - depositValue 
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const [config, setConfig] = useState({ porcentagemSinal: 50, precoServico: 1.0 });
+
+  {/* Cálculo dinâmico: Preço x (Percentagem / 100) */}
+ <span>R$ {(config.precoServico * (config.porcentagemSinal / 100)).toFixed(2)}</span>
+
+useEffect(() => {
+  // Procura a regra de negócio que definiste no Admin
+  fetch("/api/admin/config")
+    .then((res) => res.json())
+    .then((data) => {
+      if (data && !data.error) setConfig(data);
+    });
+}, []);
 
   useEffect(() => {
     if (!date || !isValid(date)) { setBusySlots([]); setLockedSlots([]); setSelectedTime(null); return; }
