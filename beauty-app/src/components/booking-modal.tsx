@@ -170,7 +170,7 @@ useEffect(() => {
                         <p className="text-xs text-zinc-500 uppercase font-bold">Resumo</p>
                         <p className="text-white font-medium text-sm">
                             <p className="text-white font-bold text-sm">
-                            Reservar Vaga (Sinal {config.porcentagemSinal}%)
+                            Agendamento de Horário
                             </p>
                             {/* ✅ DATA CAPITALIZADA AQUI */}
                             {date ? capitalize(format(date, "dd 'de' MMMM", { locale: ptBR })) : ""} às {selectedTime}
