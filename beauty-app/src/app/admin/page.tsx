@@ -43,64 +43,12 @@ export default function AdminDashboard() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [config, setConfig] = useState({
-    id: "settings",
-    porcentagemSinal: 50,
-    precoServico: 1.0,
-    horarioAbertura: "08:00",
-    horarioFechamento: "20:00"
-  });
-  const [savingConfig, setSavingConfig] = useState(false);
 
   useEffect(() => {
     fetchBookings(); 
     if ('clearAppBadge' in navigator) {
         navigator.clearAppBadge().catch(() => {});
     }
-
-    // Busca as configurações oficiais do banco
-  const fetchConfig = async () => {
-    try {
-      const res = await fetch("/api/admin/config");
-      const data = await res.json();
-      if (data && !data.error) {
-        setConfig(data);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar configurações");
-    }
-  };
-
-  // Salva as novas regras de negócio (ex: mudar sinal para 10%)
-  const handleSaveConfig = async () => {
-    setSavingConfig(true);
-    try {
-      const res = await fetch("/api/admin/config", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
-      });
-
-      if (res.ok) {
-        toast.success("Regras de negócio atualizadas!");
-        setIsSettingsOpen(false);
-        fetchBookings(true); // Recarrega os agendamentos para atualizar os cálculos
-      } else {
-        toast.error("Erro ao salvar no servidor.");
-      }
-    } catch (error) {
-      toast.error("Falha na conexão com a API.");
-    } finally {
-      setSavingConfig(false);
-    }
-  };
-
-  // Garante que o painel comece lendo as configurações do banco
-  useEffect(() => {
-    fetchConfig();
-  }, []);
-
     const interval = setInterval(() => {
         fetchBookings(true); 
     }, 5000);
@@ -326,7 +274,6 @@ export default function AdminDashboard() {
             <Button onClick={handleLogout} variant="outline" size="sm" className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl h-10">
               <LogOut size={14} /> Sair
             </Button>
-            
         </div>
       </header>
 
@@ -484,7 +431,7 @@ export default function AdminDashboard() {
                                                                   Falta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(falta)}
                                                               </span>
                                                           </div>
- 
+                                                          
                                                           {/* Botão de Ação Oficial para Médias e Grandes Empresas */}
                                                           <button 
                                                               onClick={() => handleConfirmPayment(booking.id)}
