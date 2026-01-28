@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Settings, X, Loader2, BellRing, BellOff, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
+
 // Função auxiliar para converter a chave VAPID
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -108,30 +109,38 @@ export default function AdminSettings() {
     <>
       {/* Botão Flutuante (Correção Acessibilidade: aria-label e title) */}
       
-            <button
-                    onClick={() => setIsOpen(true)}
-                    title="Configurações do Sistema"
-                    aria-label="Configurações"
-                    className="flex items-center justify-center w-9 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all shrink-0">
-                    <Settings size={16} />
-</button>
+        <button
+        onClick={() => setIsOpen(true)}
+        title="Configurações do Sistema"
+        aria-label="Abrir Configurações"
+        className="fixed bottom-6 right-6 z-40 flex items-center justify-center w-12 h-12 bg-zinc-900 text-white rounded-full shadow-2xl border border-zinc-800 hover:bg-zinc-800 transition-all hover:scale-110 active:scale-95"
+      >
+        <Settings size={24} className="animate-spin-slow" />
+      </button>
 
 
 
       {isOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-800 w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsOpen(false)} // FECHA AO CLICAR FORA
+        >
+          <div 
+            className="relative w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-[32px] p-8 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()} // IMPEDE FECHAR AO CLICAR DENTRO
+          >
             
             {/* Botão Fechar (Correção Acessibilidade: aria-label e title) */}
-            <button 
-              onClick={() => setIsOpen(false)} 
-              title="Fechar Janela"
-              aria-label="Fechar"
-              className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors"
+            <button
+                onClick={() => setIsOpen(false)}
+                aria-label="Fechar configurações"
+                title="Fechar configurações"
+                className="absolute top-6 right-6 p-2 text-zinc-500 hover:text-white transition-colors"
             >
               <X size={20} />
             </button>
 
+            <h2 className="text-xl font-bold text-white mb-6">Configurações</h2>
             <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-1">Painel de Controle</h2>
             <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-8">Configurações Gerais</p>
 
