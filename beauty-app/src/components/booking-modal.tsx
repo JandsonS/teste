@@ -248,10 +248,12 @@ useEffect(() => {
                 <p className="font-bold text-white text-sm">
                     Reservar Vaga (Sinal {config.porcentagemSinal}%)
                 </p>
-                <span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span>
+                <span className="font-bold text-white text-sm">
+                {formatMoney(config.precoServico * (config.porcentagemSinal / 100))}
+                </span>
             </div>
                 <p className="text-[10px] text-zinc-400 leading-tight">
-                Pague {formatMoney(depositValue)} agora e o restante no estabelecimento.
+                Pague {formatMoney(config.precoServico * (config.porcentagemSinal / 100))} agora e o restante no estabelecimento.
                 </p>
                 </div>
         {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
