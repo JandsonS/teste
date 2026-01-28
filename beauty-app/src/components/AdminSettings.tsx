@@ -107,14 +107,12 @@ export default function AdminSettings() {
   return (
     <>
       {/* Botão Flutuante (Correção Acessibilidade: aria-label e title) */}
-      <button 
-        onClick={() => setIsOpen(true)}
-        title="Abrir Configurações do Sistema"
-        aria-label="Abrir Configurações"
-        className="fixed bottom-4 right-4 bg-zinc-900 text-white p-3 rounded-full shadow-lg border border-zinc-800 hover:bg-zinc-800 z-40 transition-all active:scale-95 group"
-      >
-        <Settings size={24} className="group-hover:rotate-90 transition-transform duration-500" />
-      </button>
+      <button
+          onClick={() => setIsOpen(true)}
+          title="Configurações do Sistema"
+          className="flex items-center justify-center p-2 rounded-lg border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all gap-2">
+          <Settings size={14} className="group-hover:rotate-90 transition-transform duration-500" />
+        </button>
 
       {isOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">

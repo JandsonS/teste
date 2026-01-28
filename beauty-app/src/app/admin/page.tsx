@@ -1,5 +1,7 @@
 "use client";
 
+
+import AdminSettings from "@/components/AdminSettings";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO, isValid, isToday, isTomorrow, parse } from "date-fns";
@@ -268,12 +270,14 @@ export default function AdminDashboard() {
           <p className="text-zinc-500 text-xs md:text-sm mt-1">Gestão de Agendamentos e Finanças</p>
         </div>
         <div className="flex gap-2">
+            <AdminSettings />
             <Button onClick={() => fetchBookings()} variant="outline" size="sm" className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl h-10">
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Atualizar
             </Button>
             <Button onClick={handleLogout} variant="outline" size="sm" className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 hover:text-white gap-2 rounded-xl h-10">
               <LogOut size={14} /> Sair
             </Button>
+
         </div>
       </header>
 
