@@ -111,6 +111,31 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
+  // FUNÇÃO PROFISSIONAL PARA CONFIRMAR RECEBIMENTO PRESENCIAL
+  const handleConfirmPayment = async (id: string) => {
+    // Validação de segurança profissional para evitar erros operacionais
+    if (!confirm("Deseja confirmar o recebimento do saldo restante (50%) deste cliente no balcão?")) return;
+    
+    try {
+      const res = await fetch("/api/admin/bookings/confirm", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      if (res.ok) {
+        toast.success("Pagamento integralizado com sucesso!");
+        // Atualiza a lista silenciosamente para mover o card para a aba "PAGOS"
+        fetchBookings(true); 
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.message || "Erro ao atualizar no servidor.");
+      }
+    } catch (error) {
+      toast.error("Erro de conexão. O servidor oficial não respondeu.");
+    }
+  };  
+
   const parseSmartDate = (dateString: string): Date | null => {
     if (!dateString) return null;
     try {
@@ -392,25 +417,33 @@ export default function AdminDashboard() {
 
                                             {/* Lógica do Alerta Vermelho */}
                                             {(() => {
-                                                // Se o status for pago (sinal), mas o valor pago for menor que o total esperado
-                                                // Como o sinal é 50%, se ele pagou 0.50, falta 0.50.
-                                                const pago = Number(booking.pricePaid) || 0;
-                                                
-                                                // Se o valor for exatamente 0.50 (nosso teste), sabemos que falta a outra metade
-                                                if (isPaid(booking.status) && pago > 0 && pago < 1.00) { 
-                                                    const falta = pago; // Em um sinal de 50%, o que falta é igual ao que foi pago
-                                                    
-                                                    return (
-                                                        <div className="flex items-center gap-1 mt-1 animate-pulse">
-                                                            <AlertTriangle size={10} className="text-red-500"/>
-                                                            <span className="text-[10px] font-black text-red-500 uppercase">
-                                                                Falta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(falta)}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            })()}
+                                              const pago = Number(booking.pricePaid) || 0;
+                                              // Em um sinal de 50% de R$ 1,00, o que falta é R$ 0,50
+                                              const falta = 1.00 - pago; 
+                                              
+                                              // O botão e o alerta só aparecem se houver saldo devedor e o sinal já estiver pago
+                                              if (isPaid(booking.status) && pago > 0 && pago < 1.00) { 
+                                                  return (
+                                                      <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-white/5">
+                                                          <div className="flex items-center gap-1 animate-pulse">
+                                                              <AlertTriangle size={10} className="text-red-500"/>
+                                                              <span className="text-[10px] font-black text-red-500 uppercase">
+                                                                  Falta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(falta)}
+                                                              </span>
+                                                          </div>
+                                                          
+                                                          {/* Botão de Ação Oficial para Médias e Grandes Empresas */}
+                                                          <button 
+                                                              onClick={() => handleConfirmPayment(booking.id)}
+                                                              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black py-2 rounded-lg uppercase transition-all shadow-lg active:scale-95 border border-emerald-400/20"
+                                                          >
+                                                              Confirmar Recebimento (Dinheiro/Pix)
+                                                          </button>
+                                                      </div>
+                                                  );
+                                              }
+                                              return null;
+                                          })()}
                                         </div>
 
                           <a href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)} target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp"
