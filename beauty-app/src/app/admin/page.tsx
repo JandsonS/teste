@@ -123,34 +123,39 @@ export default function AdminDashboard() {
   };
 
   const finalFilteredBookings = bookings.filter(booking => {
-  // Proteção de Data
-  const date = parseSmartDate(booking.bookingDate);
-  if (!date) return false;
-  
-  // 1. Filtro de Período (Hoje, Amanhã, Todos)
-  let matchesDate = true;
-  if (filter === 'today') matchesDate = isToday(date);
-  else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
+    // 1. Proteção Total: Se o booking não existir, ignora
+    if (!booking) return false;
 
-  // 2. Filtro de Busca (Proteção contra nome vazio para evitar tela branca)
-  const clientName = booking.clientName || "";
-  const matchesName = clientName.toLowerCase().includes(searchTerm.toLowerCase());
+    // 2. Proteção de Data
+    const date = parseSmartDate(booking.bookingDate);
+    if (!date) return false;
+    
+    // 3. Filtro de Período
+    let matchesDate = true;
+    if (filter === 'today') matchesDate = isToday(date);
+    else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
 
-  // 3. Lógica das Abas (Pagos vs Pendentes)
-  const valorPago = Number(booking.pricePaid) || 0;
-  // Consideramos PAGO INTEGRAL se o valor for 1.0 ou mais
-  const isTotalmentePago = isPaid(booking.status) && valorPago >= 1.0;
+    // 4. Filtro de Nome com proteção contra nulos
+    const clientName = (booking.clientName || "").toLowerCase();
+    const search = (searchTerm || "").toLowerCase();
+    const matchesName = clientName.includes(search);
 
-  let matchesStatus = true;
-  if (statusFilter === "pago") {
-    matchesStatus = isTotalmentePago;
-  } else if (statusFilter === "pendente") {
-    // Se não for totalmente pago, cai na aba de Pendentes
-    matchesStatus = !isTotalmentePago;
-  }
+    // 5. Lógica das Abas (Pagos vs Pendentes) com proteção
+    const valorPago = Number(booking.pricePaid) || 0;
+    const statusAtual = booking.status || "";
+    
+    // Um agendamento só sai da aba "Pendentes" se ele for 'paid' E tiver pago 1.0 ou mais
+    const isTotalmentePago = ['paid', 'PAGO', 'CONFIRMADO'].includes(statusAtual) && valorPago >= 1.0;
 
-  return matchesDate && matchesName && matchesStatus;
-});
+    let matchesStatus = true;
+    if (statusFilter === "pago") {
+      matchesStatus = isTotalmentePago;
+    } else if (statusFilter === "pendente") {
+      matchesStatus = !isTotalmentePago;
+    }
+
+    return matchesDate && matchesName && matchesStatus;
+  });
 
   const isPaid = (status: string) => {
       return ['paid', 'PAGO', 'CONFIRMADO'].includes(status);
