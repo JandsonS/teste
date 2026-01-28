@@ -123,33 +123,29 @@ export default function AdminDashboard() {
   };
 
   const finalFilteredBookings = bookings.filter(booking => {
-  // 1. Proteção de Data: se a data estiver bugada, não quebra o sistema
-  const date = parseSmartDate(booking.bookingDate);
-  if (!date) return false;
-  
-  // 2. Filtro de Data (Hoje, Amanhã, Todos)
-  let matchesDate = true;
-  if (filter === 'today') matchesDate = isToday(date);
-  else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
+    const date = parseSmartDate(booking.bookingDate);
+    if (!date) return false;
+    
+    // Filtro de Data
+    let matchesDate = true;
+    if (filter === 'today') matchesDate = isToday(date);
+    else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
 
-  // 3. Filtro de Busca por Nome (Proteção contra nome vazio)
-  const matchesName = (booking.clientName || "").toLowerCase().includes(searchTerm.toLowerCase());
+    // Filtro de Busca por Nome
+    const matchesName = (booking.clientName || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-  // 4. Filtro de Status (Pagos vs Pendentes) - CORREÇÃO PRINCIPAL
-  let matchesStatus = true;
-  const statusPago = isPaid(booking.status);
+    // Filtro de Status (Abas Pagos/Pendentes)
+    const pagoTotalmente = isPaid(booking.status) && (Number(booking.pricePaid) >= Number(booking.priceTotal));
+    
+    let matchesStatus = true;
+    if (statusFilter === "pago") {
+      matchesStatus = pagoTotalmente;
+    } else if (statusFilter === "pendente") {
+      matchesStatus = !pagoTotalmente;
+    }
 
-  if (statusFilter === "pago") {
-    matchesStatus = statusPago;
-  } else if (statusFilter === "pendente") {
-    // É considerado pendente se não estiver pago OU se ainda houver valor a pagar (Reserva)
-    const falta = (Number(booking.priceTotal) || 0) - (Number(booking.pricePaid) || 0);
-    matchesStatus = !statusPago || falta > 0;
-  }
-
-  return matchesDate && matchesName && matchesStatus;
-});
-
+    return matchesDate && matchesName && matchesStatus;
+  });
   const isPaid = (status: string) => {
       return ['paid', 'PAGO', 'CONFIRMADO'].includes(status);
   };
