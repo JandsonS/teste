@@ -123,21 +123,30 @@ export default function AdminDashboard() {
   };
 
   const finalFilteredBookings = bookings.filter(booking => {
-    const date = parseSmartDate(booking.bookingDate);
-    if (!date) return false;
-    
-    let matchesDate = true;
-    if (filter === 'today') matchesDate = isToday(date);
-    else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
+  const date = parseSmartDate(booking.bookingDate);
+  if (!date) return false;
+  
+  let matchesDate = true;
+  if (filter === 'today') matchesDate = isToday(date);
+  else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
 
-    const matchesName = booking.clientName.toLowerCase().includes(searchTerm.toLowerCase());
+  // Proteção contra nome vazio para não dar tela branca
+  const matchesName = (booking.clientName || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-    let matchesStatus = true;
-    if (statusFilter === "pago") matchesStatus = isPaid(booking.status);
-    else if (statusFilter === "pendente") matchesStatus = !isPaid(booking.status);
+  // LÓGICA DE FILTRO SEGURA
+  const pago = Number(booking.pricePaid) || 0;
+  
+  let matchesStatus = true;
+  if (statusFilter === "pago") {
+    // Só mostra na aba "Pagos" se o valor for maior que o sinal (ex: R$ 1,00)
+    matchesStatus = isPaid(booking.status) && pago >= 1.0;
+  } else if (statusFilter === "pendente") {
+    // Mostra na aba "Pendentes" se NÃO estiver pago OU se for apenas o sinal (R$ 0,50)
+    matchesStatus = !isPaid(booking.status) || (pago > 0 && pago < 1.0);
+  }
 
-    return matchesDate && matchesName && matchesStatus;
-  });
+  return matchesDate && matchesName && matchesStatus;
+});
 
   const isPaid = (status: string) => {
       return ['paid', 'PAGO', 'CONFIRMADO'].includes(status);
