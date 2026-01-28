@@ -35,3 +35,12 @@ model PushSubscription {
   auth      String
   createdAt DateTime @default(now())
 }
+
+model Configuracao {
+  id                String   @id @default("settings")
+  porcentagemSinal  Float    @default(50.0) // A grade que você quer (10 a 70)
+  precoServico      Float    @default(1.0)  // Valor total base
+  horarioAbertura   String   @default("08:00")
+  horarioFechamento String   @default("20:00")
+  updatedAt         DateTime @updatedAt
+}
