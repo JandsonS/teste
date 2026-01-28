@@ -123,29 +123,31 @@ export default function AdminDashboard() {
   };
 
   const finalFilteredBookings = bookings.filter(booking => {
-    const date = parseSmartDate(booking.bookingDate);
-    if (!date) return false;
-    
-    // Filtro de Data
-    let matchesDate = true;
-    if (filter === 'today') matchesDate = isToday(date);
-    else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
+  const date = parseSmartDate(booking.bookingDate);
+  if (!date) return false;
+  
+  let matchesDate = true;
+  if (filter === 'today') matchesDate = isToday(date);
+  else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
 
-    // Filtro de Busca por Nome
-    const matchesName = (booking.clientName || "").toLowerCase().includes(searchTerm.toLowerCase());
+  // Proteção simples: evita erro se o nome vier vazio
+  const matchesName = (booking.clientName || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Filtro de Status (Abas Pagos/Pendentes)
-    const pagoTotalmente = isPaid(booking.status) && (Number(booking.pricePaid) >= Number(booking.priceTotal));
-    
-    let matchesStatus = true;
-    if (statusFilter === "pago") {
-      matchesStatus = pagoTotalmente;
-    } else if (statusFilter === "pendente") {
-      matchesStatus = !pagoTotalmente;
-    }
+  // Lógica do Filtro de Status
+  const pagoTotalmente = isPaid(booking.status) && (Number(booking.pricePaid) >= Number(booking.priceTotal));
+  
+  let matchesStatus = true;
+  if (statusFilter === "pago") {
+    // Só entra aqui quem pagou 100% (Agendamento Integral)
+    matchesStatus = pagoTotalmente;
+  } else if (statusFilter === "pendente") {
+    // Entra aqui quem não pagou nada OU quem só pagou o sinal (Reserva de Vaga)
+    matchesStatus = !pagoTotalmente;
+  }
 
-    return matchesDate && matchesName && matchesStatus;
-  });
+  return matchesDate && matchesName && matchesStatus;
+});
+
   const isPaid = (status: string) => {
       return ['paid', 'PAGO', 'CONFIRMADO'].includes(status);
   };
