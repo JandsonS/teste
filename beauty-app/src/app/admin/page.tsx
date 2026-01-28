@@ -123,26 +123,30 @@ export default function AdminDashboard() {
   };
 
   const finalFilteredBookings = bookings.filter(booking => {
+  // Proteção de Data
   const date = parseSmartDate(booking.bookingDate);
   if (!date) return false;
   
+  // 1. Filtro de Período (Hoje, Amanhã, Todos)
   let matchesDate = true;
   if (filter === 'today') matchesDate = isToday(date);
   else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
 
-  // Proteção contra nome vazio para não dar tela branca
-  const matchesName = (booking.clientName || "").toLowerCase().includes(searchTerm.toLowerCase());
+  // 2. Filtro de Busca (Proteção contra nome vazio para evitar tela branca)
+  const clientName = booking.clientName || "";
+  const matchesName = clientName.toLowerCase().includes(searchTerm.toLowerCase());
 
-  // LÓGICA DE FILTRO SEGURA
-  const pago = Number(booking.pricePaid) || 0;
-  
+  // 3. Lógica das Abas (Pagos vs Pendentes)
+  const valorPago = Number(booking.pricePaid) || 0;
+  // Consideramos PAGO INTEGRAL se o valor for 1.0 ou mais
+  const isTotalmentePago = isPaid(booking.status) && valorPago >= 1.0;
+
   let matchesStatus = true;
   if (statusFilter === "pago") {
-    // Só mostra na aba "Pagos" se o valor for maior que o sinal (ex: R$ 1,00)
-    matchesStatus = isPaid(booking.status) && pago >= 1.0;
+    matchesStatus = isTotalmentePago;
   } else if (statusFilter === "pendente") {
-    // Mostra na aba "Pendentes" se NÃO estiver pago OU se for apenas o sinal (R$ 0,50)
-    matchesStatus = !isPaid(booking.status) || (pago > 0 && pago < 1.0);
+    // Se não for totalmente pago, cai na aba de Pendentes
+    matchesStatus = !isTotalmentePago;
   }
 
   return matchesDate && matchesName && matchesStatus;
