@@ -245,11 +245,13 @@ useEffect(() => {
         </div>
         <div className="flex-1">
             <div className="flex justify-between mb-1">
-                <p className="font-bold text-white text-sm">Reservar Vaga (Sinal 50%)</p>
+                <p className="font-bold text-white text-sm">
+                    Reservar Vaga (Sinal {config.porcentagemSinal}%)
+                </p>
                 <span className="font-bold text-white text-sm">{formatMoney(depositValue)}</span>
             </div>
-                <p className="text-zinc-400 text-[10px] leading-relaxed">
-                Pague R$ {(config.precoServico * (config.porcentagemSinal / 100)).toFixed(2)} agora e o restante no estabelecimento.
+                <p className="text-[10px] text-zinc-400 leading-tight">
+                Pague {formatMoney(depositValue)} agora e o restante no estabelecimento.
                 </p>
                 </div>
         {loading && <Loader2 className="animate-spin w-4 h-4 ml-2"/>}
