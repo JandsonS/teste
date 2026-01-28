@@ -269,21 +269,35 @@ export default function AdminDashboard() {
           </h1>
           <p className="text-zinc-500 text-xs md:text-sm mt-1">Gestão de Agendamentos e Finanças</p>
         </div>
+
         {/* Mudamos para flex-wrap e justify-end para garantir que caiba no celular */}
-              <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-                <AdminSettings />
-                
-                {/* Ocultamos o texto 'Atualizar' em telas muito pequenas (opcional) */}
-                <Button onClick={() => fetchBookings()} variant="outline" size="sm" className="...">
-                  <RefreshCw size={14} />
-                  <span className="hidden xs:inline">Atualizar</span>
-                </Button>
-                
-                <Button onClick={handleLogout} variant="outline" size="sm" className="...">
-                  <LogOut size={14} />
-                  <span className="hidden xs:inline">Sair</span>
-                </Button>
-              </div>
+              <div className="flex items-center gap-2">
+  {/* Botão de Configurações (já deve estar quadrado e pequeno) */}
+  <AdminSettings />
+
+  {/* Botão Atualizar - Texto some no mobile */}
+  <Button 
+    onClick={() => fetchBookings()} 
+    variant="outline" 
+    size="sm" 
+    className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 h-9"
+  >
+    <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+    <span className="hidden md:inline ml-2">Atualizar</span>
+  </Button>
+
+  {/* Botão Sair - Texto some no mobile */}
+  <Button 
+    onClick={handleLogout} 
+    variant="outline" 
+    size="sm" 
+    className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 h-9"
+  >
+    <LogOut size={14} />
+    <span className="hidden md:inline ml-2">Sair</span>
+  </Button>
+</div>
+
       </header>
 
       <main className="relative z-10 max-w-7xl mx-auto space-y-6 flex-1 w-full">

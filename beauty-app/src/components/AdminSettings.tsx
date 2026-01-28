@@ -110,11 +110,11 @@ export default function AdminSettings() {
       
             <button
                     onClick={() => setIsOpen(true)}
-                    title="Configurações do Sistema" // Adicione esta linha
-                    aria-label="Configurações"        // E esta linha também
-                    className="flex items-center justify-center min-w-[36px] h-[36px] rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all shadow-sm">
+                    title="Configurações do Sistema"
+                    aria-label="Configurações"
+                    className="flex items-center justify-center w-9 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all shrink-0">
                     <Settings size={16} />
-          </button>
+</button>
 
 
 
