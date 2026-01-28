@@ -123,21 +123,32 @@ export default function AdminDashboard() {
   };
 
   const finalFilteredBookings = bookings.filter(booking => {
-    const date = parseSmartDate(booking.bookingDate);
-    if (!date) return false;
-    
-    let matchesDate = true;
-    if (filter === 'today') matchesDate = isToday(date);
-    else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
+  // 1. Proteção de Data: se a data estiver bugada, não quebra o sistema
+  const date = parseSmartDate(booking.bookingDate);
+  if (!date) return false;
+  
+  // 2. Filtro de Data (Hoje, Amanhã, Todos)
+  let matchesDate = true;
+  if (filter === 'today') matchesDate = isToday(date);
+  else if (filter === 'tomorrow') matchesDate = isTomorrow(date);
 
-    const matchesName = booking.clientName.toLowerCase().includes(searchTerm.toLowerCase());
+  // 3. Filtro de Busca por Nome (Proteção contra nome vazio)
+  const matchesName = (booking.clientName || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-    let matchesStatus = true;
-    if (statusFilter === "pago") matchesStatus = isPaid(booking.status);
-    else if (statusFilter === "pendente") matchesStatus = !isPaid(booking.status);
+  // 4. Filtro de Status (Pagos vs Pendentes) - CORREÇÃO PRINCIPAL
+  let matchesStatus = true;
+  const statusPago = isPaid(booking.status);
 
-    return matchesDate && matchesName && matchesStatus;
-  });
+  if (statusFilter === "pago") {
+    matchesStatus = statusPago;
+  } else if (statusFilter === "pendente") {
+    // É considerado pendente se não estiver pago OU se ainda houver valor a pagar (Reserva)
+    const falta = (Number(booking.priceTotal) || 0) - (Number(booking.pricePaid) || 0);
+    matchesStatus = !statusPago || falta > 0;
+  }
+
+  return matchesDate && matchesName && matchesStatus;
+});
 
   const isPaid = (status: string) => {
       return ['paid', 'PAGO', 'CONFIRMADO'].includes(status);
