@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, Mail } from "lucide-react"
+import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
@@ -24,10 +24,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [step, setStep] = useState(1)
   const [open, setOpen] = useState(false)
   
-  // DADOS
+  // DADOS DO CLIENTE (Só o essencial: Nome e Whats)
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
-  const [email, setEmail] = useState("") // Mantive o Email para o Mercado Pago
   
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD'>('PIX')
@@ -42,7 +41,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
   const formatPhone = (value: string) => value.replace(/\D/g, '').slice(0, 11).replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1')
   const isPhoneValid = phone.replace(/\D/g, '').length >= 10
-  const isEmailValid = email.includes("@") && email.includes(".")
   
   const numericPrice = useMemo(() => { 
     if (!price) return 0; 
@@ -100,8 +98,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." })
         return
     }
-    if (!date || !selectedTime || !name || !isPhoneValid || !isEmailValid) {
-        toast.error("Preencha todos os dados corretamente (incluindo e-mail).")
+    // Validação Rápida: Apenas Nome e Telefone
+    if (!date || !selectedTime || !name || !isPhoneValid) {
+        toast.error("Preencha seu nome e WhatsApp corretamente.")
         return 
     }
     
@@ -116,7 +115,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
               time: selectedTime, 
               clientName: name, 
               clientPhone: phone,
-              clientEmail: email,
+              // Backend vai criar email fictício se não enviarmos nada
               method: paymentMethod, 
               paymentType, 
               pricePaid: paymentType === 'FULL' ? numericPrice : depositValue, 
@@ -138,6 +137,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-0 bg-[#09090b] border-zinc-800 text-white rounded-3xl shadow-2xl animate-in fade-in zoom-in-95">
         
+        {/* Header */}
         <div className="p-5 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
             <div>
                 <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
@@ -151,6 +151,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
 
         <div className="p-5">
+          {/* PASSO 1: Data e Hora */}
           {step === 1 && (
             <div className="flex flex-col gap-6">
               <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-900/30 flex justify-center">
@@ -184,6 +185,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             </div>
           )}
 
+          {/* PASSO 2: Dados do Cliente (SEM EMAIL) */}
           {step === 2 && (
             <div className="space-y-5 py-2">
                 <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl flex items-center gap-4">
@@ -203,20 +205,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     </div>
                     
                     <div className="space-y-1.5">
-                        <Label className="text-zinc-400 text-xs font-bold uppercase ml-1">E-mail (Para comprovante)</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-3.5 h-4 w-4 text-zinc-500" />
-                            <Input 
-                                type="email" 
-                                placeholder="seu@email.com" 
-                                className="pl-10 bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" 
-                                value={email} 
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-1.5">
                         <Label className="text-zinc-400 text-xs font-bold uppercase ml-1">WhatsApp</Label>
                         <Input type="tel" placeholder="(00) 00000-0000" className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} maxLength={15} />
                     </div>
@@ -224,8 +212,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             </div>
           )}
 
+          {/* PASSO 3: Pagamento (PIX ou CARTÃO) */}
           {step === 3 && (
             <div className="py-1 space-y-4">
+                {/* Abas */}
                 <div className="grid grid-cols-2 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
                     <button onClick={() => setPaymentMethod('PIX')} className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase transition-all ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white shadow-sm ring-1 ring-white/10' : 'text-zinc-500 hover:text-zinc-300'}`}>
                         <QrCode size={16} className={paymentMethod === 'PIX' ? 'text-emerald-400' : ''}/> PIX
@@ -235,6 +225,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     </button>
                 </div>
 
+                {/* Termos */}
                 <div onClick={() => setAcceptedTerms(!acceptedTerms)} className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 cursor-pointer hover:bg-zinc-900/50 transition-colors flex gap-3">
                     <div className={`mt-0.5 min-w-[1.25rem] h-5 rounded border flex items-center justify-center transition-colors ${acceptedTerms ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600 bg-zinc-800'}`}>
                         {acceptedTerms && <Check size={12} className="text-black stroke-[3]" />}
@@ -245,6 +236,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     </div>
                 </div>
 
+                {/* Botões de Valor */}
                 <div className="grid grid-cols-1 gap-3 mt-2">
                     <button onClick={() => handleCheckout('FULL')} disabled={loading || !acceptedTerms} className={`group flex items-center justify-between p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500'}`}>
                         <div className="flex items-center gap-3">
@@ -282,7 +274,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 2 && (
              <div className="flex gap-2 w-full">
                  <Button variant="ghost" onClick={() => setStep(1)} className="flex-1 text-zinc-500 hover:text-white hover:bg-zinc-900">Voltar</Button>
-                 <Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid || !isEmailValid} className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold">Ir para Pagamento</Button>
+                 <Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold">Ir para Pagamento</Button>
              </div>
           )}
           {step === 3 && (
