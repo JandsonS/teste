@@ -15,16 +15,11 @@ function urlBase64ToUint8Array(base64String: string) {
   }
   return outputArray;
 }
-
-export default function AdminSettings() {
+export default function AdminSettings({ config, setConfig, handleUpdateSettings }: any) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [config, setConfig] = useState({
-    porcentagemSinal: 50,
-    precoServico: 1.0
-  });
 
   // Busca Configurações do Banco
   const fetchConfig = async () => {
@@ -109,16 +104,13 @@ export default function AdminSettings() {
     <>
       {/* Botão Flutuante (Correção Acessibilidade: aria-label e title) */}
       
-        <button
-        onClick={() => setIsOpen(true)}
-        title="Configurações do Sistema"
-        aria-label="Abrir Configurações"
-        className="fixed bottom-6 right-6 z-40 flex items-center justify-center w-12 h-12 bg-zinc-900 text-white rounded-full shadow-2xl border border-zinc-800 hover:bg-zinc-800 transition-all hover:scale-110 active:scale-95"
-      >
-        <Settings size={24} className="animate-spin-slow" />
-      </button>
-
-
+          <button
+            onClick={() => setIsOpen(true)}
+            className="flex items-center gap-2 px-3 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all"
+          >
+            <Settings size={14} />
+            <span className="text-xs font-bold uppercase tracking-widest">Configurações</span>
+          </button>
 
       {isOpen && (
         <div 
