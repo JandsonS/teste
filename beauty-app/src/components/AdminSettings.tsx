@@ -51,7 +51,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
         body: JSON.stringify(config),
       });
       if (res.ok) {
-        toast.success("Regras de sinal atualizadas! 🎯");
+        toast.success("Regras de sinal atualizadas!");
         handleUpdateSettings();
       }
     } catch (error) {
