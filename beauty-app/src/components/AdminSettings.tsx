@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Settings, X, Loader2, BellRing, BellOff, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,6 +28,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Busca Configurações do Banco
   const fetchConfig = async () => {
@@ -61,6 +63,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
 
   // Verifica subscrição push ao carregar
   useEffect(() => {
+    setMounted(true);
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.ready.then((reg) => {
         reg.pushManager.getSubscription().then((sub) => {
@@ -122,7 +125,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
         <span className="hidden md:inline text-xs font-bold uppercase tracking-widest ml-2">Configurações</span>
       </button>
 
-      {isOpen && (
+      {mounted && isOpen && createPortal(
         <div 
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm"
           onClick={() => setIsOpen(false)} // FECHA AO CLICAR FORA
@@ -208,7 +211,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }
