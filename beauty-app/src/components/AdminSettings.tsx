@@ -100,20 +100,19 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
     }
   };
 
-return (
-  <>
-    {/* Botão Flutuante (Correção Acessibilidade: aria-label e title) */}
-    <button
-      onClick={() => setIsOpen(true)}
-      className="flex items-center gap-2 px-3 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all shrink-0"
-    >
-      <Settings size={14} />
-      <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">
-        Configurações
-      </span>
-    </button>
+  return (
+    <>
+      {/* Botão Flutuante (Correção Acessibilidade: aria-label e title) */}
+      
+          <button
+          onClick={() => setIsOpen(true)}
+          className="flex items-center gap-2 px-3 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all"
+        >
+          <Settings size={14} />
+          <span className="text-xs font-bold uppercase tracking-widest">Configurações</span>
+        </button>
 
-    {isOpen && (
+      {isOpen && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => setIsOpen(false)} // FECHA AO CLICAR FORA
