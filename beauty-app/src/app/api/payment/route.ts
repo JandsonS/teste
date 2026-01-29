@@ -104,7 +104,6 @@ export async function POST(request: Request) {
     // Se for Admin, finalizamos aqui. Não gera cobrança nem envia notificações.
     if (isAdmin) {
         return NextResponse.json({ success: true, message: "Bloqueio realizado com sucesso!" });
-        if (isAdmin) return NextResponse.json({ success: true });
     }
 
     // =================================================================================
@@ -155,7 +154,7 @@ export async function POST(request: Request) {
         payer: { name: nomeClienteLimpo },
         payment_methods: {
           excluded_payment_types: excludedPaymentTypes,
-          installments: method === 'PIX' ? 1 : 12
+          installments: 1
         },
         back_urls: { 
             success: `${BASE_URL}/sucesso?id=${agendamento.id}`, 
