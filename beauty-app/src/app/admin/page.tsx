@@ -273,7 +273,6 @@ export default function AdminDashboard() {
         {/* Mudamos para flex-wrap e justify-end para garantir que caiba no celular */}
               <div className="flex items-center gap-2">
   {/* Botão de Configurações (já deve estar quadrado e pequeno) */}
-  <AdminSettings />
 
   {/* Botão Atualizar - Texto some no mobile */}
   <Button 

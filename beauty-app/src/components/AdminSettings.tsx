@@ -145,13 +145,12 @@ export default function AdminSettings() {
             <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-8">Configurações Gerais</p>
 
             <div className="space-y-8">
-              {/* SEÇÃO 1: PORCENTAGEM DE SINAL */}
+              {/* SEÇÃO 1: PORCENTAGEM DE SINAL (SEU CÓDIGO) */}
               <div className="space-y-3">
                 <label htmlFor="porcentagemSinal" className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">
                   Valor da Reserva (Sinal)
                 </label>
                 <div className="relative">
-                  {/* Select (Correção Acessibilidade: title e id) */}
                   <select 
                     id="porcentagemSinal"
                     title="Selecione a porcentagem do sinal para reserva"
