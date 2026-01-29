@@ -102,7 +102,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
         });
 
         setIsSubscribed(true);
-        toast.success("Notificações ativadas! 🚀");
+        toast.success("Notificações ativadas!");
       }
     } catch (error) {
       toast.error("Erro nas permissões de notificação.");
