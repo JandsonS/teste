@@ -104,13 +104,16 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
     <>
       {/* Botão Flutuante (Correção Acessibilidade: aria-label e title) */}
       
+        
           <button
-            onClick={() => setIsOpen(true)}
-            className="flex items-center gap-2 px-3 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all"
-          >
-            <Settings size={14} />
-            <span className="text-xs font-bold uppercase tracking-widest">Configurações</span>
-          </button>
+      onClick={() => setIsOpen(true)}
+      className="flex items-center gap-2 px-3 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all shrink-0"
+    >
+      <Settings size={14} />
+      <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">
+        Configurações
+      </span>
+    </button>
 
       {isOpen && (
         <div 
