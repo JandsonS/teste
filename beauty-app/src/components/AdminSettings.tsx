@@ -106,10 +106,13 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
       
           <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 px-3 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all"
+          aria-label="Abrir configurações"
+          title="Configurações"
+          className="flex items-center gap-2 px-3 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all flex-none"
         >
           <Settings size={14} />
-          <span className="text-xs font-bold uppercase tracking-widest">Configurações</span>
+          {/* Hide the label on small screens so the button doesn't push other controls */}
+          <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">Configurações</span>
         </button>
 
       {isOpen && (

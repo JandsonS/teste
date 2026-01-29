@@ -275,7 +275,7 @@ export default function AdminDashboard() {
               {/* Mudamos para flex-wrap e justify-end para garantir que caiba no celular */}
                     
              {/* Botão de Configurações (já deve estar quadrado e pequeno) */}
-             <div className="flex items-center gap-2">
+             <div className="flex items-center gap-2 flex-wrap justify-end">
                 <AdminSettings 
                 config={config} 
                 setConfig={setConfig} 
