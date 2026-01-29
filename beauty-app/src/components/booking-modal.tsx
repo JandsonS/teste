@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check } from "lucide-react"
+import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, Mail } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
@@ -23,38 +23,37 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [step, setStep] = useState(1)
   const [open, setOpen] = useState(false)
+  
+  // DADOS
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
-  const [email, setEmail] = useState("") // Novo estado para E-mail
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState("") // Mantive o Email para o Mercado Pago
   
-  // NOVO: Estado para alternar entre PIX e Cartão
+  const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD'>('PIX')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   const [busySlots, setBusySlots] = useState<string[]>([]) 
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
-  const [config, setConfig] = useState({ porcentagemSinal: 20 }) // Padrão 20%
+  const [config, setConfig] = useState({ porcentagemSinal: 20 })
 
   // Helpers
   const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
   const formatPhone = (value: string) => value.replace(/\D/g, '').slice(0, 11).replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1')
   const isPhoneValid = phone.replace(/\D/g, '').length >= 10
+  const isEmailValid = email.includes("@") && email.includes(".")
   
-  // Cálculo de Preços
   const numericPrice = useMemo(() => { 
     if (!price) return 0; 
     const c = price.replace('R$', '').trim(); 
     return parseFloat(c.includes(',') ? c.replace(/\./g, '').replace(',', '.') : c); 
   }, [price])
 
-  // Lógica Dinâmica do Sinal
   const depositValue = (numericPrice * config.porcentagemSinal) / 100
   const remainingValue = numericPrice - depositValue 
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-  // Reset ao fechar modal
   useEffect(() => { 
       if (!open) { 
           setStep(1); 
@@ -63,7 +62,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       } 
   }, [open])
 
-  // Busca Configurações do Admin (Porcentagem do Sinal)
   useEffect(() => {
     fetch("/api/admin/config")
       .then((res) => res.json())
@@ -73,7 +71,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       .catch(() => console.log("Usando config padrão"));
   }, [])
 
-  // Busca Horários
   useEffect(() => {
     if (!date || !isValid(date)) { setBusySlots([]); setSelectedTime(null); return; }
     setLoadingSlots(true); setBusySlots([]); setSelectedTime(null); 
@@ -103,7 +100,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." })
         return
     }
-    if (!date || !selectedTime || !name || !isPhoneValid || !email) return 
+    if (!date || !selectedTime || !name || !isPhoneValid || !isEmailValid) {
+        toast.error("Preencha todos os dados corretamente (incluindo e-mail).")
+        return 
+    }
     
     setLoading(true)
     try {
@@ -115,9 +115,9 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
               date: format(date, "dd/MM/yyyy"), 
               time: selectedTime, 
               clientName: name, 
-              clientPhone: phone, 
-              clientEmail: email, // Envia o e-mail para a API
-              method: paymentMethod, // Envia PIX ou CARD
+              clientPhone: phone,
+              clientEmail: email,
+              method: paymentMethod, 
               paymentType, 
               pricePaid: paymentType === 'FULL' ? numericPrice : depositValue, 
               pricePending: paymentType === 'FULL' ? 0 : remainingValue 
@@ -134,29 +134,23 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   }
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
-      <DrawerTrigger asChild>{children}</DrawerTrigger>
-      
-      <DrawerContent className="bg-[#09090b] border-zinc-800 text-white rounded-t-[10px] mt-24 h-[96%] fixed bottom-0 left-0 right-0 outline-none flex flex-col">
-        <div className="mx-auto w-full max-w-md flex flex-col h-full">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-0 bg-[#09090b] border-zinc-800 text-white rounded-3xl shadow-2xl animate-in fade-in zoom-in-95">
         
-        {/* Header */}
-        <DrawerHeader className="p-5 border-b border-zinc-800 bg-zinc-900/50 flex-none">
-            <div className="flex justify-between items-center w-full">
-                <div className="text-left">
-                    <DrawerTitle className="text-lg font-bold text-white flex items-center gap-2">
-                        Agendar Horário
-                    </DrawerTitle>
-                    <div className="flex items-center gap-2 text-zinc-400 text-xs mt-1">
-                        <span className="bg-zinc-800 px-2 py-0.5 rounded text-white font-medium border border-zinc-700">{serviceName}</span>
-                    </div>
+        <div className="p-5 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
+            <div>
+                <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                    Agendar Horário
+                </DialogTitle>
+                <div className="flex items-center gap-2 text-zinc-400 text-xs mt-1">
+                    <span className="bg-zinc-800 px-2 py-0.5 rounded text-white font-medium border border-zinc-700">{serviceName}</span>
                 </div>
-                <div className="text-emerald-400 font-bold text-lg">{price}</div>
             </div>
-        </DrawerHeader>
+            <div className="text-emerald-400 font-bold text-lg">{price}</div>
+        </div>
 
-        <div className="p-5 flex-1 overflow-y-auto">
-          {/* PASSO 1: Data e Hora */}
+        <div className="p-5">
           {step === 1 && (
             <div className="flex flex-col gap-6">
               <div className="border border-zinc-800 rounded-2xl p-4 bg-zinc-900/30 flex justify-center">
@@ -190,7 +184,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             </div>
           )}
 
-          {/* PASSO 2: Dados do Cliente */}
           {step === 2 && (
             <div className="space-y-5 py-2">
                 <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl flex items-center gap-4">
@@ -202,82 +195,73 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                         </p>
                     </div>
                 </div>
+                
                 <div className="space-y-4">
-                    <div className="space-y-1.5"><Label className="text-zinc-400 text-xs font-bold uppercase ml-1">Seu Nome</Label><Input placeholder="Ex: João Silva" className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={name} onChange={(e) => setName(e.target.value)}/></div>
-                    <div className="space-y-1.5"><Label className="text-zinc-400 text-xs font-bold uppercase ml-1">WhatsApp</Label><Input type="tel" placeholder="(00) 00000-0000" className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} maxLength={15} /></div>
-                    <div className="space-y-1.5"><Label className="text-zinc-400 text-xs font-bold uppercase ml-1">E-mail</Label><Input type="email" placeholder="seu@email.com" className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={email} onChange={(e) => setEmail(e.target.value)}/></div>
+                    <div className="space-y-1.5">
+                        <Label className="text-zinc-400 text-xs font-bold uppercase ml-1">Nome Completo</Label>
+                        <Input placeholder="Seu nome..." className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={name} onChange={(e) => setName(e.target.value)}/>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                        <Label className="text-zinc-400 text-xs font-bold uppercase ml-1">E-mail (Para comprovante)</Label>
+                        <div className="relative">
+                            <Mail className="absolute left-3 top-3.5 h-4 w-4 text-zinc-500" />
+                            <Input 
+                                type="email" 
+                                placeholder="seu@email.com" 
+                                className="pl-10 bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" 
+                                value={email} 
+                                onChange={(e) => setEmail(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label className="text-zinc-400 text-xs font-bold uppercase ml-1">WhatsApp</Label>
+                        <Input type="tel" placeholder="(00) 00000-0000" className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} maxLength={15} />
+                    </div>
                 </div>
             </div>
           )}
 
-          {/* PASSO 3: Pagamento (Com Abas e Lógica Correta) */}
           {step === 3 && (
             <div className="py-1 space-y-4">
-                
-                {/* --- ABAS DE PAGAMENTO --- */}
                 <div className="grid grid-cols-2 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-                    <button 
-                        onClick={() => setPaymentMethod('PIX')}
-                        className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase transition-all ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white shadow-sm ring-1 ring-white/10' : 'text-zinc-500 hover:text-zinc-300'}`}
-                    >
+                    <button onClick={() => setPaymentMethod('PIX')} className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase transition-all ${paymentMethod === 'PIX' ? 'bg-zinc-800 text-white shadow-sm ring-1 ring-white/10' : 'text-zinc-500 hover:text-zinc-300'}`}>
                         <QrCode size={16} className={paymentMethod === 'PIX' ? 'text-emerald-400' : ''}/> PIX
                     </button>
-                    <button 
-                        onClick={() => setPaymentMethod('CARD')}
-                        className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase transition-all ${paymentMethod === 'CARD' ? 'bg-zinc-800 text-white shadow-sm ring-1 ring-white/10' : 'text-zinc-500 hover:text-zinc-300'}`}
-                    >
+                    <button onClick={() => setPaymentMethod('CARD')} className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase transition-all ${paymentMethod === 'CARD' ? 'bg-zinc-800 text-white shadow-sm ring-1 ring-white/10' : 'text-zinc-500 hover:text-zinc-300'}`}>
                         <CreditCard size={16} className={paymentMethod === 'CARD' ? 'text-blue-400' : ''}/> Cartão
                     </button>
                 </div>
 
-                {/* Termos */}
                 <div onClick={() => setAcceptedTerms(!acceptedTerms)} className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 cursor-pointer hover:bg-zinc-900/50 transition-colors flex gap-3">
                     <div className={`mt-0.5 min-w-[1.25rem] h-5 rounded border flex items-center justify-center transition-colors ${acceptedTerms ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600 bg-zinc-800'}`}>
                         {acceptedTerms && <Check size={12} className="text-black stroke-[3]" />}
                     </div>
                     <div className="text-xs text-zinc-400 select-none">
-                        <span className="text-white font-bold block mb-1 flex items-center gap-1">
-                            <AlertCircle size={10} className="text-yellow-500"/> Política de Agendamento
-                        </span>
+                        <span className="text-white font-bold block mb-1 flex items-center gap-1"><AlertCircle size={10} className="text-yellow-500"/> Política de Agendamento</span>
                         Concordo com os termos. Cancelamentos com 2h de antecedência.
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 mt-2">
-                    {/* BOTAO PAGAMENTO INTEGRAL */}
-                    <button 
-                        onClick={() => handleCheckout('FULL')} 
-                        disabled={loading || !acceptedTerms}
-                        className={`group flex items-center justify-between p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500'}`}
-                    >
+                    <button onClick={() => handleCheckout('FULL')} disabled={loading || !acceptedTerms} className={`group flex items-center justify-between p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500'}`}>
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors">
-                                <Wallet size={18} />
-                            </div>
+                            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors"><Wallet size={18} /></div>
                             <div>
-                                <p className="font-bold text-white text-sm">
-                                    {paymentMethod === 'PIX' ? 'Pagar Tudo no Pix' : 'Pagar Tudo no Cartão'}
-                                </p>
+                                <p className="font-bold text-white text-sm">{paymentMethod === 'PIX' ? 'Pagar Tudo no Pix' : 'Pagar Tudo no Cartão'}</p>
                                 <p className="text-[10px] text-zinc-500">Sem filas no local.</p>
                             </div>
                         </div>
                         <span className="font-bold text-white text-sm">{formatMoney(numericPrice)}</span>
                     </button>
 
-                    {/* BOTAO SINAL */}
-                    <button 
-                        onClick={() => handleCheckout('DEPOSIT')} 
-                        disabled={loading || !acceptedTerms}
-                        className={`group flex items-center justify-between p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500'}`}
-                    >
+                    <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading || !acceptedTerms} className={`group flex items-center justify-between p-4 rounded-xl border text-left transition-all ${!acceptedTerms ? 'opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500'}`}>
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors">
-                                <Clock size={18} />
-                            </div>
+                            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors"><Clock size={18} /></div>
                             <div>
-                                <p className="font-bold text-white text-sm">
-                                    Sinal de Reserva ({config.porcentagemSinal}%)
-                                </p>
+                                <p className="font-bold text-white text-sm">Sinal de Reserva ({config.porcentagemSinal}%)</p>
                                 <p className="text-[10px] text-zinc-500">Restante no estabelecimento.</p>
                             </div>
                         </div>
@@ -288,34 +272,24 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           )}
         </div>
         
-        {/* Footer Navegação */}
-        <DrawerFooter className="p-4 bg-zinc-950 border-t border-zinc-900 flex-none">
+        <DialogFooter className="p-4 bg-zinc-950 border-t border-zinc-900 flex flex-col sm:flex-row gap-2">
           {step === 1 && (
              <div className="flex gap-2 w-full">
-                 <DrawerClose asChild>
-                    <Button variant="ghost" className="flex-1 text-zinc-500 hover:text-white hover:bg-zinc-900">Cancelar</Button>
-                 </DrawerClose>
-                 <Button 
-                    className={`flex-1 font-bold transition-all duration-300 ${!selectedTime || !date ? 'opacity-50 grayscale cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200 shadow-[0_0_20px_rgba(255,255,255,0.3)]'}`} 
-                    disabled={!selectedTime || !date} 
-                    onClick={() => setStep(2)}
-                 >
-                    Continuar
-                 </Button>
+                 <Button variant="ghost" onClick={() => setOpen(false)} className="flex-1 text-zinc-500 hover:text-white hover:bg-zinc-900">Cancelar</Button>
+                 <Button className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>
              </div>
           )}
           {step === 2 && (
              <div className="flex gap-2 w-full">
                  <Button variant="ghost" onClick={() => setStep(1)} className="flex-1 text-zinc-500 hover:text-white hover:bg-zinc-900">Voltar</Button>
-                 <Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid || !email} className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold">Ir para Pagamento</Button>
+                 <Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid || !isEmailValid} className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold">Ir para Pagamento</Button>
              </div>
           )}
           {step === 3 && (
              <Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-white text-xs uppercase tracking-widest">Voltar para dados</Button>
           )}
-        </DrawerFooter>
-        </div>
-      </DrawerContent>
-    </Drawer>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
