@@ -271,7 +271,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Mudamos para flex-wrap e justify-end para garantir que caiba no celular */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
   {/* Botão de Configurações (já deve estar quadrado e pequeno) */}
 
   {/* Botão Atualizar - Texto some no mobile */}
@@ -284,8 +284,6 @@ export default function AdminDashboard() {
     <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
     <span className="hidden md:inline ml-2">Atualizar</span>
   </Button>
-
-  <AdminSettings inline />
 
   {/* Botão Sair - Texto some no mobile */}
   <Button 
