@@ -127,11 +127,11 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
 
       {isOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center"
           onClick={() => setIsOpen(false)} // FECHA AO CLICAR FORA
         >
           <div 
-            className="relative w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-[32px] p-8 shadow-2xl animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-[32px] p-8 shadow-2xl"
             onClick={(e) => e.stopPropagation()} // IMPEDE FECHAR AO CLICAR DENTRO
           >
             
