@@ -16,7 +16,7 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-export default function AdminSettings() {
+export default function AdminSettings({ inline = false }: { inline?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -107,16 +107,30 @@ export default function AdminSettings() {
 
   return (
     <>
-      {/* Botão Flutuante (Correção Acessibilidade: aria-label e title) */}
-      
+      {/* Botão Flutuante ou Inline (Correção Acessibilidade: aria-label e title) */}
+      {inline ? (
         <button
-        onClick={() => setIsOpen(true)}
-        title="Configurações do Sistema"
-        aria-label="Abrir Configurações"
-        className="fixed bottom-6 right-6 z-40 flex items-center justify-center w-12 h-12 bg-zinc-900 text-white rounded-full shadow-2xl border border-zinc-800 hover:bg-zinc-800 transition-all hover:scale-110 active:scale-95"
-      >
-        <Settings size={24} className="animate-spin-slow" />
-      </button>
+          type="button"
+          onClick={() => setIsOpen(true)}
+          title="Configurações do Sistema"
+          aria-label="Abrir Configurações"
+          className="border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 h-9 flex items-center gap-2 rounded-md px-3 py-1 text-sm"
+        >
+          <Settings size={14} aria-hidden="true" />
+          <span className="inline md:hidden ml-1 text-xs">Cfg</span>
+          <span className="hidden md:inline ml-2">Configurações</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          title="Configurações do Sistema"
+          aria-label="Abrir Configurações"
+          className="fixed bottom-6 right-6 z-40 flex items-center justify-center w-12 h-12 bg-zinc-900 text-white rounded-full shadow-2xl border border-zinc-800 hover:bg-zinc-800 transition-all hover:scale-110 active:scale-95"
+        >
+          <Settings size={24} className="animate-spin-slow" aria-hidden="true" />
+        </button>
+      )}
 
 
 
