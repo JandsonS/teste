@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerFooter, DrawerClose } from "@/components/ui/drawer"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
@@ -25,6 +25,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
+  const [email, setEmail] = useState("") // Novo estado para E-mail
   const [loading, setLoading] = useState(false)
   
   // NOVO: Estado para alternar entre PIX e Cartão
@@ -102,7 +103,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." })
         return
     }
-    if (!date || !selectedTime || !name || !isPhoneValid) return 
+    if (!date || !selectedTime || !name || !isPhoneValid || !email) return 
     
     setLoading(true)
     try {
@@ -115,6 +116,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
               time: selectedTime, 
               clientName: name, 
               clientPhone: phone, 
+              clientEmail: email, // Envia o e-mail para a API
               method: paymentMethod, // Envia PIX ou CARD
               paymentType, 
               pricePaid: paymentType === 'FULL' ? numericPrice : depositValue, 
@@ -132,25 +134,28 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      {/* CORREÇÃO VISUAL: bg-[#09090b] para não ficar transparente */}
-      <DialogContent className="w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-0 bg-[#09090b] border-zinc-800 text-white rounded-3xl shadow-2xl animate-in fade-in zoom-in-95">
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>{children}</DrawerTrigger>
+      
+      <DrawerContent className="bg-[#09090b] border-zinc-800 text-white rounded-t-[10px] mt-24 h-[96%] fixed bottom-0 left-0 right-0 outline-none flex flex-col">
+        <div className="mx-auto w-full max-w-md flex flex-col h-full">
         
         {/* Header */}
-        <div className="p-5 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
-            <div>
-                <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
-                    Agendar Horário
-                </DialogTitle>
-                <div className="flex items-center gap-2 text-zinc-400 text-xs mt-1">
-                    <span className="bg-zinc-800 px-2 py-0.5 rounded text-white font-medium border border-zinc-700">{serviceName}</span>
+        <DrawerHeader className="p-5 border-b border-zinc-800 bg-zinc-900/50 flex-none">
+            <div className="flex justify-between items-center w-full">
+                <div className="text-left">
+                    <DrawerTitle className="text-lg font-bold text-white flex items-center gap-2">
+                        Agendar Horário
+                    </DrawerTitle>
+                    <div className="flex items-center gap-2 text-zinc-400 text-xs mt-1">
+                        <span className="bg-zinc-800 px-2 py-0.5 rounded text-white font-medium border border-zinc-700">{serviceName}</span>
+                    </div>
                 </div>
+                <div className="text-emerald-400 font-bold text-lg">{price}</div>
             </div>
-            <div className="text-emerald-400 font-bold text-lg">{price}</div>
-        </div>
+        </DrawerHeader>
 
-        <div className="p-5">
+        <div className="p-5 flex-1 overflow-y-auto">
           {/* PASSO 1: Data e Hora */}
           {step === 1 && (
             <div className="flex flex-col gap-6">
@@ -200,6 +205,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                 <div className="space-y-4">
                     <div className="space-y-1.5"><Label className="text-zinc-400 text-xs font-bold uppercase ml-1">Seu Nome</Label><Input placeholder="Ex: João Silva" className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={name} onChange={(e) => setName(e.target.value)}/></div>
                     <div className="space-y-1.5"><Label className="text-zinc-400 text-xs font-bold uppercase ml-1">WhatsApp</Label><Input type="tel" placeholder="(00) 00000-0000" className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} maxLength={15} /></div>
+                    <div className="space-y-1.5"><Label className="text-zinc-400 text-xs font-bold uppercase ml-1">E-mail</Label><Input type="email" placeholder="seu@email.com" className="bg-zinc-950 border-zinc-800 text-white h-11 rounded-xl focus-visible:ring-emerald-500" value={email} onChange={(e) => setEmail(e.target.value)}/></div>
                 </div>
             </div>
           )}
@@ -283,24 +289,33 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         </div>
         
         {/* Footer Navegação */}
-        <DialogFooter className="p-4 bg-zinc-950 border-t border-zinc-900 flex flex-col sm:flex-row gap-2">
+        <DrawerFooter className="p-4 bg-zinc-950 border-t border-zinc-900 flex-none">
           {step === 1 && (
              <div className="flex gap-2 w-full">
-                 <Button variant="ghost" onClick={() => setOpen(false)} className="flex-1 text-zinc-500 hover:text-white hover:bg-zinc-900">Cancelar</Button>
-                 <Button className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold" disabled={!selectedTime || !date} onClick={() => setStep(2)}>Continuar</Button>
+                 <DrawerClose asChild>
+                    <Button variant="ghost" className="flex-1 text-zinc-500 hover:text-white hover:bg-zinc-900">Cancelar</Button>
+                 </DrawerClose>
+                 <Button 
+                    className={`flex-1 font-bold transition-all duration-300 ${!selectedTime || !date ? 'opacity-50 grayscale cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200 shadow-[0_0_20px_rgba(255,255,255,0.3)]'}`} 
+                    disabled={!selectedTime || !date} 
+                    onClick={() => setStep(2)}
+                 >
+                    Continuar
+                 </Button>
              </div>
           )}
           {step === 2 && (
              <div className="flex gap-2 w-full">
                  <Button variant="ghost" onClick={() => setStep(1)} className="flex-1 text-zinc-500 hover:text-white hover:bg-zinc-900">Voltar</Button>
-                 <Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid} className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold">Ir para Pagamento</Button>
+                 <Button onClick={() => setStep(3)} disabled={!name || !isPhoneValid || !email} className="flex-1 bg-white text-black hover:bg-zinc-200 font-bold">Ir para Pagamento</Button>
              </div>
           )}
           {step === 3 && (
              <Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="w-full text-zinc-500 hover:text-white text-xs uppercase tracking-widest">Voltar para dados</Button>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DrawerFooter>
+        </div>
+      </DrawerContent>
+    </Drawer>
   )
 }
