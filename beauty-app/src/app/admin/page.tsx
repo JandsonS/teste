@@ -276,11 +276,13 @@ export default function AdminDashboard() {
                     
              {/* Botão de Configurações (já deve estar quadrado e pequeno) */}
              <div className="flex items-center gap-2 flex-wrap justify-end">
-                <AdminSettings 
-                config={config} 
-                setConfig={setConfig} 
-                handleUpdateSettings={handleUpdateSettings} 
+                <div className="order-last flex-none">
+                  <AdminSettings 
+                    config={config} 
+                    setConfig={setConfig} 
+                    handleUpdateSettings={handleUpdateSettings} 
                   />
+                </div>
 
         {/* Botão Atualizar - Texto some no mobile */}
         <Button 
