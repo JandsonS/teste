@@ -37,7 +37,6 @@ interface Booking {
 }
 
 export default function AdminDashboard() {
-  const handleUpdateSettings = async () => {
   const [config, setConfig] = useState({ porcentagemSinal: 50 });
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +84,11 @@ export default function AdminDashboard() {
     } finally {
       if (!silent) setLoading(false);
     }
+  };
+
+  const handleUpdateSettings = async () => {
+    // Atualiza os agendamentos silenciosamente quando as configurações são alteradas
+    await fetchBookings(true);
   };
 
   const handleDeleteBooking = async (id: string) => {
@@ -498,5 +502,4 @@ export default function AdminDashboard() {
       </footer>
     </div>
   );
-}
 }

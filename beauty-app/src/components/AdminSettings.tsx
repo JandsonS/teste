@@ -15,7 +15,14 @@ function urlBase64ToUint8Array(base64String: string) {
   }
   return outputArray;
 }
-export default function AdminSettings({ config, setConfig, handleUpdateSettings }: any) {
+
+interface AdminSettingsProps {
+  config: any;
+  setConfig: (config: any) => void;
+  handleUpdateSettings: () => void;
+}
+
+export default function AdminSettings({ config, setConfig, handleUpdateSettings }: AdminSettingsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -43,6 +50,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
       });
       if (res.ok) {
         toast.success("Regras de sinal atualizadas! 🎯");
+        handleUpdateSettings();
       }
     } catch (error) {
       toast.error("Erro ao salvar regras.");
