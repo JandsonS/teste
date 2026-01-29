@@ -138,27 +138,19 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       
-      <DialogContent className="fixed z-50 flex flex-col gap-0 p-0 bg-[#09090b] text-white w-full h-full sm:h-auto sm:max-h-[85vh] sm:max-w-[480px] border-0 sm:border sm:border-zinc-800 rounded-none sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300 focus:outline-none">
+      {/* CORREÇÃO DE RESPONSIVIDADE (O FIX PARA O "BUGADO"):
+         - w-screen h-[100dvh]: Força ocupar a tela inteira (incluindo área da barra de endereço).
+         - max-w-none m-0: Remove margens laterais que causam o "bug" de espaço.
+         - rounded-none: Remove cantos arredondados no celular para parecer app nativo.
+      */}
+      <DialogContent className="fixed z-50 flex flex-col gap-0 p-0 bg-[#09090b] text-white w-screen h-[100dvh] max-w-none m-0 border-0 rounded-none sm:h-auto sm:w-full sm:max-w-[480px] sm:border sm:border-zinc-800 sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300 focus:outline-none">
         
         {/* === HEADER (FIXO) === */}
-        <div className="flex-none px-5 py-4 border-b border-zinc-800 bg-[#09090b] flex justify-between items-center z-10">
+        <div className="flex-none px-5 py-4 border-b border-zinc-800 bg-[#09090b] flex justify-between items-center z-10 safe-area-top">
             <div className="flex items-center gap-3">
-                {step > 1 ? (
-                   <button 
-                     onClick={() => setStep(step - 1)} 
-                     className="p-2 -ml-2 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-                     aria-label="Voltar para etapa anterior"
-                   >
-                      <ChevronLeft size={22} />
-                   </button>
-                ) : (
-                   <DialogClose 
-                     className="p-2 -ml-2 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors sm:hidden"
-                     aria-label="Fechar agendamento"
-                   >
-                      <X size={22} />
-                   </DialogClose>
-                )}
+                <DialogClose className="p-2 -ml-2 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors" aria-label="Fechar">
+                   <X size={22} />
+                </DialogClose>
                 <div>
                     <DialogTitle className="text-base font-bold text-white leading-tight">
                         {step === 1 && "Escolha a Data"}
@@ -303,8 +295,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           )}
         </div>
         
-        {/* === RODAPÉ (BOTÕES DE AÇÃO) === */}
-        <div className="flex-none p-5 bg-[#09090b] border-t border-zinc-900 z-20 pb-8 sm:pb-5">
+        {/* === RODAPÉ (BOTÕES DE AÇÃO COM "VOLTAR") === */}
+        <div className="flex-none p-5 bg-[#09090b] border-t border-zinc-900 z-20 pb-8 sm:pb-5 safe-area-bottom">
           {step === 1 && selectedTime && (
              <Button className="w-full h-14 bg-white hover:bg-zinc-200 text-black font-bold text-lg rounded-2xl shadow-lg shadow-white/10 animate-in slide-in-from-bottom-2" 
                 onClick={() => setStep(2)}>
@@ -312,18 +304,38 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
              </Button>
           )}
           
+          {/* PASSO 2: AQUI ESTÁ O BOTÃO DE VOLTAR NO RODAPÉ QUE VOCÊ PEDIU */}
           {step === 2 && isPhoneValid && name.length > 2 && (
-             <Button className="w-full h-14 bg-white hover:bg-zinc-200 text-black font-bold text-lg rounded-2xl shadow-lg shadow-white/10 animate-in slide-in-from-bottom-2" 
-                onClick={() => setStep(3)}>
-                Ir para Pagamento <ArrowRight size={20} className="ml-2 opacity-50"/>
-             </Button>
+             <div className="flex gap-3 animate-in slide-in-from-bottom-2">
+                 <Button 
+                    className="h-14 px-6 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-2xl border border-zinc-700" 
+                    onClick={() => setStep(1)}
+                    aria-label="Voltar"
+                 >
+                    <ChevronLeft size={24} />
+                 </Button>
+                 
+                 <Button 
+                    className="flex-1 h-14 bg-white hover:bg-zinc-200 text-black font-bold text-lg rounded-2xl shadow-lg shadow-white/10" 
+                    onClick={() => setStep(3)}
+                 >
+                    Ir para Pagamento <ArrowRight size={20} className="ml-2 opacity-50"/>
+                 </Button>
+             </div>
           )}
           
           {step === 3 && (
-             <div className="text-center">
-                 <Button variant="ghost" onClick={() => setStep(2)} disabled={loading} className="text-zinc-500 hover:text-white text-xs uppercase tracking-widest hover:bg-transparent">
-                    Voltar e editar dados
+             <div className="flex gap-3 animate-in slide-in-from-bottom-2">
+                 <Button 
+                    className="h-14 px-6 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-2xl border border-zinc-700" 
+                    onClick={() => setStep(2)}
+                    aria-label="Voltar e editar"
+                 >
+                    <ChevronLeft size={24} />
                  </Button>
+                 <div className="flex-1 flex items-center justify-center text-zinc-500 text-xs uppercase tracking-widest">
+                    Revise os dados acima
+                 </div>
              </div>
           )}
         </div>
