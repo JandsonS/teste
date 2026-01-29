@@ -111,19 +111,16 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
   return (
     <>
       {/* Botão Flutuante (Correção Acessibilidade: aria-label e title) */}
-      
-          <button
-          onClick={() => setIsOpen(true)}
-          aria-label="Abrir configurações"
-          title="Configurações"
-          // fixed small width on mobile, prevent growing, center icon and keep label hidden on small screens
-          className="flex items-center justify-center gap-2 w-9 px-2 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all flex-none overflow-hidden"
-        >
-          <Settings size={14} />
-          {/* Visual label hidden on small screens to avoid layout shifts; accessible sr-only label kept for screen readers */}
-          <span className="sr-only">Abrir configurações</span>
-          <span className="hidden md:inline text-xs font-bold uppercase tracking-widest ml-2">Configurações</span>
-        </button>
+      <button
+        onClick={() => setIsOpen(true)}
+        aria-label="Abrir configurações"
+        title="Configurações"
+        className="flex items-center justify-center gap-2 w-9 px-2 h-9 rounded-md border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 transition-all flex-none overflow-hidden"
+      >
+        <Settings size={14} />
+        <span className="sr-only">Abrir configurações</span>
+        <span className="hidden md:inline text-xs font-bold uppercase tracking-widest ml-2">Configurações</span>
+      </button>
 
       {isOpen && (
         <div 
@@ -131,7 +128,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
           onClick={() => setIsOpen(false)} // FECHA AO CLICAR FORA
         >
           <div 
-            className="bg-zinc-950 border border-zinc-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative"
+            className="bg-[#09090b] border border-zinc-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()} // IMPEDE FECHAR AO CLICAR DENTRO
           >
             
@@ -140,16 +137,17 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                 onClick={() => setIsOpen(false)}
                 aria-label="Fechar configurações"
                 title="Fechar configurações"
-                className="absolute top-6 right-6 p-2 text-zinc-500 hover:text-white transition-colors"
+                className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white transition-colors"
             >
               <X size={20} />
             </button>
 
-            <h2 className="text-xl font-bold text-white mb-6">Configurações</h2>
-            <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-1">Painel de Controle</h2>
-            <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-8">Configurações Gerais</p>
+            <div>
+              <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-1">Painel de Controle</h2>
+              <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Configurações Gerais</p>
+            </div>
 
-            <div className="space-y-8">
+            <div className="space-y-6">
               {/* SEÇÃO 1: PORCENTAGEM DE SINAL (SEU CÓDIGO) */}
               <div className="space-y-3">
                 <label htmlFor="porcentagemSinal" className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">
@@ -175,7 +173,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                   onClick={handleSaveRules}
                   disabled={isSaving}
                   title="Salvar alterações de porcentagem"
-                  className="w-full py-2 bg-emerald-600/10 text-emerald-500 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-emerald-600/10 text-emerald-500 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600/20 transition-all flex items-center justify-center gap-2"
                 >
                   {isSaving && <Loader2 size={12} className="animate-spin" />}
                   {isSaving ? "Salvando..." : "Aplicar Nova Porcentagem"}
@@ -183,7 +181,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
               </div>
 
               {/* SEÇÃO 2: NOTIFICAÇÕES (O que já existia, agora integrado) */}
-              <div className="pt-6 border-t border-white/5 space-y-4">
+              <div className="pt-4 border-t border-white/5 space-y-3">
                 <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Sistema de Alertas</label>
                 <div className={`p-4 rounded-2xl border transition-all ${isSubscribed ? "bg-emerald-500/5 border-emerald-500/20" : "bg-zinc-900/50 border-zinc-800"}`}>
                    <div className="flex items-center justify-between mb-2">
@@ -199,7 +197,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                   onClick={toggleSubscription}
                   disabled={loading}
                   title={isSubscribed ? "Desativar alertas sonoros" : "Ativar alertas sonoros"}
-                  className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${
+                  className={`w-full py-3 rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${
                     isSubscribed ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700" : "bg-white text-black hover:bg-zinc-200"
                   }`}
                 >
