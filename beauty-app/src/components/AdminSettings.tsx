@@ -118,10 +118,10 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
         onClick={() => setIsOpen(true)}
         aria-label="Abrir configurações"
         title="Configurações"
-        className="h-9 px-3 border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 rounded-md flex items-center gap-2 transition-colors"
+        className="h-9 px-4 border border-zinc-800 bg-black/20 hover:bg-zinc-800 text-zinc-300 rounded-md flex items-center gap-2 transition-colors text-sm font-medium"
       >
         <Settings size={14} />
-        <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">Configurações</span>
+        <span className="hidden md:inline">Configurações</span>
         <span className="sr-only">Abrir configurações</span>
       </button>
 

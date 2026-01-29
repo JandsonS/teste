@@ -414,8 +414,8 @@ export default function AdminDashboard() {
                                       // Se pagou 0.50 (seu sinal de 50%), força a etiqueta de Reserva
                                       if (pago > 0 && pago <= 0.50) {
                                           return (
-                                              <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-[9px] font-black text-amber-500 uppercase tracking-tighter animate-pulse">
-                                                  Reserva de Vaga (50%)
+                                              <span className="text-[10px] font-bold px-2 py-1 rounded-full border border-yellow-500/20 bg-yellow-500/10 text-yellow-400 uppercase tracking-widest">
+                                                  Reserva de Vaga ({config.porcentagemSinal}%)
                                               </span>
                                           );
                                       } 
