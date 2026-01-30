@@ -1,6 +1,5 @@
 "use client";
 
-
 import AdminSettings from "@/components/AdminSettings";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -49,6 +48,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchBookings(); 
+    
+    // --- NOVO: Busca a configuração atualizada ao carregar a página ---
+    fetch("/api/admin/config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && !data.error) setConfig(prev => ({ ...prev, ...data }));
+      })
+      .catch(() => console.log("Usando config padrão"));
+
     if ('clearAppBadge' in navigator) {
         navigator.clearAppBadge().catch(() => {});
     }
@@ -121,8 +129,11 @@ export default function AdminDashboard() {
 
   // FUNÇÃO PROFISSIONAL PARA CONFIRMAR RECEBIMENTO PRESENCIAL
   const handleConfirmPayment = async (id: string) => {
+    // --- NOVO: Cálculo Dinâmico da Porcentagem Restante ---
+    const porcentagemRestante = 100 - config.porcentagemSinal;
+
     // Validação de segurança profissional para evitar erros operacionais
-    if (!confirm("Deseja confirmar o recebimento do saldo restante (50%) deste cliente no balcão?")) return;
+    if (!confirm(`Deseja confirmar o recebimento do saldo restante (${porcentagemRestante}%) deste cliente no balcão?`)) return;
     
     try {
       const res = await fetch("/api/admin/bookings/confirm", {
@@ -440,47 +451,47 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                                    <div className="flex flex-col">
-                                            <span className="text-[10px] text-zinc-500 font-bold uppercase">Financeiro</span>
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-white font-bold text-sm">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(booking.pricePaid || 0)}
-                                                </span>
-                                                <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                                    {getPaymentLabel(booking.status, booking.paymentMethod)}
-                                                </span>
-                                            </div>
+                                      <div className="flex flex-col">
+                                              <span className="text-[10px] text-zinc-500 font-bold uppercase">Financeiro</span>
+                                              <div className="flex items-baseline gap-1">
+                                                  <span className="text-white font-bold text-sm">
+                                                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(booking.pricePaid || 0)}
+                                                  </span>
+                                                  <span className={`text-[10px] font-bold uppercase ${isPaid(booking.status) ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                      {getPaymentLabel(booking.status, booking.paymentMethod)}
+                                                  </span>
+                                              </div>
 
-                                            {/* Lógica do Alerta Vermelho */}
-                                            {(() => {
-                                              const pago = Number(booking.pricePaid) || 0;
-                                              // Em um sinal de 50% de R$ 1,00, o que falta é R$ 0,50
-                                              const falta = 1.00 - pago; 
-                                              
-                                              // O botão e o alerta só aparecem se houver saldo devedor e o sinal já estiver pago
-                                              if (isPaid(booking.status) && pago > 0 && pago < 1.00) { 
-                                                  return (
-                                                      <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-white/5">
-                                                          <div className="flex items-center gap-1 animate-pulse">
-                                                              <AlertTriangle size={10} className="text-red-500"/>
-                                                              <span className="text-[10px] font-black text-red-500 uppercase">
-                                                                  Falta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(falta)}
-                                                              </span>
+                                              {/* Lógica do Alerta Vermelho */}
+                                              {(() => {
+                                                  const pago = Number(booking.pricePaid) || 0;
+                                                  // Em um sinal de 50% de R$ 1,00, o que falta é R$ 0,50
+                                                  const falta = 1.00 - pago; 
+                                                  
+                                                  // O botão e o alerta só aparecem se houver saldo devedor e o sinal já estiver pago
+                                                  if (isPaid(booking.status) && pago > 0 && pago < 1.00) { 
+                                                      return (
+                                                          <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-white/5">
+                                                              <div className="flex items-center gap-1 animate-pulse">
+                                                                  <AlertTriangle size={10} className="text-red-500"/>
+                                                                  <span className="text-[10px] font-black text-red-500 uppercase">
+                                                                      Falta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(falta)}
+                                                                  </span>
+                                                              </div>
+                                                              
+                                                              {/* Botão de Ação Oficial para Médias e Grandes Empresas */}
+                                                              <button 
+                                                                  onClick={() => handleConfirmPayment(booking.id)}
+                                                                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black py-2 rounded-lg uppercase transition-all shadow-lg active:scale-95 border border-emerald-400/20"
+                                                              >
+                                                                  Confirmar Recebimento (Dinheiro/Pix)
+                                                              </button>
                                                           </div>
-                                                          
-                                                          {/* Botão de Ação Oficial para Médias e Grandes Empresas */}
-                                                          <button 
-                                                              onClick={() => handleConfirmPayment(booking.id)}
-                                                              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black py-2 rounded-lg uppercase transition-all shadow-lg active:scale-95 border border-emerald-400/20"
-                                                          >
-                                                              Confirmar Recebimento (Dinheiro/Pix)
-                                                          </button>
-                                                      </div>
-                                                  );
-                                              }
-                                              return null;
-                                          })()}
-                                        </div>
+                                                      );
+                                                  }
+                                                  return null;
+                                              })()}
+                                      </div>
 
                           <a href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)} target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp"
                               className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95 group/btn">
