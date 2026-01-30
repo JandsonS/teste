@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
-import webPush from "web-push";
-import { SITE_CONFIG } from "@/constants/info";
+import webPush from "web-push"; // Mantido para não quebrar imports
+import { SITE_CONFIG } from "@/constants/info"; // Mantido seu import original
 
-// Singleton do Prisma para evitar excesso de conexões
+// Singleton do Prisma
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
@@ -20,17 +20,17 @@ export async function POST(request: Request) {
       isAdmin 
     } = body;
 
+    // --- CONFIGURAÇÕES DE NEGÓCIO (MANTIDAS) ---
     const businessConfig = await prisma.configuracao.findFirst();
     const percentualSinal = businessConfig?.porcentagemSinal || 50;
-    const valorServicoTotal = 1.0; // Valor base do seu serviço (mude conforme necessário)
+    const valorServicoTotal = 1.0; 
     const valorFinalParaCobranca = paymentType === 'DEPOSIT' 
       ? Number((valorServicoTotal * (percentualSinal / 100)).toFixed(2))
       : valorServicoTotal;
 
     const valorRestaNoLocal = valorServicoTotal - valorFinalParaCobranca;
-    
 
-    // 1. Limpeza e Formatação do Nome
+    // --- LIMPEZA DE NOME ---
     const nomeClienteLimpo = clientName
         .trim()
         .toLowerCase()
@@ -39,36 +39,39 @@ export async function POST(request: Request) {
         .join(' ');
     
     const BASE_URL = "https://teste-drab-rho-60.vercel.app"; 
-    const agora = new Date().getTime();
+    
+    // NOVO: Tempo limite de 2 minutos para considerar "Abandono de Carrinho"
+    const tempoLimite = new Date(Date.now() - 2 * 60 * 1000);
 
     // =================================================================================
     // FASE DE VALIDAÇÃO (SÓ PARA CLIENTES)
     // =================================================================================
     if (!isAdmin) {
-        // --- Checagem de Duplicidade do Cliente ---
+        
+        // 1. Checagem de Duplicidade do Cliente (MANTIDA)
         const historicoCliente = await prisma.agendamento.findMany({ 
             where: { cliente: nomeClienteLimpo, status: { not: 'CANCELADO' } } 
         });
 
         for (const r of historicoCliente) {
-           if (r.status === 'CONFIRMADO' || r.status.includes('PAGO') || r.status === 'PENDENTE') {
-               if (r.data === date) {
+            // Se já tem confirmado ou pago no dia
+            if (r.status === 'CONFIRMADO' || r.status.includes('PAGO')) {
+                if (r.data === date) {
                     return NextResponse.json({ 
-                        error: `🚫 Olá ${nomeClienteLimpo.split(' ')[0]}, você já possui um agendamento para este dia.` 
+                        error: `🚫 Olá ${nomeClienteLimpo.split(' ')[0]}, você já possui um agendamento confirmado para este dia.` 
                     }, { status: 409 });
-               }
-           }
-          
-           if (r.status === 'PENDENTE') {
-              const diff = (agora - new Date(r.createdAt).getTime()) / 1000 / 60;
-              if (diff >= 2) {
+                }
+            }
+            // Limpeza de pendentes antigos do próprio cliente
+            if (r.status === 'PENDENTE') {
+               if (new Date(r.createdAt) < tempoLimite) {
                   await prisma.agendamento.delete({ where: { id: r.id } }).catch(()=>{});
-              }
-           }
+               }
+            }
         }
 
-        // --- Checagem de Horário Ocupado ---
-        const vagaOcupada = await prisma.agendamento.findFirst({
+        // 2. Checagem Inteligente de Vaga (ALTERADA PARA REGRA DE 2 MIN)
+        const agendamentoExistente = await prisma.agendamento.findFirst({
             where: { 
                 data: date, 
                 horario: time, 
@@ -76,22 +79,37 @@ export async function POST(request: Request) {
             }
         });
 
-        if (vagaOcupada) {
-            return NextResponse.json({ 
-                error: '❌ Este horário já foi reservado. Por favor, escolha outro.' 
-            }, { status: 409 });
+        if (agendamentoExistente) {
+            // Se já pagou -> Bloqueia
+            if (agendamentoExistente.status === 'CONFIRMADO' || agendamentoExistente.status.includes('PAGO')) {
+                 return NextResponse.json({ error: 'Este horário já foi reservado por outra pessoa.' }, { status: 409 });
+            }
+
+            // Se for PENDENTE...
+            if (agendamentoExistente.status === 'PENDENTE') {
+                if (new Date(agendamentoExistente.createdAt) > tempoLimite) {
+                    // ...e é RECENTE (< 2 min) -> Bloqueia com mensagem específica
+                    return NextResponse.json({ 
+                        error: '⚠️ Este horário está sendo reservado agora. Tente novamente em 2 minutos ou escolha outro.' 
+                    }, { status: 409 });
+                } else {
+                    // ...e é VELHO (> 2 min) -> Exclui para liberar a vaga para você
+                    await prisma.agendamento.delete({ where: { id: agendamentoExistente.id } });
+                }
+            }
         }
     }
 
     // =================================================================================
     // FASE DE CRIAÇÃO (ADMIN E CLIENTES)
     // =================================================================================
-      const valorRestanteFormatado = Number(pricePending).toLocaleString('pt-BR', { 
-        style: 'currency', 
-        currency: 'BRL' 
-      });
+    
+    // Formatação do valor restante (R$ 0,40)
+    const valorRestanteFormatado = Number(pricePending).toLocaleString('pt-BR', { 
+        style: 'currency', currency: 'BRL' 
+    });
 
-          let nomeServicoFinal = isAdmin 
+    let nomeServicoFinal = isAdmin 
         ? `🚫 BLOQUEIO: ${title}` 
         : (paymentType === 'DEPOSIT' 
             ? `${title} (Sinal Pago | Restante: ${valorRestanteFormatado} a pagar no local)` 
@@ -110,43 +128,16 @@ export async function POST(request: Request) {
       }
     });
 
-    // Se for Admin, finalizamos aqui. Não gera cobrança nem envia notificações.
+    // Se for Admin, finalizamos aqui.
     if (isAdmin) {
         return NextResponse.json({ success: true, message: "Bloqueio realizado com sucesso!" });
     }
 
-    // =================================================================================
-    // FASE DE NOTIFICAÇÃO PUSH (SÓ CLIENTES)
-    // =================================================================================
-    try {
-      webPush.setVapidDetails(
-        process.env.VAPID_SUBJECT || "mailto:admin@admin.com", 
-        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-        process.env.VAPID_PRIVATE_KEY!
-      );
-
-      const subscriptions = await prisma.pushSubscription.findMany();
-      const notificationIcon = SITE_CONFIG.images.logo || "/logo.png";
-
-      const notificationPayload = JSON.stringify({
-        title: "Novo Agendamento!",
-        body: `${agendamento.cliente} agendou ${title}`,
-        url: "/admin",
-        icon: notificationIcon 
-      });
-
-      await Promise.all(subscriptions.map(sub => {
-        return webPush.sendNotification({
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth }
-        }, notificationPayload).catch(() => {
-          prisma.pushSubscription.delete({ where: { endpoint: sub.endpoint } }).catch(()=>{});
-        });
-      }));
-    } catch (e) { console.error("Push skip"); }
+    // *** NOTIFICAÇÃO PUSH REMOVIDA DAQUI ***
+    // (Isso impede que o cliente receba "Confirmado" antes de pagar)
 
     // =================================================================================
-    // FASE MERCADO PAGO (SÓ CLIENTES)
+    // FASE MERCADO PAGO
     // =================================================================================
     let excludedPaymentTypes: { id: string }[] = [];
     if (method === 'PIX') {

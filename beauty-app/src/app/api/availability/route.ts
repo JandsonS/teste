@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { isToday, format, parse } from "date-fns";
-import * as Info from "@/constants/info"; // Importamos tudo como Info
+import * as Info from "@/constants/info"; 
 
-// 1. DEFINIÇÃO DE TIPAGEM (Resolve o erro "type never")
+// 1. DEFINIÇÃO DE TIPAGEM (Mantida)
 interface BusinessHours {
   start: number;
   end: number;
   pauses?: { start: string; end: string }[];
 }
 
-// Forçamos o TypeScript a reconhecer o formato correto
 const BUSINESS_HOURS = Info.BUSINESS_HOURS as BusinessHours;
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -23,13 +22,15 @@ export async function GET(request: Request) {
 
   if (!dateStr) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
 
+  // === MUDANÇA: TEMPO LIMITE DE 2 MINUTOS ===
+  const tempoLimite = new Date(Date.now() - 2 * 60 * 1000);
+
   try {
     const allSlots: string[] = [];
     
-    // 2. GARANTE QUE PAUSES SEJA UM ARRAY (Mesmo se estiver vazio ou comentado)
+    // 2. GERAÇÃO DA GRADE (Mantido seu Info original)
     const pauses = BUSINESS_HOURS.pauses || [];
     
-    // 3. GERAÇÃO DA GRADE COM FILTRO DE PAUSA
     for (let hour = BUSINESS_HOURS.start; hour < BUSINESS_HOURS.end; hour++) {
       const times = [
         `${hour.toString().padStart(2, '0')}:00`, 
@@ -37,7 +38,6 @@ export async function GET(request: Request) {
       ];
       
       times.forEach(slot => {
-        // Verifica se o slot atual cai dentro de alguma pausa definida no info.ts
         const isPaused = pauses.some(pause => {
           return slot >= pause.start && slot < pause.end;
         });
@@ -48,29 +48,41 @@ export async function GET(request: Request) {
       });
     }
 
+    // 3. BUSCA NO BANCO (Regra de 2 min aplicada)
     const agendamentos = await prisma.agendamento.findMany({
-      where: { data: dateStr, status: { not: 'CANCELADO' } },
+      where: { 
+        data: dateStr, 
+        status: { not: 'CANCELADO' },
+        OR: [
+            { status: 'CONFIRMADO' },
+            { status: 'PAGO_PIX' },
+            { status: 'PAGO_CARTAO' },
+            // Se for PENDENTE, só trava se for MUITO RECENTE (menos de 2 min)
+            { 
+              status: 'PENDENTE',
+              createdAt: { gt: tempoLimite } 
+            }
+        ]
+      },
       select: { horario: true }
     });
+    
     const busySlots = agendamentos.map(a => a.horario);
 
-    // 4. REGRA DE HORÁRIO RETROATIVO (Fuso de Brasília/Arcoverde)
+    // 4. FILTRO DE HORÁRIO PASSADO (Mantido)
     const dataSelecionada = parse(dateStr, 'dd/MM/yyyy', new Date());
     const agoraBrasilia = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
     const horaAtualFormatada = format(agoraBrasilia, "HH:mm");
 
-    const finalAvailableSlots = allSlots.filter(slot => {
+    const available = allSlots.filter(slot => {
+      if (busySlots.includes(slot)) return false;
       if (isToday(dataSelecionada)) {
-          // Se for hoje, só mostra o que for maior que a hora atual (ex: 11:30 > 11:24)
-          return slot > horaAtualFormatada;
+         return slot > horaAtualFormatada;
       }
       return true;
     });
 
-    return NextResponse.json({ 
-        available: finalAvailableSlots, 
-        busy: busySlots 
-    });
+    return NextResponse.json({ available, busy: busySlots });
 
   } catch (error) {
     console.error("Erro na API:", error);
