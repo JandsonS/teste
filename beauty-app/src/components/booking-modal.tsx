@@ -145,7 +145,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         animate-in fade-in zoom-in-95 duration-200 flex flex-col">
 
         {/* ================================================================= */}
-        {/* CSS CORRIGIDO: Padding removido para não cortar o texto */}
+        {/* CSS DO BOTÃO 29 E LAYOUT */}
         {/* ================================================================= */}
         <style jsx>{`
           .btn-29,
@@ -169,7 +169,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             line-height: 1.5;
             margin: 0;
             -webkit-mask-image: -webkit-radial-gradient(#000, #fff);
-            padding: 0; /* CORREÇÃO: Padding zerado para usar altura fixa */
+            padding: 0;
             text-transform: uppercase;
           }
           .btn-29:disabled {
@@ -422,17 +422,37 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         {/* === RODAPÉ (BOTÕES DE AÇÃO COM ESTILO 29) === */}
         <div className="flex-none p-5 bg-[#09090b]/90 backdrop-blur-md border-t border-zinc-800/50 z-20 pb-8 sm:pb-5 safe-area-bottom transition-all">
           
-          {step === 1 && selectedTime && (
-             // BOTÃO CONTINUAR
-             <div className="animate-in slide-in-from-bottom-2">
-               <button 
-                  className="btn-29 border border-white w-full rounded-2xl h-14" 
-                  onClick={() => setStep(2)}
-               >
-                  <span className="text-container">
-                    <span className="text">CONTINUAR</span>
-                  </span>
-               </button>
+          {step === 1 && (
+             <div className="flex gap-3 animate-in slide-in-from-bottom-2">
+                 {/* BOTÃO VOLTAR (Fecha o Modal) */}
+                 <Button 
+                    className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
+                    onClick={() => setOpen(false)}
+                    aria-label="Voltar para serviços"
+                 >
+                    <ChevronLeft size={24} />
+                 </Button>
+
+                 {/* BOTÃO CONTINUAR (Condicional) */}
+                 <div className="flex-1">
+                   {selectedTime ? (
+                       <button 
+                          className="btn-29 border border-white w-full rounded-2xl h-14" 
+                          onClick={() => setStep(2)}
+                       >
+                          <span className="text-container">
+                            <span className="text">CONTINUAR</span>
+                          </span>
+                       </button>
+                   ) : (
+                       <Button 
+                          className="w-full h-14 bg-zinc-900 text-zinc-600 font-bold text-base rounded-2xl border border-zinc-800 cursor-not-allowed hover:bg-zinc-900" 
+                          disabled
+                       >
+                          ESCOLHA UM HORÁRIO
+                       </Button>
+                   )}
+                 </div>
              </div>
           )}
           
@@ -446,7 +466,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     <ChevronLeft size={24} />
                  </Button>
                  
-                 {/* BOTÃO IR PARA PAGAMENTO */}
                  <div className="flex-1">
                    <button 
                       className="btn-29 border border-white w-full rounded-2xl h-14" 
