@@ -86,7 +86,16 @@ export async function POST(request: Request) {
     // =================================================================================
     // FASE DE CRIAÇÃO (ADMIN E CLIENTES)
     // =================================================================================
-    let nomeServicoFinal = isAdmin ? `🚫 BLOQUEIO: ${title}` : (paymentType === 'DEPOSIT' ? `${title} (Sinal Pago | Resta: R$ ${pricePending})` : `${title} (Integral)`);
+      const valorRestanteFormatado = Number(pricePending).toLocaleString('pt-BR', { 
+        style: 'currency', 
+        currency: 'BRL' 
+      });
+
+          let nomeServicoFinal = isAdmin 
+        ? `🚫 BLOQUEIO: ${title}` 
+        : (paymentType === 'DEPOSIT' 
+            ? `${title} (Sinal Pago | Restante: ${valorRestanteFormatado} a pagar no local)` 
+            : `${title} (Integral)`);
     
     const agendamento = await prisma.agendamento.create({
       data: { 
