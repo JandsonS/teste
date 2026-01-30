@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, ChevronLeft, X } from "lucide-react"
+import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, ChevronLeft, X, ArrowRight } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
@@ -145,7 +145,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         animate-in fade-in zoom-in-95 duration-200 flex flex-col">
 
         {/* ================================================================= */}
-        {/* CSS DO BOTÃO 29 INJETADO AQUI */}
+        {/* CSS CORRIGIDO: Padding removido para não cortar o texto */}
         {/* ================================================================= */}
         <style jsx>{`
           .btn-29,
@@ -169,7 +169,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             line-height: 1.5;
             margin: 0;
             -webkit-mask-image: -webkit-radial-gradient(#000, #fff);
-            padding: 0;
+            padding: 0; /* CORREÇÃO: Padding zerado para usar altura fixa */
             text-transform: uppercase;
           }
           .btn-29:disabled {
@@ -190,7 +190,6 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             --tilt: 30px;
             border-width: 1px;
             display: grid;
-            padding: 1.2rem 3rem;
             place-content: center;
           }
           .btn-29,
@@ -427,7 +426,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
              // BOTÃO CONTINUAR
              <div className="animate-in slide-in-from-bottom-2">
                <button 
-                  className="btn-29 border border-white w-full rounded-2xl" 
+                  className="btn-29 border border-white w-full rounded-2xl h-14" 
                   onClick={() => setStep(2)}
                >
                   <span className="text-container">
@@ -440,17 +439,17 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 2 && isPhoneValid && name.length > 2 && (
              <div className="flex gap-3 animate-in slide-in-from-bottom-2">
                  <Button 
-                    className="h-[52px] w-[52px] rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
+                    className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
                     onClick={() => setStep(1)}
                     aria-label="Voltar"
                  >
-                    <ChevronLeft size={22} />
+                    <ChevronLeft size={24} />
                  </Button>
                  
                  {/* BOTÃO IR PARA PAGAMENTO */}
                  <div className="flex-1">
                    <button 
-                      className="btn-29 border border-white w-full rounded-2xl h-[52px]" 
+                      className="btn-29 border border-white w-full rounded-2xl h-14" 
                       onClick={() => setStep(3)}
                    >
                       <span className="text-container">
@@ -464,11 +463,11 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           {step === 3 && (
              <div className="flex gap-3 animate-in slide-in-from-bottom-2">
                  <Button 
-                    className="h-[52px] w-[52px] rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
+                    className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
                     onClick={() => setStep(2)}
                     aria-label="Voltar e editar"
                  >
-                    <ChevronLeft size={22} />
+                    <ChevronLeft size={24} />
                  </Button>
                  <div className="flex-1 flex items-center justify-center text-zinc-400 text-xs uppercase tracking-widest font-medium">
                     Revise os dados acima
