@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, ChevronLeft, X, ArrowRight, ArrowUpRight } from "lucide-react"
+import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, ChevronLeft, X } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
@@ -143,6 +143,133 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         sm:w-full sm:h-auto sm:max-w-[480px] sm:max-h-[85vh] sm:border sm:border-zinc-800 sm:rounded-3xl 
         sm:left-[50%] sm:top-[50%] sm:-translate-x-1/2 sm:-translate-y-1/2
         animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+
+        {/* ================================================================= */}
+        {/* CSS DO BOTÃO 29 INJETADO AQUI */}
+        {/* ================================================================= */}
+        <style jsx>{`
+          .btn-29,
+          .btn-29 *,
+          .btn-29 :after,
+          .btn-29 :before,
+          .btn-29:after,
+          .btn-29:before {
+            border: 0 solid;
+            box-sizing: border-box;
+          }
+          .btn-29 {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-appearance: button;
+            background-color: #000;
+            background-image: none;
+            color: #fff;
+            cursor: pointer;
+            font-size: 100%;
+            font-weight: 900;
+            line-height: 1.5;
+            margin: 0;
+            -webkit-mask-image: -webkit-radial-gradient(#000, #fff);
+            padding: 0;
+            text-transform: uppercase;
+          }
+          .btn-29:disabled {
+            cursor: default;
+            opacity: 0.5;
+          }
+          .btn-29:-moz-focusring {
+            outline: auto;
+          }
+          .btn-29 svg {
+            display: block;
+            vertical-align: middle;
+          }
+          .btn-29 [hidden] {
+            display: none;
+          }
+          .btn-29 {
+            --tilt: 30px;
+            border-width: 1px;
+            display: grid;
+            padding: 1.2rem 3rem;
+            place-content: center;
+          }
+          .btn-29,
+          .btn-29 .text-container {
+            overflow: hidden;
+            position: relative;
+          }
+          .btn-29 .text-container {
+            display: block;
+            width: fit-content;
+          }
+          .btn-29 .text {
+            display: block;
+            font-weight: 900;
+            mix-blend-mode: difference;
+            position: relative;
+          }
+          .btn-29:hover .text {
+            -webkit-animation: move-right-alternate 0.3s ease forwards;
+            animation: move-right-alternate 0.3s ease forwards;
+          }
+          @-webkit-keyframes move-right-alternate {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(80%); }
+            51% { transform: translateX(-80%); }
+            to { transform: translateX(0); }
+          }
+          @keyframes move-right-alternate {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(80%); }
+            51% { transform: translateX(-80%); }
+            to { transform: translateX(0); }
+          }
+          .btn-29:before {
+            -webkit-animation: move-out 0.3s ease;
+            animation: move-out 0.3s ease;
+            background: #fff;
+            -webkit-clip-path: polygon(
+              0 0,
+              calc(100% - var(--tilt)) 0,
+              100% 50%,
+              calc(100% - var(--tilt)) 100%,
+              0 100%
+            );
+            clip-path: polygon(
+              0 0,
+              calc(100% - var(--tilt)) 0,
+              100% 50%,
+              calc(100% - var(--tilt)) 100%,
+              0 100%
+            );
+            content: "";
+            height: 100%;
+            left: calc(-100% - var(--tilt));
+            position: absolute;
+            top: 0;
+            width: calc(100% + var(--tilt));
+          }
+          .btn-29:hover:before {
+            -webkit-animation: move-in 0.3s ease forwards;
+            animation: move-in 0.3s ease forwards;
+          }
+          @-webkit-keyframes move-in {
+            0% { transform: translateX(0); }
+            to { transform: translateX(100%); }
+          }
+          @keyframes move-in {
+            0% { transform: translateX(0); }
+            to { transform: translateX(100%); }
+          }
+          @-webkit-keyframes move-out {
+            0% { transform: translateX(100%); }
+            to { transform: translateX(200%); }
+          }
+          @keyframes move-out {
+            0% { transform: translateX(100%); }
+            to { transform: translateX(200%); }
+          }
+        `}</style>
         
         {/* === HEADER (FIXO) === */}
         <div className="flex-none px-5 py-4 border-b border-zinc-800 bg-[#09090b] flex justify-between items-center z-10 safe-area-top">
@@ -167,7 +294,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         {/* === CORPO (ROLAGEM) === */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#09090b]">
           
-          <div className="p-5 pb-28 sm:pb-5"> {/* Padding bottom MAIOR no mobile para o botão flutuante */}
+          <div className="p-5 pb-28 sm:pb-5"> 
           
             {/* PASSO 1: CALENDÁRIO E DATA */}
             {step === 1 && (
@@ -293,45 +420,55 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           </div>
         </div>
         
-        {/* === RODAPÉ (BOTÕES DE AÇÃO MODERNOS E ELEGANTES) === */}
-        {/* Fundo semi-transparente com blur para um efeito moderno */}
+        {/* === RODAPÉ (BOTÕES DE AÇÃO COM ESTILO 29) === */}
         <div className="flex-none p-5 bg-[#09090b]/90 backdrop-blur-md border-t border-zinc-800/50 z-20 pb-8 sm:pb-5 safe-area-bottom transition-all">
+          
           {step === 1 && selectedTime && (
-             <Button className="w-full h-12 bg-white hover:bg-zinc-100 text-black font-bold text-base rounded-full shadow-[0_0_20px_rgba(255,255,255,0.15)] hover:shadow-[0_0_25px_rgba(255,255,255,0.25)] transition-all active:scale-95 flex items-center justify-center gap-2 animate-in slide-in-from-bottom-2" 
-                onClick={() => setStep(2)}>
-                Continuar <ArrowRight size={18} className="opacity-70"/>
-             </Button>
+             // BOTÃO CONTINUAR
+             <div className="animate-in slide-in-from-bottom-2">
+               <button 
+                  className="btn-29 border border-white w-full rounded-2xl" 
+                  onClick={() => setStep(2)}
+               >
+                  <span className="text-container">
+                    <span className="text">CONTINUAR</span>
+                  </span>
+               </button>
+             </div>
           )}
           
           {step === 2 && isPhoneValid && name.length > 2 && (
              <div className="flex gap-3 animate-in slide-in-from-bottom-2">
-                 {/* Botão Voltar Circular */}
                  <Button 
-                    className="h-12 w-12 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white border border-zinc-700/50 flex items-center justify-center transition-all active:scale-90" 
+                    className="h-[52px] w-[52px] rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
                     onClick={() => setStep(1)}
                     aria-label="Voltar"
                  >
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={22} />
                  </Button>
                  
-                 {/* Botão Principal Pílula */}
-                 <Button 
-                    className="flex-1 h-12 bg-white hover:bg-zinc-100 text-black font-bold text-base rounded-full shadow-[0_0_20px_rgba(255,255,255,0.15)] hover:shadow-[0_0_25px_rgba(255,255,255,0.25)] transition-all active:scale-95 flex items-center justify-center gap-2" 
-                    onClick={() => setStep(3)}
-                 >
-                    Ir para Pagamento <ArrowRight size={18} className="opacity-70"/>
-                 </Button>
+                 {/* BOTÃO IR PARA PAGAMENTO */}
+                 <div className="flex-1">
+                   <button 
+                      className="btn-29 border border-white w-full rounded-2xl h-[52px]" 
+                      onClick={() => setStep(3)}
+                   >
+                      <span className="text-container">
+                        <span className="text">IR PARA PAGAMENTO</span>
+                      </span>
+                   </button>
+                 </div>
              </div>
           )}
           
           {step === 3 && (
              <div className="flex gap-3 animate-in slide-in-from-bottom-2">
                  <Button 
-                    className="h-12 w-12 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white border border-zinc-700/50 flex items-center justify-center transition-all active:scale-90" 
+                    className="h-[52px] w-[52px] rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
                     onClick={() => setStep(2)}
                     aria-label="Voltar e editar"
                  >
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={22} />
                  </Button>
                  <div className="flex-1 flex items-center justify-center text-zinc-400 text-xs uppercase tracking-widest font-medium">
                     Revise os dados acima
