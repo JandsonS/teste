@@ -397,7 +397,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                               <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors"><Wallet size={24} /></div>
                               <div>
                                   <p className="font-bold text-white text-base">{paymentMethod === 'PIX' ? 'Pagar Total (Pix)' : 'Pagar Total (Cartão)'}</p>
-                                  <p className="text-xs text-zinc-500">Agendamento confirmado na hora.</p>
+                                  <p className="text-xs text-zinc-500">Agendamento Integral.</p>
                               </div>
                           </div>
                           <span className="font-bold text-white text-lg relative z-10">{formatMoney(numericPrice)}</span>
@@ -407,7 +407,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                           <div className="flex items-center gap-4 relative z-10">
                               <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors"><Clock size={24} /></div>
                               <div>
-                                  <p className="font-bold text-white text-base">Pagar Sinal ({config.porcentagemSinal}%)</p>
+                                  <p className="font-bold text-white text-base">Reservar Vaga (Pagar Sinal) ({config.porcentagemSinal}%)</p>
                                   <p className="text-xs text-zinc-500">Restante do valor no local.</p>
                               </div>
                           </div>

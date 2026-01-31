@@ -1,10 +1,21 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { Clock, Instagram, MapPin, ChevronDown, CalendarDays, ArrowUpRight, CheckCircle2, ShoppingBag, X } from 'lucide-react';
-import { SERVICES, SITE_CONFIG } from '@/constants/info'; 
+import { Clock, Instagram, MapPin, ChevronDown, CalendarDays, ArrowUpRight, CheckCircle2, ShoppingBag, X, Loader2 } from 'lucide-react';
+import { SITE_CONFIG } from '@/constants/info'; 
 import { BookingModal } from "@/components/booking-modal"; 
+
+// Define o formato do Serviço que vem do Banco
+interface Service {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  duration: number;
+  imageUrl: string | null;
+  active: boolean;
+}
 
 // --- ÍCONE DO WHATSAPP ---
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -21,6 +32,31 @@ export default function Home() {
   
   // --- ESTADO PARA MULTI-SELEÇÃO ---
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  
+  // --- NOVOS ESTADOS: DADOS DO BANCO ---
+  const [services, setServices] = useState<Service[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+
+  // Busca os serviços no banco ao carregar a página
+  useEffect(() => {
+    async function fetchServices() {
+        try {
+            const res = await fetch('/api/admin/services');
+            const data = await res.json();
+            
+            if (Array.isArray(data)) {
+                // Filtra apenas os serviços ativos para mostrar no site
+                const activeServices = data.filter((s: Service) => s.active);
+                setServices(activeServices);
+            }
+        } catch (error) {
+            console.error("Erro ao carregar serviços:", error);
+        } finally {
+            setLoadingServices(false);
+        }
+    }
+    fetchServices();
+  }, []);
 
   const toggleServices = () => {
     const newState = !showServices;
@@ -32,7 +68,7 @@ export default function Home() {
     }
   };
 
-  // --- LÓGICA DE SELEÇÃO ---
+  // --- LÓGICA DE SELEÇÃO (Agora usa o ID ou Index do array filtrado) ---
   const toggleSelection = (index: number) => {
     if (selectedItems.includes(index)) {
         setSelectedItems(selectedItems.filter((i) => i !== index));
@@ -41,9 +77,9 @@ export default function Home() {
     }
   };
 
-  // Calcula Total e Nomes Combinados
-  const totalValue = selectedItems.reduce((acc, idx) => acc + SERVICES[idx].price, 0);
-  const combinedNames = selectedItems.map(idx => SERVICES[idx].title).join(" + ");
+  // Calcula Total e Nomes Combinados (Baseado no Array `services`)
+  const totalValue = selectedItems.reduce((acc, idx) => acc + (services[idx]?.price || 0), 0);
+  const combinedNames = selectedItems.map(idx => services[idx]?.title).join(" + ");
   const formattedTotal = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const containerVariants: Variants = {
@@ -60,7 +96,7 @@ export default function Home() {
   const whatsappMessage = encodeURIComponent("Olá, estou precisando de ajuda com o agendamento online");
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-pink-500/30 overflow-x-hidden pb-24"> {/* pb-24 para espaço do footer fixo */}
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-pink-500/30 overflow-x-hidden pb-24">
       
       <div className="fixed inset-0 z-0 pointer-events-none">
           <div className="absolute top-[-10%] left-[-10%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-pink-600/10 rounded-full blur-[80px] md:blur-[120px] opacity-40 animate-pulse" />
@@ -169,67 +205,83 @@ export default function Home() {
                     <p className="text-zinc-500 text-sm text-center max-w-lg">Selecione um ou mais procedimentos.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                {SERVICES.map((service, index) => {
-                    const imageSrc = SITE_CONFIG.images.services && SITE_CONFIG.images.services.length > 0 
-                        ? SITE_CONFIG.images.services[index % SITE_CONFIG.images.services.length] 
-                        : SITE_CONFIG.images.logo; 
-                    
-                    const isSelected = selectedItems.includes(index);
+                {loadingServices ? (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                        <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
+                        <p className="text-zinc-500 text-sm">Carregando serviços...</p>
+                    </div>
+                ) : services.length === 0 ? (
+                    <div className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/30">
+                         <p className="text-zinc-400">Nenhum serviço disponível no momento.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                    {services.map((service, index) => {
+                        // Lógica da Imagem: Prioriza a do banco (imageUrl), senão pega do array de fallback, senão pega a logo.
+                        const fallbackImage = SITE_CONFIG.images.services && SITE_CONFIG.images.services.length > 0 
+                             ? SITE_CONFIG.images.services[index % SITE_CONFIG.images.services.length]
+                             : SITE_CONFIG.images.logo;
+                        
+                        const imageSrc = service.imageUrl || fallbackImage;
+                        
+                        const isSelected = selectedItems.includes(index);
 
-                    return (
-                        <motion.div
-                            key={index}
-                            variants={itemVariants}
-                            onClick={() => toggleSelection(index)}
-                            className={`
-                                group relative rounded-[2rem] border transition-all duration-300 overflow-hidden hover:shadow-2xl cursor-pointer
-                                ${isSelected 
-                                    ? 'bg-zinc-800/80 border-emerald-500 ring-2 ring-emerald-500/50' 
-                                    : 'bg-zinc-900/40 border-white/5 hover:border-pink-500/30'
-                                }
-                            `}
-                        >
-                            <div className="h-48 relative overflow-hidden">
-                                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent z-10 opacity-90" />
-                                <img 
-                                    src={imageSrc} 
-                                    alt={service.title} 
-                                    className={`w-full h-full object-cover transition-transform duration-700 ease-out 
-                                        ${isSelected ? 'scale-110 grayscale-0' : 'grayscale group-hover:grayscale-0 group-hover:scale-105'}
-                                    `}
-                                />
-                                
-                                {/* CHECKBOX FLUTUANTE */}
-                                <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${isSelected ? 'scale-110' : 'scale-100 opacity-80'}`}>
-                                    <div className={`
-                                        w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md shadow-lg transition-colors
-                                        ${isSelected ? 'bg-emerald-500 text-black' : 'bg-black/50 border border-white/20 text-white group-hover:bg-white group-hover:text-black'}
-                                    `}>
-                                        {isSelected ? <CheckCircle2 size={18} /> : <div className="w-4 h-4 rounded-full border-2 border-current" />}
+                        return (
+                            <motion.div
+                                key={service.id} // Usa ID do banco como key
+                                variants={itemVariants}
+                                onClick={() => toggleSelection(index)}
+                                className={`
+                                    group relative rounded-[2rem] border transition-all duration-300 overflow-hidden hover:shadow-2xl cursor-pointer
+                                    ${isSelected 
+                                        ? 'bg-zinc-800/80 border-emerald-500 ring-2 ring-emerald-500/50' 
+                                        : 'bg-zinc-900/40 border-white/5 hover:border-pink-500/30'
+                                    }
+                                `}
+                            >
+                                <div className="h-48 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent z-10 opacity-90" />
+                                    <img 
+                                        src={imageSrc} 
+                                        alt={service.title} 
+                                        className={`w-full h-full object-cover transition-transform duration-700 ease-out 
+                                            ${isSelected ? 'scale-110 grayscale-0' : 'grayscale group-hover:grayscale-0 group-hover:scale-105'}
+                                        `}
+                                    />
+                                    
+                                    {/* CHECKBOX FLUTUANTE */}
+                                    <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${isSelected ? 'scale-110' : 'scale-100 opacity-80'}`}>
+                                        <div className={`
+                                            w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md shadow-lg transition-colors
+                                            ${isSelected ? 'bg-emerald-500 text-black' : 'bg-black/50 border border-white/20 text-white group-hover:bg-white group-hover:text-black'}
+                                        `}>
+                                            {isSelected ? <CheckCircle2 size={18} /> : <div className="w-4 h-4 rounded-full border-2 border-current" />}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="p-6 relative z-20 -mt-16">
-                                <h3 className={`text-xl font-bold mb-2 drop-shadow-lg transition-colors ${isSelected ? 'text-emerald-400' : 'text-white group-hover:text-pink-400'}`}>
-                                    {service.title}
-                                </h3>
-                                <p className="text-xs text-zinc-300 mb-4 line-clamp-2 leading-relaxed h-8 drop-shadow-md opacity-90">{service.description}</p>
-                                
-                                <div className="flex items-center justify-between border-t border-white/10 pt-4">
-                                    <div className="flex items-center gap-2 text-zinc-300 text-[10px] uppercase font-bold tracking-wider bg-white/5 px-2 py-1 rounded-lg">
-                                        <Clock size={12} className={isSelected ? "text-emerald-500" : "text-pink-500"} /> {service.duration}
-                                    </div>
-                                    <div className="text-lg font-bold text-white flex items-baseline gap-1">
-                                        <span className="text-xs text-zinc-500 font-normal">R$</span>{service.price.toFixed(2)}
+                                <div className="p-6 relative z-20 -mt-16">
+                                    <h3 className={`text-xl font-bold mb-2 drop-shadow-lg transition-colors ${isSelected ? 'text-emerald-400' : 'text-white group-hover:text-pink-400'}`}>
+                                        {service.title}
+                                    </h3>
+                                    <p className="text-xs text-zinc-300 mb-4 line-clamp-2 leading-relaxed h-8 drop-shadow-md opacity-90">
+                                        {service.description}
+                                    </p>
+                                    
+                                    <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                                        <div className="flex items-center gap-2 text-zinc-300 text-[10px] uppercase font-bold tracking-wider bg-white/5 px-2 py-1 rounded-lg">
+                                            <Clock size={12} className={isSelected ? "text-emerald-500" : "text-pink-500"} /> {service.duration} min
+                                        </div>
+                                        <div className="text-lg font-bold text-white flex items-baseline gap-1">
+                                            <span className="text-xs text-zinc-500 font-normal">R$</span>{service.price.toFixed(2)}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </motion.div>
-                    );
-                })}
-                </div>
+                            </motion.div>
+                        );
+                    })}
+                    </div>
+                )}
             </motion.section>
         )}
       </AnimatePresence>
@@ -262,14 +314,14 @@ export default function Home() {
                     </BookingModal>
 
                     {/* Botão limpar */}
-                        <button 
-                             onClick={() => setSelectedItems([])} 
-                                 aria-label="Limpar seleção" // <--- CORREÇÃO AQUI
-                              title="Limpar seleção"      // <--- E AQUI (aparece ao passar o mouse)
+                    <button 
+                         onClick={() => setSelectedItems([])} 
+                         aria-label="Limpar seleção" 
+                         title="Limpar seleção" 
                          className="absolute -top-3 -right-3 bg-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-700 p-2 rounded-full border border-zinc-700 shadow-lg transition-colors"
->
-    <X size={14} />
-</button>
+                    >
+                        <X size={14} />
+                    </button>
                 </div>
             </motion.div>
         )}

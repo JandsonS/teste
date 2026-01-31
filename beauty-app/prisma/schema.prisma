@@ -44,3 +44,16 @@ model Configuracao {
   horarioFechamento String   @default("20:00")
   updatedAt         DateTime @updatedAt
 }
+
+// Tabela de Serviços (Para criar cortes, unhas, sobrancelhas, etc)
+model Service {
+  id          String   @id @default(cuid())
+  title       String   // Ex: "Corte Social"
+  description String?  // Ex: "Acompanha lavagem"
+  price       Float    // Ex: 30.00
+  duration    Int      // Ex: 30 (minutos)
+  imageUrl    String?  // Link da foto (opcional)
+  active      Boolean  @default(true) // Se está visível no site
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
