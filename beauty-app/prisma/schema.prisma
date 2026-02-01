@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL_UNPOOLED")
+  directUrl = env("DIRECT_URL")
 }
 
 model Agendamento {
@@ -25,7 +25,6 @@ model Agendamento {
   metodoPagamento String?  
   
   createdAt       DateTime @default(now())
-  
 }
 
 model PushSubscription {
@@ -37,23 +36,30 @@ model PushSubscription {
 }
 
 model Configuracao {
-  id                String   @id @default("settings")
-  porcentagemSinal  Float    @default(50.0) // A grade que você quer (10 a 70)
-  precoServico      Float    @default(1.0)  // Valor total base
-  horarioAbertura   String   @default("08:00")
-  horarioFechamento String   @default("20:00")
-  updatedAt         DateTime @updatedAt
+  id                  String   @id @default("settings")
+  porcentagemSinal    Float    @default(50.0)
+  precoServico        Float    @default(1.0)
+  horarioAbertura     String   @default("08:00")
+  horarioFechamento   String   @default("20:00")
+  
+  nomeEstabelecimento String   @default("Minha Barbearia") 
+  telefoneWhatsApp    String?
+  corPrincipal        String   @default("#acb9b5")
+  logoUrl             String?  // Link da logo da Loja
+  backgroundImageUrl  String?  // Backgroud 
+  updatedAt           DateTime @updatedAt
 }
 
-// Tabela de Serviços (Para criar cortes, unhas, sobrancelhas, etc)
+// Tabela de Serviços
 model Service {
   id          String   @id @default(cuid())
   title       String   // Ex: "Corte Social"
   description String?  // Ex: "Acompanha lavagem"
   price       Float    // Ex: 30.00
   duration    Int      // Ex: 30 (minutos)
-  imageUrl    String?  // Link da foto (opcional)
-  active      Boolean  @default(true) // Se está visível no site
+  imageUrl    String?  // Link da foto do serviço
+  active      Boolean  @default(true) 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
 }
