@@ -34,7 +34,7 @@ interface Booking {
   pricePaid: number;
   priceTotal: number;
 }
-
+export const dynamic = "force-dynamic";
 export default function AdminDashboard() {
   const [config, setConfig] = useState({ porcentagemSinal: 50 });
   const [bookings, setBookings] = useState<Booking[]>([]);
