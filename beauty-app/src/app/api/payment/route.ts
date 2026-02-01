@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     // URL do seu site (para o webhook avisar quando pagar)
     // Se estiver em localhost, o webhook não funciona (precisa de túnel ou deploy)
     // Mas o QR Code gera mesmo assim.
-    const notificationUrl = "https://seu-site.vercel.app/api/webhook"; 
+    const notificationUrl = "https://teste-drab-rho-60.vercel.app/"; 
 
     const paymentResponse = await payment.create({
       body: {
