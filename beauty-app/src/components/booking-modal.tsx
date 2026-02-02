@@ -45,7 +45,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const [busySlots, setBusySlots] = useState<string[]>([]) 
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
-  const [config, setConfig] = useState({ porcentagemSinal: 20 })
+  const [config, setConfig] = useState<any>({ porcentagemSinal: 20 })
 
   // --- HELPERS ---
   const formatPhone = (value: string) => value.replace(/\D/g, '').slice(0, 11).replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1')
@@ -106,7 +106,7 @@ useEffect(() => {
     fetch("/api/admin/config")
       .then((res) => res.json())
       .then((data) => {
-        if (data && !data.error) setConfig(prev => ({ ...prev, ...data }));
+        if (data && !data.error) setConfig((prev: any) => ({ ...prev, ...data }));
       })
       .catch(() => console.log("Usando config padrão"));
   }, [])
@@ -401,34 +401,52 @@ useEffect(() => {
             )}
 
             {/* PASSO 4: EXIBIÇÃO DO QR CODE (NOVO) */}
-           {step === 4 && (
+          {step === 4 && (
   <div className="space-y-4">
-      {/* 1. SEÇÃO DE COPIAR CÓDIGO */}
-      <p className="text-zinc-400 text-sm">Ou copie o código abaixo</p>
-      
-      <div className="w-full flex gap-2">
-          <Input 
-              value={pixCode} 
-              readOnly 
-              className="bg-zinc-900/50 border-zinc-800 text-zinc-400 font-mono text-xs h-12" 
-          />
-          <Button onClick={copyPix} className="h-12 w-12 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700">
-              <Copy size={18} />
-          </Button>
+      {/* 1. A IMAGEM DO QR CODE (QUE EU TINHA ESQUECIDO) */}
+      <div className="flex justify-center py-2">
+          <div className="bg-white p-2 rounded-xl shadow-lg border border-zinc-200">
+              {pixImage ? (
+                  <img 
+                    src={`data:image/jpeg;base64,${pixImage}`} 
+                    alt="QR Code Pix" 
+                    className="w-48 h-48 object-contain" 
+                  />
+              ) : (
+                  <div className="w-48 h-48 flex items-center justify-center text-zinc-400 text-xs">
+                      Carregando QR Code...
+                  </div>
+              )}
+          </div>
       </div>
 
-      {/* 2. AVISO DE AGUARDANDO */}
-      <div className="mt-6 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl">
+      {/* 2. INPUT DE COPIAR */}
+      <div className="text-center space-y-2">
+          <p className="text-zinc-400 text-sm">Escaneie para pagar ou copie o código:</p>
+          <div className="w-full flex gap-2">
+              <Input 
+                  value={pixCode} 
+                  readOnly 
+                  className="bg-zinc-900/50 border-zinc-800 text-zinc-400 font-mono text-xs h-12" 
+              />
+              <Button onClick={copyPix} className="h-12 w-12 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700">
+                  <Copy size={18} />
+              </Button>
+          </div>
+      </div>
+
+      {/* 3. AVISO DE AGUARDANDO */}
+      <div className="mt-4 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl">
            <Loader2 className="animate-spin text-emerald-500 shrink-0 mt-0.5" size={16} />
            <div className="space-y-1">
                <p className="text-sm font-bold text-emerald-400">Aguardando pagamento...</p>
                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Assim que você pagar no app do banco, o sistema confirmará seu horário automaticamente em alguns instantes.
+                  O sistema confirmará seu horário automaticamente em alguns instantes.
                </p>
            </div>
       </div>
 
-      {/* 3. BOTÃO DE ENVIAR COMPROVANTE (NOVO) */}
+      {/* 4. BOTÃO WHATSAPP (DINÂMICO) */}
       <div className="mt-6 pt-6 border-t border-zinc-800 text-center">
           <p className="text-xs text-zinc-500 mb-3">
               O sistema confirma automático, mas se preferir:
@@ -437,9 +455,20 @@ useEffect(() => {
               variant="outline" 
               className="w-full bg-zinc-900 border-zinc-700 hover:bg-green-500/10 hover:border-green-500 hover:text-green-500 transition-all"
               onClick={() => {
-                  const seuNumero = "5587999999999"; // <--- SEU NÚMERO AQUI
-                  const msg = `Olá! Acabei de fazer o Pix do agendamento *${serviceName}* e gostaria de enviar o comprovante.`;
-                  window.open(`https://wa.me/${seuNumero}?text=${encodeURIComponent(msg)}`, '_blank');
+                  // LÓGICA DO TELEFONE DINÂMICO
+                  const phoneFromDb = config?.telefone || config?.whatsapp || ""; 
+                  const cleanPhone = phoneFromDb.replace(/\D/g, '');
+                  
+                  if (!cleanPhone) {
+                      toast.error("Número do estabelecimento não configurado.");
+                      return;
+                  }
+
+                  // Garante o 55 do Brasil se não tiver
+                  const finalNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+                  const msg = `Olá! Fiz o Pix do agendamento *${serviceName}* e envio o comprovante.`;
+                  
+                  window.open(`https://wa.me/${finalNumber}?text=${encodeURIComponent(msg)}`, '_blank');
               }}
           >
               <MessageCircle size={18} className="mr-2" />
@@ -448,6 +477,8 @@ useEffect(() => {
       </div>
   </div>
 )}
+
+
 
           </div>
         </div>
