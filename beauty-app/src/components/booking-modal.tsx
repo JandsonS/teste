@@ -61,32 +61,38 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const remainingValue = numericPrice - depositValue 
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-  // --- INICIO DO ESPIÃO DE PIX (CORRIGIDO) ---
-useEffect(() => {
-  // ATENÇÃO: Mudamos para step !== 4, pois é no passo 4 que o QR Code aparece
-  if (!paymentId || step !== 4) return; 
+  // --- INICIO DO ESPIÃO DE PIX ---
+  useEffect(() => {
+    // Só roda se tivermos o ID e estivermos na tela 4
+    if (!paymentId || step !== 4) return; 
 
-  const interval = setInterval(async () => {
-    try {
-      const res = await fetch(`/api/check-status?id=${paymentId}`);
-      const data = await res.json();
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/check-status?id=${paymentId}`);
+        const data = await res.json();
 
-      if (data.status === 'approved') {
-         clearInterval(interval);
-         toast.success("Pagamento confirmado! 🎉");
-         
-         // Aqui você decide o que fazer quando aprova. 
-         // Geralmente fecha o modal ou avança para um passo 5 de "Sucesso"
-         handleFinish(); 
+        if (data.status === 'approved') {
+           clearInterval(interval); // Para de perguntar
+           
+           // MENSAGEM DE SUCESSO
+           toast.success("Pagamento Confirmado! 🎉", {
+               description: "Seu horário foi agendado. Voltando para o início...",
+               duration: 4000, // Fica 4 segundos na tela
+           });
+           
+           // Espera 3 segundos para o cliente ler e depois recarrega
+           setTimeout(() => {
+               window.location.reload();
+           }, 3000);
+        }
+      } catch (error) {
+        console.error("Erro check status", error);
       }
-    } catch (error) {
-      console.error("Erro check status", error);
-    }
-  }, 3000); 
+    }, 3000); 
 
-  return () => clearInterval(interval);
-}, [paymentId, step]); // Fica observando o paymentId e o step
-// --- FIM DO ESPIÃO ---
+    return () => clearInterval(interval);
+  }, [paymentId, step]);
+  // --- FIM DO ESPIÃO ---
 
   // --- RESETAR AO FECHAR ---
   useEffect(() => { 
@@ -401,11 +407,11 @@ useEffect(() => {
             )}
 
             {/* PASSO 4: EXIBIÇÃO DO QR CODE (NOVO) */}
-          {step === 4 && (
-  <div className="space-y-4">
-      {/* 1. A IMAGEM DO QR CODE (QUE EU TINHA ESQUECIDO) */}
-      <div className="flex justify-center py-2">
-          <div className="bg-white p-2 rounded-xl shadow-lg border border-zinc-200">
+         {step === 4 && (
+  <div className="space-y-6">
+      {/* 1. IMAGEM DO QR CODE */}
+      <div className="flex justify-center py-4">
+          <div className="bg-white p-3 rounded-2xl shadow-sm border border-zinc-200">
               {pixImage ? (
                   <img 
                     src={`data:image/jpeg;base64,${pixImage}`} 
@@ -421,13 +427,13 @@ useEffect(() => {
       </div>
 
       {/* 2. INPUT DE COPIAR */}
-      <div className="text-center space-y-2">
-          <p className="text-zinc-400 text-sm">Escaneie para pagar ou copie o código:</p>
+      <div className="text-center space-y-3">
+          <p className="text-zinc-400 text-sm font-medium">Escaneie ou copie o código Pix:</p>
           <div className="w-full flex gap-2">
               <Input 
                   value={pixCode} 
                   readOnly 
-                  className="bg-zinc-900/50 border-zinc-800 text-zinc-400 font-mono text-xs h-12" 
+                  className="bg-zinc-900/50 border-zinc-800 text-zinc-400 font-mono text-xs h-12 text-center" 
               />
               <Button onClick={copyPix} className="h-12 w-12 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700">
                   <Copy size={18} />
@@ -435,51 +441,18 @@ useEffect(() => {
           </div>
       </div>
 
-      {/* 3. AVISO DE AGUARDANDO */}
-      <div className="mt-4 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl">
-           <Loader2 className="animate-spin text-emerald-500 shrink-0 mt-0.5" size={16} />
-           <div className="space-y-1">
-               <p className="text-sm font-bold text-emerald-400">Aguardando pagamento...</p>
-               <p className="text-xs text-zinc-400 leading-relaxed">
-                  O sistema confirmará seu horário automaticamente em alguns instantes.
-               </p>
+      {/* 3. AVISO DE AGUARDANDO (Sem botão embaixo) */}
+      <div className="flex flex-col items-center gap-2 bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl text-center">
+           <div className="flex items-center gap-2">
+               <Loader2 className="animate-spin text-emerald-500" size={18} />
+               <p className="text-sm font-bold text-emerald-400">Aguardando confirmação...</p>
            </div>
-      </div>
-
-      {/* 4. BOTÃO WHATSAPP (DINÂMICO) */}
-      <div className="mt-6 pt-6 border-t border-zinc-800 text-center">
-          <p className="text-xs text-zinc-500 mb-3">
-              O sistema confirma automático, mas se preferir:
-          </p>
-          <Button 
-              variant="outline" 
-              className="w-full bg-zinc-900 border-zinc-700 hover:bg-green-500/10 hover:border-green-500 hover:text-green-500 transition-all"
-              onClick={() => {
-                  // LÓGICA DO TELEFONE DINÂMICO
-                  const phoneFromDb = config?.telefone || config?.whatsapp || ""; 
-                  const cleanPhone = phoneFromDb.replace(/\D/g, '');
-                  
-                  if (!cleanPhone) {
-                      toast.error("Número do estabelecimento não configurado.");
-                      return;
-                  }
-
-                  // Garante o 55 do Brasil se não tiver
-                  const finalNumber = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-                  const msg = `Olá! Fiz o Pix do agendamento *${serviceName}* e envio o comprovante.`;
-                  
-                  window.open(`https://wa.me/${finalNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-              }}
-          >
-              <MessageCircle size={18} className="mr-2" />
-              Enviar Comprovante no WhatsApp
-          </Button>
+           <p className="text-xs text-zinc-500">
+              Não feche esta tela. Assim que o pagamento for identificado, você será redirecionado automaticamente.
+           </p>
       </div>
   </div>
 )}
-
-
-
           </div>
         </div>
         
