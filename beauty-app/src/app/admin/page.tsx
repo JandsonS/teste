@@ -26,7 +26,9 @@ interface Booking {
   id: string;
   clientName: string;
   clientPhone: string;
-  serviceTitle: string;
+  servico?: string;      
+  serviceTitle?: string; 
+  service?: string;
   bookingDate: string;
   bookingTime: string;
   status: string;
@@ -225,9 +227,10 @@ export default function AdminDashboard() {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
   
-  const cleanServiceName = (title: string) => {
-      return title.split('(')[0].trim();
-  };
+  const cleanServiceName = (title: any) => {
+    if (!title) return "Serviço sem nome";
+    return String(title).split('(')[0].trim();
+};
 
   const revenueStats = finalFilteredBookings.reduce((acc, curr) => {
     const value = curr.pricePaid || 0;
@@ -394,7 +397,8 @@ export default function AdminDashboard() {
           <motion.div layout className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             <AnimatePresence>
             {finalFilteredBookings.map((booking) => {
-              const restante = getRestante(booking.serviceTitle);
+              const restante = getRestante(booking);
+              const nomeReal = booking.servico || booking.serviceTitle || booking.service || "Serviço";
               return (
                 <motion.div layout key={booking.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
                   className="bg-zinc-950/80 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden hover:border-white/20 transition-all shadow-lg flex flex-col relative"
@@ -407,10 +411,12 @@ export default function AdminDashboard() {
                   <div className="p-5 space-y-4 flex-1 mt-2">
                       <div className="flex justify-between items-start gap-3 pr-2">
                           <div className="min-w-0 flex-1">
-                              <h3 className="font-bold text-white text-base truncate leading-tight pr-20">{cleanServiceName(booking.serviceTitle)}</h3>
-                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">{formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}</p>
-                          </div>
-                      </div>
+                              <h3 className="font-bold text-white text-base truncate leading-tight pr-20">
+                                    {cleanServiceName(nomeReal)}
+                                </h3>
+                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">{formatDateDisplay(booking.bookingDate)} • {booking.bookingTime}</p>
+                            </div>
+                        </div>
                       <div className="bg-white/5 p-3 rounded-xl space-y-2 border border-white/5">
                          <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-3">
@@ -493,7 +499,7 @@ export default function AdminDashboard() {
                                               })()}
                                       </div>
 
-                          <a href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, booking.serviceTitle)} target="_blank" rel="noopener noreferrer" title="Enviar WhatsApp"
+                          <a href={getWhatsAppLink(booking.clientPhone, booking.clientName, booking.bookingDate, booking.bookingTime, nomeReal)}
                               className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95 group/btn">
                               <WhatsAppLogo className="w-4 h-4 fill-current group-hover/btn:animate-bounce" /><span className="text-xs font-bold uppercase tracking-wide">WhatsApp</span>
                           </a>

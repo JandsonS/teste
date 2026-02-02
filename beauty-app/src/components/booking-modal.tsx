@@ -75,7 +75,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
            clearInterval(interval); // Para de perguntar
            
            // MENSAGEM DE SUCESSO
-           toast.success("Pagamento Confirmado! 🎉", {
+           toast.success("Pagamento Confirmado!", {
                description: "Seu horário foi agendado. Voltando para o início...",
                duration: 4000, // Fica 4 segundos na tela
            });

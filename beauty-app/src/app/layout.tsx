@@ -7,31 +7,47 @@ import { prisma } from "@/lib/prisma";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// --- MUDANÇA PRINCIPAL: TÍTULO DINÂMICO ---
-// Essa função roda antes da página carregar para decidir o que escrever na aba do navegador
 export async function generateMetadata(): Promise<Metadata> {
-  let siteName = SITE_CONFIG.name; // Começa com o nome padrão
+  // 1. Padrão: Se o banco falhar, usa "Barbearia App" e a logo local
+  let siteName = "Barbearia App"; 
+  let iconUrl = "/logo.png"; // <--- Garanta que tem um arquivo logo.png na pasta public
 
   try {
-    // Tenta buscar o nome personalizado no banco
     const settings = await prisma.configuracao.findUnique({
       where: { id: "settings" }
     });
     
-    if (settings?.nomeEstabelecimento) {
-      siteName = settings.nomeEstabelecimento;
+    if (settings) {
+      // Se o dono mudou o nome, pega do banco
+      if (settings.nomeEstabelecimento) {
+        siteName = settings.nomeEstabelecimento;
+      }
+      // Se o dono subiu logo, pega do banco. Senão, mantém a local /logo.png
+      if (settings.logoUrl && settings.logoUrl.length > 5) {
+        iconUrl = settings.logoUrl;
+      }
     }
   } catch (error) {
-    // Se der erro, mantém o padrão
+    console.error("Erro ao buscar config:", error);
   }
 
   return {
-    title: `${siteName} | Agendamento`,
-    description: SITE_CONFIG.description,
+    // AQUI ESTÁ A CORREÇÃO DO NOME DUPLICADO:
+    title: {
+      default: siteName,
+      template: `%s`, // Removemos qualquer texto extra aqui
+      absolute: siteName, // <--- O 'absolute' proíbe o Next.js de juntar nomes
+    },
+    description: "Agende seu horário com praticidade.",
+    icons: {
+      icon: iconUrl,
+      shortcut: iconUrl,
+      apple: iconUrl,
+    },
   };
 }
 
-// Função para buscar a Cor (Tema)
+// --- 2. CONFIGURAÇÃO DE TEMA (CORES) ---
 async function getThemeSettings() {
   try {
     const config = await prisma.configuracao.findUnique({
@@ -39,10 +55,9 @@ async function getThemeSettings() {
     });
     return {
       color: config?.corPrincipal || "#10b981", 
-      name: config?.nomeEstabelecimento || SITE_CONFIG.name
     };
   } catch (error) {
-    return { color: "#10b981", name: SITE_CONFIG.name };
+    return { color: "#10b981" };
   }
 }
 
@@ -63,7 +78,6 @@ export default async function RootLayout({
           :root {
             --primary-color: ${theme.color};
           }
-          /* Classes utilitárias para usar a cor dinâmica */
           .bg-primary-custom { background-color: var(--primary-color) !important; }
           .text-primary-custom { color: var(--primary-color) !important; }
           .border-primary-custom { border-color: var(--primary-color) !important; }

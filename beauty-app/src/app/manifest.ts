@@ -1,37 +1,39 @@
-import { MetadataRoute } from "next";
-import { SITE_CONFIG } from "@/constants/info";
+import { MetadataRoute } from 'next';
+import { prisma } from '@/lib/prisma'; // Verifique se o caminho do prisma está certo
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  // Valores padrão
+  let name = "Agendamento App";
+  let shortName = "Agendamento";
+  let iconUrl = "/logo.png"; 
+
+  try {
+      const settings = await prisma.configuracao.findUnique({ where: { id: "settings" } });
+      if (settings) {
+          name = settings.nomeEstabelecimento || name;
+          shortName = name.slice(0, 12);
+          if (settings.logoUrl) iconUrl = settings.logoUrl;
+      }
+  } catch(e) {}
+
   return {
-    name: SITE_CONFIG.name,             // Nome do App
-    short_name: SITE_CONFIG.name,       // Nome curto
-    description: SITE_CONFIG.description,
-    start_url: "/admin",                // Onde abre
-    display: "standalone",              // Abre sem barra de navegador (Cara de App)
-    background_color: "#09090b",
-    theme_color: "#10b981",
-    
-    // 👇 O SEGREDO PARA MATAR O SINO ESTÁ AQUI 👇
+    name: name,
+    short_name: shortName,
+    description: 'Agende seu horário',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#000000',
+    theme_color: '#000000',
     icons: [
       {
-        src: SITE_CONFIG.images.logo,   // Sua logo (ex: 512x512)
-        sizes: "192x192",
-        type: "image/png",
-        // 'maskable' permite que o Android preencha o ícone inteiro, sem bordas brancas
-        purpose: "any maskable" as any, 
+        src: iconUrl,
+        sizes: '192x192',
+        type: 'image/png',
       },
       {
-        src: SITE_CONFIG.images.logo,
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any maskable" as any,
-      },
-      // Ícone padrão (caso o maskable falhe em algum navegador antigo)
-      {
-        src: SITE_CONFIG.images.logo,
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any" as any, 
+        src: iconUrl,
+        sizes: '512x512',
+        type: 'image/png',
       },
     ],
   };
