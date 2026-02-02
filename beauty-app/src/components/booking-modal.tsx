@@ -38,6 +38,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   // Novos estados para o Pix Transparente
   const [pixCode, setPixCode] = useState("")
   const [pixImage, setPixImage] = useState("")
+  const [paymentId, setPaymentId] = useState("")
 
   // --- DISPONIBILIDADE ---
   const [busySlots, setBusySlots] = useState<string[]>([]) 
@@ -58,6 +59,33 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   const depositValue = (numericPrice * config.porcentagemSinal) / 100
   const remainingValue = numericPrice - depositValue 
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+  // --- INICIO DO ESPIÃO DE PIX (CORRIGIDO) ---
+useEffect(() => {
+  // ATENÇÃO: Mudamos para step !== 4, pois é no passo 4 que o QR Code aparece
+  if (!paymentId || step !== 4) return; 
+
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/check-status?id=${paymentId}`);
+      const data = await res.json();
+
+      if (data.status === 'approved') {
+         clearInterval(interval);
+         toast.success("Pagamento confirmado! 🎉");
+         
+         // Aqui você decide o que fazer quando aprova. 
+         // Geralmente fecha o modal ou avança para um passo 5 de "Sucesso"
+         handleFinish(); 
+      }
+    } catch (error) {
+      console.error("Erro check status", error);
+    }
+  }, 3000); 
+
+  return () => clearInterval(interval);
+}, [paymentId, step]); // Fica observando o paymentId e o step
+// --- FIM DO ESPIÃO ---
 
   // --- RESETAR AO FECHAR ---
   useEffect(() => { 
@@ -155,6 +183,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
       if (data.qrCodeBase64) {
           setPixImage(data.qrCodeBase64)
           setPixCode(data.qrCodeCopyPaste)
+          setPaymentId(data.id)
           setStep(4) // VAI PARA A TELA DO PIX
           toast.success("Agendamento pré-reservado!", { description: "Realize o pagamento para confirmar." })
       } 
