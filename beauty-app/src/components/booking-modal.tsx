@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, ChevronLeft, X, Copy, CheckCircle2 } from "lucide-react"
+import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, ChevronLeft, X, Copy, CheckCircle2, MessageCircle } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
+
 
 interface BookingModalProps { 
   serviceName: string; 
@@ -400,49 +401,53 @@ useEffect(() => {
             )}
 
             {/* PASSO 4: EXIBIÇÃO DO QR CODE (NOVO) */}
-            {step === 4 && (
-                <div className="flex flex-col items-center justify-center pt-2 animate-in zoom-in-90 fade-in duration-300">
-                    <div className="bg-white p-3 rounded-2xl shadow-[0_0_40px_rgba(16,185,129,0.2)] mb-6">
-                        {pixImage ? (
-                            <img 
-                                src={`data:image/jpeg;base64,${pixImage}`} 
-                                alt="QR Code Pix" 
-                                className="w-52 h-52 object-contain"
-                            />
-                        ) : (
-                            <div className="w-52 h-52 bg-zinc-100 flex items-center justify-center text-zinc-400">
-                                <Loader2 className="animate-spin" />
-                            </div>
-                        )}
-                    </div>
+           {step === 4 && (
+  <div className="space-y-4">
+      {/* 1. SEÇÃO DE COPIAR CÓDIGO */}
+      <p className="text-zinc-400 text-sm">Ou copie o código abaixo</p>
+      
+      <div className="w-full flex gap-2">
+          <Input 
+              value={pixCode} 
+              readOnly 
+              className="bg-zinc-900/50 border-zinc-800 text-zinc-400 font-mono text-xs h-12" 
+          />
+          <Button onClick={copyPix} className="h-12 w-12 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700">
+              <Copy size={18} />
+          </Button>
+      </div>
 
-                    <div className="text-center mb-6 space-y-1">
-                        <p className="text-white font-bold text-lg">Escaneie para pagar</p>
-                        <p className="text-zinc-400 text-sm">Ou copie o código abaixo</p>
-                    </div>
+      {/* 2. AVISO DE AGUARDANDO */}
+      <div className="mt-6 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl">
+           <Loader2 className="animate-spin text-emerald-500 shrink-0 mt-0.5" size={16} />
+           <div className="space-y-1">
+               <p className="text-sm font-bold text-emerald-400">Aguardando pagamento...</p>
+               <p className="text-xs text-zinc-400 leading-relaxed">
+                  Assim que você pagar no app do banco, o sistema confirmará seu horário automaticamente em alguns instantes.
+               </p>
+           </div>
+      </div>
 
-                    <div className="w-full flex gap-2">
-                        <Input 
-                            value={pixCode} 
-                            readOnly 
-                            className="bg-zinc-900/50 border-zinc-800 text-zinc-400 font-mono text-xs h-12"
-                        />
-                        <Button onClick={copyPix} className="h-12 w-12 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700">
-                            <Copy size={18} />
-                        </Button>
-                    </div>
-
-                    <div className="mt-6 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl">
-                        <Loader2 className="animate-spin text-emerald-500 shrink-0 mt-0.5" size={16} />
-                        <div className="space-y-1">
-                            <p className="text-sm font-bold text-emerald-400">Aguardando pagamento...</p>
-                            <p className="text-xs text-zinc-400 leading-relaxed">
-                                Assim que você pagar no app do banco, o sistema confirmará seu horário automaticamente em alguns instantes.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
+      {/* 3. BOTÃO DE ENVIAR COMPROVANTE (NOVO) */}
+      <div className="mt-6 pt-6 border-t border-zinc-800 text-center">
+          <p className="text-xs text-zinc-500 mb-3">
+              O sistema confirma automático, mas se preferir:
+          </p>
+          <Button 
+              variant="outline" 
+              className="w-full bg-zinc-900 border-zinc-700 hover:bg-green-500/10 hover:border-green-500 hover:text-green-500 transition-all"
+              onClick={() => {
+                  const seuNumero = "5587999999999"; // <--- SEU NÚMERO AQUI
+                  const msg = `Olá! Acabei de fazer o Pix do agendamento *${serviceName}* e gostaria de enviar o comprovante.`;
+                  window.open(`https://wa.me/${seuNumero}?text=${encodeURIComponent(msg)}`, '_blank');
+              }}
+          >
+              <MessageCircle size={18} className="mr-2" />
+              Enviar Comprovante no WhatsApp
+          </Button>
+      </div>
+  </div>
+)}
 
           </div>
         </div>
