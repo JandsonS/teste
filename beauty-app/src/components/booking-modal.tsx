@@ -173,20 +173,34 @@ useEffect(() => {
       })
       
       const data = await response.json()
-      
-      if (data.error) { 
-          toast.error("Ops!", { description: data.error }); 
-          return; 
-      }
 
-      // 1. SE RECEBEU QR CODE (PIX TRANSPARENTE)
-      if (data.qrCodeBase64) {
-          setPixImage(data.qrCodeBase64)
-          setPixCode(data.qrCodeCopyPaste)
-          setPaymentId(data.id)
-          setStep(4) // VAI PARA A TELA DO PIX
-          toast.success("Agendamento pré-reservado!", { description: "Realize o pagamento para confirmar." })
-      } 
+// ADICIONE ESTE LOG PARA VER NO F12 O QUE O SERVIDOR MANDOU
+console.log("RESPOSTA DO SERVIDOR:", data); 
+
+if (data.error) { 
+    toast.error("Ops!", { description: data.error }); 
+    return; 
+}
+
+// 1. SE RECEBEU QR CODE (PIX TRANSPARENTE)
+if (data.qrCodeBase64) {
+    setPixImage(data.qrCodeBase64)
+    setPixCode(data.qrCodeCopyPaste)
+    
+    // --- VERIFICAÇÃO DE SEGURANÇA ---
+    if (!data.id) {
+        // Se cair aqui, o problema é no backend que não mandou o ID
+        alert("ALERTA DE DESENVOLVEDOR: O backend não retornou o ID do pagamento!");
+        console.error("ID faltando na resposta:", data);
+    } else {
+        console.log("ID SALVO COM SUCESSO:", data.id);
+        setPaymentId(data.id) // <--- Isso é crucial
+    }
+    // --------------------------------
+
+    setStep(4) // VAI PARA A TELA DO PIX
+    toast.success("Agendamento pré-reservado!", { description: "Realize o pagamento para confirmar." })
+}
       // 2. SE RECEBEU URL (CARTÃO OU CHECKOUT PRO)
       else if (data.url) {
           window.location.href = data.url 
