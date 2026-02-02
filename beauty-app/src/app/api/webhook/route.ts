@@ -15,61 +15,65 @@ const client = new MercadoPagoConfig({
 
 export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
     const body = await request.json().catch(() => null);
 
-    // 1. Ignora requisições inválidas ou de teste
-    if (!body || (body.data?.id === "123456" || body.type === "test")) {
+    // 1. Identifica o ID do pagamento (Vem na URL ou no Corpo)
+    // O Mercado Pago manda ?id=... ou ?data.id=... na URL, ou no corpo JSON
+    const topic = url.searchParams.get("topic") || url.searchParams.get("type");
+    const idFromUrl = url.searchParams.get("id") || url.searchParams.get("data.id");
+    const idFromBody = body?.data?.id || body?.id;
+
+    const paymentId = idFromUrl || idFromBody;
+
+    // Ignora se não for notificação de pagamento
+    if (topic !== "payment" && body?.type !== "payment" && body?.action !== "payment.created" && body?.action !== "payment.updated") {
         return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    // 2. Identifica o ID do pagamento
-    const paymentId = body.data?.id || body.id;
-    const type = body.type;
-    const action = body.action;
-
-    if (!paymentId || (type !== "payment" && action !== "payment.created" && action !== "payment.updated")) {
+    if (!paymentId) {
         return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    console.log(`[WEBHOOK] Processando pagamento ID: ${paymentId}`);
+    console.log(`[WEBHOOK] Verificando pagamento ID: ${paymentId}`);
 
-    // 3. Consulta status oficial
+    // 2. Consulta o Status Real no Mercado Pago
     const payment = new Payment(client);
     const paymentInfo = await payment.get({ id: paymentId });
 
-    // 4. Se APROVADO, executa a confirmação
+    // 3. Se estiver APROVADO, busca o agendamento e confirma
     if (paymentInfo.status === "approved") {
-        const agendamentoId = paymentInfo.external_reference;
+        
+        // --- A MUDANÇA ESTÁ AQUI ---
+        // Buscamos o agendamento que tem esse paymentId salvo
+        const agendamento = await prisma.agendamento.findFirst({
+            where: { paymentId: String(paymentId) }
+        });
 
-        if (agendamentoId) {
-            // Define o método (Formato Interno)
+        if (agendamento) {
+            // Define o método de pagamento para salvar bonito no banco
             let nomeMetodo = "OUTROS";
             const metodoMP = paymentInfo.payment_type_id;
+            if (metodoMP === 'bank_transfer' || metodoMP === 'pix') nomeMetodo = "PIX";
+            else if (metodoMP === 'credit_card') nomeMetodo = "CARTAO";
+            else if (metodoMP === 'debit_card') nomeMetodo = "DEBITO";
 
-            if (metodoMP === 'bank_transfer' || metodoMP === 'pix') {
-                nomeMetodo = "PIX";
-            } else if (metodoMP === 'credit_card') {
-                nomeMetodo = "CARTAO";
-            } else if (metodoMP === 'debit_card') {
-                nomeMetodo = "DEBITO";
-            }
-
-            // Atualiza status no Banco de Dados
+            // Atualiza para CONFIRMADO
             const agendamentoAtualizado = await prisma.agendamento.update({
-                where: { id: agendamentoId },
+                where: { id: agendamento.id },
                 data: { 
                     status: "CONFIRMADO", 
                     metodoPagamento: nomeMetodo,
                 },
             });
 
-            console.log(`[WEBHOOK] Agendamento confirmado. Cliente: ${agendamentoAtualizado.cliente}`);
+            console.log(`✅ [WEBHOOK] Pagamento confirmado! Cliente: ${agendamentoAtualizado.cliente}`);
 
-            // Envio de Notificação Push (Texto Formal)
+            // --- ENVIO DE NOTIFICAÇÃO (SEU CÓDIGO ORIGINAL) ---
             try {
                 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
                     webPush.setVapidDetails(
-                        "mailto:admin@admin.com", 
+                        "mailto:suporte@seusite.com", // Coloque um email válido
                         process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
                         process.env.VAPID_PRIVATE_KEY
                     );
@@ -77,10 +81,9 @@ export async function POST(request: Request) {
                     const subscriptions = await prisma.pushSubscription.findMany();
                     const notificationIcon = SITE_CONFIG.images.logo || "/logo.png";
 
-                    // MENSAGEM FORMAL AQUI
                     const payload = JSON.stringify({
-                        title: "Novo Pagamento Confirmado",
-                        body: `Cliente: ${agendamentoAtualizado.cliente}. Horário: ${agendamentoAtualizado.horario}. Serviço confirmado.`,
+                        title: "💰 Novo Pagamento Pix!",
+                        body: `${agendamentoAtualizado.cliente} pagou e confirmou para ${agendamentoAtualizado.horario}.`,
                         url: "/admin",
                         icon: notificationIcon 
                     });
@@ -95,19 +98,21 @@ export async function POST(request: Request) {
                             }
                         });
                     }));
-                } else {
-                    console.error("[WEBHOOK] Erro: Chaves VAPID não configuradas.");
                 }
             } catch (notifyError) {
-                console.error("[WEBHOOK] Falha ao enviar notificação:", notifyError);
+                console.error("[WEBHOOK] Erro ao notificar:", notifyError);
             }
+            // ---------------------------------------------------
+        } else {
+            console.log(`[WEBHOOK] Agendamento não encontrado para o Pagamento ID: ${paymentId}`);
         }
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
 
   } catch (error) {
-    console.error("[WEBHOOK] Erro Interno:", error);
+    console.error("[WEBHOOK] Erro Crítico:", error);
+    // Retornamos 200 mesmo com erro para o Mercado Pago não ficar reenviando infinitamente
     return NextResponse.json({ received: true }, { status: 200 });
   }
 }
