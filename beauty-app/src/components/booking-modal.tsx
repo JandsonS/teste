@@ -303,7 +303,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                   
                   <div className="space-y-5">
                       <div className="space-y-2">
-                          <Label className="text-zinc-300 text-xs font-bold uppercase ml-1">Seu Nome</Label>
+                          <Label className="text-zinc-300 text-xs font-bold uppercase ml-1">Seu Nome Completo</Label>
                           <Input placeholder="Como prefere ser chamado?" className="bg-zinc-900 border-zinc-800 text-white h-14 text-lg px-4 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all placeholder:text-zinc-600" value={name} onChange={(e) => setName(e.target.value)}/>
                       </div>
                       <div className="space-y-2">
