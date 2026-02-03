@@ -1,6 +1,8 @@
 import AdminNotificationListener from "@/components/AdminNotificationListener";
 import InstallPrompt from "@/components/InstallPrompt";
 
+export const dynamic = 'force-dynamic';
+
 export default function AdminLayout({
   children,
 }: {
