@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import ClientPage from "./ClientPage";
-
+export const dynamic = 'force-dynamic';
 async function getLojaInfo() {
   try {
     const settings = await prisma.configuracao.findUnique({

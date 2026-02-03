@@ -29,18 +29,17 @@ export default async function Icon() {
 
   // 4. Gera a imagem do ícone em tempo real
   return new ImageResponse(
-    (
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img
-        src={logoUrl}
-        alt="Favicon"
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain', // Garante que a logo não fique esticada
-        }}
-      />
-    ),
-    { ...size }
-  );
+  (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={logoUrl}
+      alt="Favicon"
+      // Usar os valores diretamente como strings simples costuma remover o alerta do Edge
+      width="100%" 
+      height="100%"
+      style={{ objectFit: 'contain' }} 
+    />
+  ),
+  { ...size }
+);
 }
