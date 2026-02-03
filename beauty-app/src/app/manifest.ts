@@ -1,39 +1,30 @@
 import { MetadataRoute } from 'next';
-import { prisma } from '@/lib/prisma'; // Verifique se o caminho do prisma está certo
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = 'force-dynamic'; // <--- O segredo para atualizar ao vivo
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  // Valores padrão
-  let name = "Agendamento App";
-  let shortName = "Agendamento";
-  let iconUrl = "/logo.png"; 
+  // Busca as configurações atuais do banco de dados
+  const settings = await prisma.configuracao.findUnique({
+    where: { id: "settings" }
+  });
 
-  try {
-      const settings = await prisma.configuracao.findUnique({ where: { id: "settings" } });
-      if (settings) {
-          name = settings.nomeEstabelecimento || name;
-          shortName = name.slice(0, 12);
-          if (settings.logoUrl) iconUrl = settings.logoUrl;
-      }
-  } catch(e) {}
+  const nomeLoja = settings?.nomeEstabelecimento || "Nome Padrão";
+  const logoUrl = settings?.logoUrl || "/icon-192x192.png";
 
   return {
-    name: name,
-    short_name: shortName,
-    description: 'Agende seu horário',
+    name: nomeLoja,
+    short_name: nomeLoja,
+    description: `Agendamentos online para ${nomeLoja}`,
     start_url: '/',
     display: 'standalone',
-    background_color: '#000000',
-    theme_color: '#000000',
+    background_color: '#09090b',
+    theme_color: '#09090b',
     icons: [
       {
-        src: iconUrl,
-        sizes: '192x192',
-        type: 'image/png',
-      },
-      {
-        src: iconUrl,
-        sizes: '512x512',
-        type: 'image/png',
+        src: logoUrl,
+        sizes: 'any',
+        type: 'image/x-icon',
       },
     ],
   };
