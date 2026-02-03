@@ -15,7 +15,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     name: nomeLoja,
     short_name: nomeLoja,
     description: `Agendamentos para ${nomeLoja}`,
-    start_url: '/',
+    start_url: '/admin',
     display: 'standalone',
     background_color: '#09090b',
     theme_color: '#09090b',
