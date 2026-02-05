@@ -173,7 +173,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
               date: format(date, "dd/MM/yyyy"), 
               time: selectedTime, 
               clientName: name, 
-              clientWhatsapp: phone,
+              clientPhone: phone,
               method: paymentMethod, 
               
               // --- MUDANÇA AQUI ---
