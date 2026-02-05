@@ -150,63 +150,67 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     })
   }
 
-  // --- CHECKOUT (LÓGICA ATUALIZADA) ---
-  const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
-    if (!acceptedTerms) {
-        toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." })
-        return
-    }
-    if (!date || !selectedTime || !name || !isPhoneValid) {
-        toast.error("Preencha todos os dados corretamente.")
-        return 
-    }
-    
-    setLoading(true)
-    try {
-      const response = await fetch('/api/payment', { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ 
-              serviceName, // Alterado para bater com a nova API
-              date: format(date, "dd/MM/yyyy"), 
-              time: selectedTime, 
-              clientName: name, 
-              clientWhatsapp: phone,
-              method: paymentMethod, 
-              // Envia preço formatado ou number, a API trata
-              price: paymentType === 'FULL' ? formatMoney(numericPrice) : formatMoney(depositValue),
-              paymentType // Mantido para lógica interna se precisar
-          }), 
-      })
-      
-      const data = await response.json()
-      
-      if (data.error) { 
-          toast.error("Ops!", { description: data.error }); 
-          return; 
-      }
+  // --- CHECKOUT CORRIGIDO ---
+  const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
+    if (!acceptedTerms) {
+        toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." })
+        return
+    }
+    if (!date || !selectedTime || !name || !isPhoneValid) {
+        toast.error("Preencha todos os dados corretamente.")
+        return 
+    }
+    
+    setLoading(true)
+    try {
+      const response = await fetch('/api/payment', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ 
+              serviceName, 
+              date: format(date, "dd/MM/yyyy"), 
+              time: selectedTime, 
+              clientName: name, 
+              clientWhatsapp: phone,
+              method: paymentMethod, 
+              
+              // --- MUDANÇA AQUI ---
+              // Enviamos sempre o PREÇO TOTAL NUMÉRICO (ex: 50.00).
+              // O Backend lê o 'paymentType' e calcula a porcentagem se necessário.
+              price: numericPrice, 
+              // --------------------
 
-      // 1. SE RECEBEU QR CODE (PIX TRANSPARENTE)
-      if (data.qrCodeBase64) {
-          setPixImage(data.qrCodeBase64)
-          setPixCode(data.qrCodeCopyPaste)
-          setPaymentId(data.id)
-          setStep(4) // VAI PARA A TELA DO PIX
-          toast.success("Agendamento pré-reservado!", { description: "Realize o pagamento para confirmar." })
-      } 
-      // 2. SE RECEBEU URL (CARTÃO OU CHECKOUT PRO)
-      else if (data.url) {
-          window.location.href = data.url 
-      }
+              paymentType 
+          }), 
+      })
+      
+      const data = await response.json()
+      
+      if (data.error) { 
+          toast.error("Ops!", { description: data.error }); 
+          return; 
+      }
 
-    } catch (error) { 
-        console.error(error)
-        toast.error("Erro no Servidor") 
-    } finally { 
-        setLoading(false) 
-    }
-  }
+      // 1. SE RECEBEU QR CODE (PIX TRANSPARENTE)
+      if (data.qrCodeBase64) {
+          setPixImage(data.qrCodeBase64)
+          setPixCode(data.qrCodeCopyPaste)
+          setPaymentId(data.id)
+          setStep(4) 
+          toast.success("Agendamento pré-reservado!", { description: "Realize o pagamento para confirmar." })
+      } 
+      // 2. SE RECEBEU URL (CARTÃO OU CHECKOUT PRO)
+      else if (data.url) {
+          window.location.href = data.url 
+      }
 
+    } catch (error) { 
+        console.error(error)
+        toast.error("Erro no Servidor") 
+    } finally { 
+        setLoading(false) 
+    }
+  }
   const handleFinish = () => {
       setOpen(false)
       toast.success("Aguardando confirmação!", { 
