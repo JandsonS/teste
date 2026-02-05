@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       const valorRestante = valorOriginalServico - valorFinalParaCobranca;
       const restanteFormatado = valorRestante.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       
-      textoDiferenca = `(Sinal de ${percentualSinal}% | Restante: ${restanteFormatado} no local)`;
+      textoDiferenca = `(Sinal de ${percentualSinal}% (PAGO)| Restante: ${restanteFormatado} no local)`;
     } else {
       // Valor Integral (100%)
       valorFinalParaCobranca = valorOriginalServico;
