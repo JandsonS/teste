@@ -23,6 +23,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   // --- ESTADOS DE FLUXO ---
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(1) // 1: Data, 2: Dados, 3: Pagamento, 4: QR Code (Novo)
+  const [bookingType, setBookingType] = useState<'FULL' | 'DEPOSIT'>('FULL')
   const [loading, setLoading] = useState(false)
 
   // --- DADOS DO AGENDAMENTO ---
@@ -152,6 +153,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
 
   // --- CHECKOUT CORRIGIDO ---
   const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
+    setBookingType(paymentType);
     if (!acceptedTerms) {
         toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." })
         return
