@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Certifique-se que o caminho está certo
 
 export async function PATCH(req: Request) {
   try {
@@ -9,18 +9,17 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ message: "ID obrigatório" }, { status: 400 });
     }
 
-    // CORREÇÃO OFICIAL: Usando 'agendamento' conforme seu schema.prisma
+    // CORREÇÃO: Atualizamos APENAS o status.
+    // Não mexemos no 'valor', mantendo o preço original do serviço.
     const updated = await prisma.agendamento.update({
       where: { id },
       data: {
-        // No seu schema, o campo de valor é 'valor'. 
-        // Vamos setar para 1.0 para integralizar o teste.
-        valor: 1.0, 
-        status: "PAGO" // No seu schema o default é "PENDENTE" em maiúsculas
+        status: "PAGO" 
+        // O valor original (ex: 50.00 ou 30.00) é mantido intacto.
       },
     });
 
-    return NextResponse.json({ message: "Sucesso!", updated }, { status: 200 });
+    return NextResponse.json({ message: "Sucesso! Agendamento confirmado.", updated }, { status: 200 });
 
   } catch (error) {
     console.error("ERRO_API:", error);

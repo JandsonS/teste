@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { PrismaClient } from "@prisma/client";
 
-// Padrão Singleton do Prisma (Evita erro de muitas conexões no Next.js)
+// Padrão Singleton do Prisma
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
 
@@ -13,15 +13,41 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
     
-    // ⚠️ CORREÇÃO PRINCIPAL: O nome deve ser igual ao do login (admin_session)
+    // Verificação de segurança (Mantida do seu código original)
     const token = cookieStore.get("admin_session");
 
-    // Verifica se o token existe e se o valor é "true" (como definimos no login)
     if (!token || token.value !== "true") {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
+    // ============================================================
+    // 🧹 1. O FAXINEIRO AUTOMÁTICO (Novidade)
+    // Antes de te mostrar a lista, o sistema limpa o lixo velho.
+    // ============================================================
+    const tempoLimite = new Date(Date.now() - 15 * 60 * 1000); // 15 minutos atrás
+
+    await prisma.agendamento.deleteMany({
+      where: {
+        status: 'PENDENTE',
+        createdAt: {
+          lt: tempoLimite // Deleta tudo que for PENDENTE e mais velho que 15 min
+        }
+      }
+    });
+
+    // ============================================================
+    // 📋 2. A BUSCA INTELIGENTE (Lista Limpa)
+    // ============================================================
     const data = await prisma.agendamento.findMany({
+      where: {
+        // AQUI ESTÁ O SEGREDO: 
+        // Só trazemos do banco o que realmente importa.
+        // O Admin NUNCA verá "Pendente", mesmo que tenha sido criado agora.
+        status: {
+            in: ['CONFIRMADO', 'PAGO', 'CANCELADO'] 
+            // Adicionei CANCELADO caso vc queira ver histórico de quem cancelou manualmente
+        }
+      },
       orderBy: {
         createdAt: 'desc'
       }
@@ -31,10 +57,10 @@ export async function GET() {
       id: item.id,
       clientName: item.cliente,
       clientPhone: item.telefone || "Não informado",
-      serviceTitle: item.servico, // Mantém o texto original para pegarmos o "Resta: R$..."
+      serviceTitle: item.servico,
       bookingDate: item.data,
       bookingTime: item.horario,
-      status: item.status, // Manda o status real (PENDENTE, PAGO, CONFIRMADO)
+      status: item.status,
       paymentMethod: item.metodoPagamento || "PIX",
       pricePaid: Number(item.valor),
       createdAt: item.createdAt
@@ -48,11 +74,11 @@ export async function GET() {
   }
 }
 
-// --- DELETAR AGENDAMENTO (DELETE) ---
+// --- DELETAR AGENDAMENTO (DELETE) - Mantido igual ao seu ---
 export async function DELETE(request: Request) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("admin_session"); // ⚠️ CORREÇÃO AQUI TAMBÉM
+    const token = cookieStore.get("admin_session");
 
     if (!token || token.value !== "true") {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -64,13 +90,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "ID não fornecido" }, { status: 400 });
     }
 
-    // Você pode optar por DELETAR de vez ou marcar como CANCELADO
-    // Se quiser apagar:
     await prisma.agendamento.delete({ where: { id } });
     
-    // Se quiser só marcar como cancelado (para histórico):
-    // await prisma.agendamento.update({ where: { id }, data: { status: "CANCELADO" } });
-
     return NextResponse.json({ success: true });
 
   } catch (error) {
