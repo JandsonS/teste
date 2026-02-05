@@ -17,52 +17,52 @@ export async function POST(request: Request) {
       title, serviceName, 
       date, time, clientName, clientPhone, 
       method, paymentType, 
-      price, // <--- AGORA O SISTEMA LÊ O PREÇO QUE VEM DO FRONTEND
+      price, // <--- NOVO: Agora estamos LENDO o preço que vem do site
       isAdmin 
     } = body;
 
     // Define o nome real do serviço
     const nomeRealDoServico = title || serviceName || "Serviço";
 
-    // --- 1. BUSCA CONFIGURAÇÕES (PORCENTAGEM DO SINAL) ---
+    // --- 1. CONFIGURAÇÕES E CÁLCULO FINANCEIRO ---
     const businessConfig = await prisma.configuracao.findFirst();
-    const percentualSinal = businessConfig?.porcentagemSinal || 30; // Se não tiver config, usa 30%
+    const percentualSinal = businessConfig?.porcentagemSinal || 50; // Padrão 50% se não tiver config
     
-    // --- 2. CÁLCULO FINANCEIRO CORRETO ---
-    // Converte o preço que veio (ex: "30.00") para número
-    const valorOriginalServico = Number(price); 
+    // Converte o preço recebido para número (Ex: "30.00" vira 30.00)
+    // Se por acaso o preço não vier, usa 1.00 de segurança
+    const valorOriginalServico = price ? Number(price) : 1.0; 
     
     let valorFinalParaCobranca = 0;
     let textoDiferenca = "";
 
+    // LÓGICA DO SINAL vs INTEGRAL
     if (paymentType === 'DEPOSIT') {
-        // CÁLCULO DO SINAL: (Preço * Porcentagem) / 100
-        // Ex: 50.00 * 0.20 = 10.00
-        valorFinalParaCobranca = Number((valorOriginalServico * (percentualSinal / 100)).toFixed(2));
-        
-        // Calcula quanto sobra para pagar na hora
-        const valorRestante = valorOriginalServico - valorFinalParaCobranca;
-        const restanteFormatado = valorRestante.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        
-        textoDiferenca = `(Sinal Pago | Restante: ${restanteFormatado} no local)`;
+      // Calcula X% do valor total
+      valorFinalParaCobranca = Number((valorOriginalServico * (percentualSinal / 100)).toFixed(2));
+      
+      // Calcula quanto falta pagar na hora
+      const valorRestante = valorOriginalServico - valorFinalParaCobranca;
+      const restanteFormatado = valorRestante.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      
+      textoDiferenca = `(Sinal Pago | Restante: ${restanteFormatado} no local)`;
     } else {
-        // VALOR INTEGRAL
-        valorFinalParaCobranca = valorOriginalServico;
-        textoDiferenca = `(Valor Integral)`;
+      // Valor cheio
+      valorFinalParaCobranca = valorOriginalServico;
+      textoDiferenca = `(Integral)`;
     }
 
-    // Garante que não vai cobrar zero ou negativo (Segurança)
-    if (valorFinalParaCobranca < 1) valorFinalParaCobranca = 1.00; // Mínimo do MP é aprox 1 real
+    // Trava de segurança do Mercado Pago (Mínimo R$ 0.01, mas recomendamos 1.00 para evitar erros)
+    if (valorFinalParaCobranca < 0.10) valorFinalParaCobranca = 1.00;
 
     // Limpa o nome do cliente
     const nomeClienteLimpo = clientName.trim().split(' ').map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
     
-    // Monta o nome final que vai aparecer no comprovante
+    // Monta o nome final para o comprovante
     let nomeServicoFinal = isAdmin 
         ? `🚫 BLOQUEIO: ${nomeRealDoServico}` 
         : `${nomeRealDoServico} ${textoDiferenca}`;
 
-    // --- 3. VALIDAÇÃO DE DISPONIBILIDADE ---
+    // --- 2. VALIDAÇÃO DE DISPONIBILIDADE ---
     if (!isAdmin) {
         const conflito = await prisma.agendamento.findFirst({
             where: { 
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
         }
     }
 
-    // --- 4. CRIA O AGENDAMENTO NO BANCO ---
+    // --- 3. CRIA O AGENDAMENTO NO BANCO ---
     const agendamento = await prisma.agendamento.create({
       data: { 
         cliente: nomeClienteLimpo, 
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
         servico: nomeServicoFinal, 
         data: date, 
         horario: time, 
-        valor: valorFinalParaCobranca, // Salva o valor que foi COBRADO (Sinal ou Total)
+        valor: valorFinalParaCobranca, // Salva o valor exato que será cobrado no Pix
         status: isAdmin ? "CONFIRMADO" : "PENDENTE", 
         metodoPagamento: method,
         paymentId: "PENDING"
@@ -100,16 +100,19 @@ export async function POST(request: Request) {
 
     if (isAdmin) return NextResponse.json({ success: true });
 
-    const BASE_URL = "https://teste-drab-rho-60.vercel.app"; // SEU SITE
+    const BASE_URL = "https://teste-drab-rho-60.vercel.app"; 
     const emailPadrao = "cliente@barbearia.com"; 
 
-    // --- 5. GERA O PIX OU LINK ---
+    // ============================================================
+    // PAGAMENTO
+    // ============================================================
+    
     if (method === 'PIX') {
         const payment = new Payment(client);
         
         const pixRequest = await payment.create({
             body: {
-                transaction_amount: valorFinalParaCobranca, // <--- Envia o valor calculado
+                transaction_amount: valorFinalParaCobranca, // <--- Valor Calculado (Sinal ou Total)
                 description: nomeServicoFinal,
                 payment_method_id: 'pix',
                 payer: {
