@@ -272,9 +272,15 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     <p className="text-xs text-zinc-500 font-medium truncate max-w-[180px]">{serviceName}</p>
                 </div>
             </div>
-            <div className="bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
-                <span className="text-emerald-400 font-bold text-sm">{price}</span>
-            </div>
+                            <div className="bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-all duration-300">
+                    <span className="text-emerald-400 font-bold text-sm">
+                        {/* LÓGICA: Se estiver no passo do QR Code (4) E escolheu Depósito, mostra o valor do Depósito */}
+                        {step === 4 && bookingType === 'DEPOSIT' 
+                            ? formatMoney(depositValue) 
+                            : price 
+                        }
+                    </span>
+                </div>
         </div>
 
         {/* === CORPO (ROLAGEM) === */}
