@@ -44,6 +44,21 @@ export default function ClientPage({ dbNome, dbWhatsapp, dbLogo }: ClientPagePro
   const finalWhatsapp = dbWhatsapp || SITE_CONFIG.whatsappNumber;
   const whatsappMessage = encodeURIComponent("Olá, estou precisando de ajuda com o agendamento online");
 
+  const formatarTelefoneVisual = (phone: string) => {
+  if (!phone) return "";
+  
+  // Remove tudo que não é número
+  let clean = phone.replace(/\D/g, '');
+
+  // Se começar com 55 e for longo, tira o 55 pra ficar bonito
+  if (clean.startsWith('55') && clean.length > 11) {
+    clean = clean.slice(2);
+  }
+
+  // Máscara: (87) 99153-7080
+  return clean.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+};
+
   useEffect(() => {
     async function fetchServices() {
         try {
@@ -230,6 +245,17 @@ export default function ClientPage({ dbNome, dbWhatsapp, dbLogo }: ClientPagePro
                         
                         const imageSrc = service.imageUrl || fallbackImage;
                         const isSelected = selectedItems.includes(index);
+                        const formatarTelefoneVisual = (phone: string) => {
+                            if (!phone) return "";
+                            // Remove tudo que não é número
+                            let clean = phone.replace(/\D/g, '');
+                            // Se começar com 55, remove ele só para mostrar na tela
+                            if (clean.startsWith('55') && clean.length > 11) {
+                                clean = clean.slice(2);
+                            }
+                            // Aplica a máscara (XX) XXXXX-XXXX
+                            return clean.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+                            };
 
                         return (
                             <motion.div
@@ -364,7 +390,7 @@ export default function ClientPage({ dbNome, dbWhatsapp, dbLogo }: ClientPagePro
                                  <WhatsAppIcon className="w-5 h-5 md:w-6 md:h-6 fill-current" />
                             </div>
                         </div>
-                        <p className="relative z-10 mt-2 text-xs md:text-sm text-zinc-500 group-hover:text-zinc-400 transition-colors font-mono text-left">{finalWhatsapp}</p>
+                        <p className="relative z-10 mt-2 text-xs md:text-sm text-zinc-500 group-hover:text-zinc-400 transition-colors font-mono text-left">{formatarTelefoneVisual(finalWhatsapp)}</p>
                         <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-x-2 -translate-y-2 group-hover:translate-x-0 group-hover:translate-y-0">
                              <ArrowUpRight size={14} className="text-green-500" />
                         </div>
