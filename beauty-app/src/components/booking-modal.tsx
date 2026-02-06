@@ -419,6 +419,24 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             )}
 
             {/* PASSO 4: EXIBIÇÃO DO QR CODE (NOVO) */}
+            {/* --- ALERTA DE RESERVA TEMPORÁRIA (15 MIN) --- */}
+<div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 flex gap-3 items-start animate-pulse">
+    <div className="bg-amber-500/20 p-2 rounded-full shrink-0">
+        {/* Ícone de Relógio Alerta */}
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+    </div>
+    <div>
+        <h4 className="text-amber-400 font-bold text-sm">Reserva Temporária</h4>
+        <p className="text-zinc-400 text-xs mt-1 leading-relaxed">
+            Sua vaga está pré-reservada por <span className="text-amber-300 font-bold">15 minutos</span>. 
+            Realize o pagamento agora para confirmar, ou o horário será liberado automaticamente.
+        </p>
+    </div>
+</div>
+{/* ----------------------------------------------- */}
          {step === 4 && (
   <div className="space-y-6">
       {/* 1. IMAGEM DO QR CODE */}
