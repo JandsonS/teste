@@ -9,37 +9,133 @@ const prisma = globalForPrisma.prisma || new PrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
-// --- BUSCAR AGENDAMENTOS (GET) ---
-// Mantido EXATAMENTE como você mandou, pois estava funcionando
-// --- BUSCAR AGENDAMENTOS (GET) ---
+// =================================================================
+// 1. CRIAR AGENDAMENTO E GERAR PIX (POST)
+// =================================================================
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    
+    // Normalização de dados (Aceita name ou clientName, etc)
+    const nomeFinal = body.name || body.clientName;
+    const telefoneFinal = body.phone || body.clientPhone;
+    const { date, time, serviceName, price, establishmentId, paymentType, slug } = body;
+
+    // --- VALIDAÇÃO ---
+    if (!nomeFinal || !price || (!establishmentId && !slug)) {
+        return NextResponse.json({ error: "Dados incompletos" }, { status: 400 });
+    }
+
+    // Descobre o ID da loja se veio apenas o Slug
+    let lojaId = establishmentId;
+    let tokenDaLoja = process.env.MP_ACCESS_TOKEN; // Token padrão (.env)
+
+    // Se tiver ID ou Slug, busca configurações da loja
+    if (lojaId || slug) {
+        const loja = await prisma.estabelecimento.findFirst({
+            where: { OR: [{ id: lojaId }, { slug: slug }] }
+        });
+        
+        if (loja) {
+            lojaId = loja.id;
+            if (loja.mercadoPagoToken) {
+                tokenDaLoja = loja.mercadoPagoToken; // Usa token da loja se existir
+            }
+        }
+    }
+
+    if (!tokenDaLoja) return NextResponse.json({ error: "Configuração de pagamento ausente" }, { status: 500 });
+
+    // --- CRIA PIX NO MERCADO PAGO ---
+    const client = new MercadoPagoConfig({ accessToken: tokenDaLoja });
+    const payment = new Payment(client);
+
+    const valorCobrado = paymentType === 'DEPOSIT' ? (Number(price) * 0.50) : Number(price);
+
+    // ⚠️ ATENÇÃO: Em produção (Vercel), troque isso pela URL do seu site
+    // Ex: https://seu-site.vercel.app/api/webhook
+    const webhookUrl = process.env.NEXT_PUBLIC_BASE_URL 
+        ? `${process.env.NEXT_PUBLIC_BASE_URL}/api/webhook` 
+        : "https://tameika-semiexpansible-anthony.ngrok-free.dev/api/webhook"; 
+
+    const mpResponse = await payment.create({
+        body: {
+            transaction_amount: Number(valorCobrado.toFixed(2)),
+            description: `${serviceName} - ${time}`,
+            payment_method_id: 'pix',
+            payer: {
+                email: 'cliente@generico.com',
+                first_name: nomeFinal.split(" ")[0],
+            },
+            notification_url: webhookUrl,
+        }
+    });
+
+    // --- EXTRAI DADOS ---
+    const qrCodeBase64 = mpResponse.point_of_interaction?.transaction_data?.qr_code_base64;
+    const qrCodeCopiaCola = mpResponse.point_of_interaction?.transaction_data?.qr_code;
+    const paymentId = mpResponse.id;
+
+    // --- SALVA NO BANCO ---
+    const novoAgendamento = await prisma.agendamento.create({
+      data: {
+        cliente: nomeFinal,
+        telefone: telefoneFinal,
+        data: date, 
+        horario: time,
+        servico: serviceName,
+        valor: valorCobrado, // Salva direto como número
+        status: "PENDENTE",
+        paymentId: String(paymentId),
+        metodoPagamento: "PIX",
+        establishmentId: lojaId,
+        
+      },
+    });
+
+    // --- RETORNO BLINDADO ---
+    const imagemPronta = `data:image/png;base64,${qrCodeBase64}`;
+    
+    return NextResponse.json({ 
+        success: true, 
+        bookingId: novoAgendamento.id,
+        qrCode: qrCodeBase64,
+        qrCodeBase64: qrCodeBase64,
+        image: qrCodeBase64,
+        base64: qrCodeBase64,
+        fullImage: imagemPronta,
+        copiaCola: qrCodeCopiaCola,
+        pixCode: qrCodeCopiaCola,
+        payload: qrCodeCopiaCola,
+        paymentId: paymentId
+    });
+
+  } catch (error: any) {
+    console.error("ERRO CRÍTICO NO POST:", error);
+    return NextResponse.json({ error: error.message || "Erro interno" }, { status: 500 });
+  }
+}
+
+// =================================================================
+// 2. BUSCAR AGENDAMENTOS (GET HÍBRIDO - CORRIGIDO)
+// =================================================================
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const bookingId = searchParams.get("bookingId"); 
 
-    // 🔒 MODO PÚBLICO (BLINDADO)
-    // Usado pelo modal para ver se o pagamento caiu
+    // 🔓 MODO PÚBLICO (BLINDADO) - Para o Modal do Cliente
     if (bookingId) {
         const agendamento = await prisma.agendamento.findUnique({
             where: { id: bookingId },
-            // 👇 AQUI ESTÁ A SEGURANÇA:
-            // Selecionamos APENAS o status. Nenhum dado pessoal é exposto.
-            select: { 
-                status: true,
-                id: true 
-            } 
+            select: { status: true, id: true } 
         });
 
-        if (!agendamento) {
-             // Retornamos 404 discreto
-             return NextResponse.json({ error: "N/A" }, { status: 404 });
-        }
-        
+        if (!agendamento) return NextResponse.json({ error: "N/A" }, { status: 404 });
         return NextResponse.json(agendamento);
     }
 
-    // 🔐 MODO ADMIN (RESTRIÇÃO TOTAL)
-    // A partir daqui, só passa se for o DONO logado
+    // 🔐 MODO ADMIN - Para o Painel do Dono
     const cookieStore = await cookies();
     const token = cookieStore.get("admin_session");
 
@@ -47,14 +143,26 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const establishmentId = searchParams.get("establishmentId");
+    // 👇 AQUI ESTÁ A CORREÇÃO QUE O SEU CÓDIGO NÃO TINHA 👇
+    let establishmentId = searchParams.get("establishmentId");
+    const slug = searchParams.get("slug");
 
-    if (!establishmentId) {
-      return NextResponse.json({ error: "ID da loja obrigatório" }, { status: 400 });
+    // Se veio o Slug mas não veio o ID, a gente busca o ID no banco
+    if (!establishmentId && slug) {
+        const loja = await prisma.estabelecimento.findUnique({
+            where: { slug: slug },
+            select: { id: true }
+        });
+        if (loja) {
+            establishmentId = loja.id;
+        }
     }
 
-    // ... (O resto do código de busca do Admin continua igual) ...
-    
+    if (!establishmentId) {
+      return NextResponse.json({ error: "Loja não identificada (Slug ou ID inválido)" }, { status: 400 });
+    }
+    // 👆 FIM DA CORREÇÃO 👆
+
     // Faxineiro Automático
     const tempoLimite = new Date(Date.now() - 15 * 60 * 1000); 
     await prisma.agendamento.deleteMany({
@@ -76,6 +184,7 @@ export async function GET(request: Request) {
       status: item.status,
       paymentMethod: item.metodoPagamento || "PIX",
       pricePaid: Number(item.valor),
+      priceTotal: Number(item.valor), // Ajuste conforme lógica de negócio
       createdAt: item.createdAt
     }));
 
@@ -87,8 +196,9 @@ export async function GET(request: Request) {
   }
 }
 
-// --- DELETAR AGENDAMENTO (DELETE) ---
-// Mantido EXATAMENTE como você mandou
+// =================================================================
+// 3. DELETAR AGENDAMENTO (DELETE)
+// =================================================================
 export async function DELETE(request: Request) {
   try {
     const cookieStore = await cookies();
@@ -99,127 +209,37 @@ export async function DELETE(request: Request) {
     }
 
     const { id } = await request.json();
-
     if (!id) return NextResponse.json({ error: "ID não fornecido" }, { status: 400 });
 
     await prisma.agendamento.delete({ where: { id } });
     
     return NextResponse.json({ success: true });
-
   } catch (error) {
-    console.error("Erro ao deletar:", error);
     return NextResponse.json({ error: "Erro ao deletar" }, { status: 500 });
   }
 }
 
 // =================================================================
-// 👇 AQUI ESTÁ A CORREÇÃO BLINDADA (POST)
+// 4. CONFIRMAR PAGAMENTO MANUALMENTE (PATCH)
 // =================================================================
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    
-    // Pega o nome de qualquer jeito (name ou clientName)
-    const nomeFinal = body.name || body.clientName;
-    const telefoneFinal = body.phone || body.clientPhone;
-
-    const { date, time, serviceName, price, establishmentId, paymentType } = body;
-
-    // --- VALIDAÇÃO ---
-    if (!nomeFinal || !price) {
-        return NextResponse.json({ error: "Dados incompletos" }, { status: 400 });
+export async function PATCH(request: Request) {
+    try {
+      const cookieStore = await cookies();
+      const token = cookieStore.get("admin_session");
+  
+      if (!token || token.value !== "true") {
+        return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      }
+  
+      const { id } = await request.json();
+  
+      const updated = await prisma.agendamento.update({
+        where: { id },
+        data: { status: 'PAGO' }
+      });
+  
+      return NextResponse.json(updated);
+    } catch (error) {
+      return NextResponse.json({ error: "Erro ao atualizar" }, { status: 500 });
     }
-
-    // --- BUSCA TOKEN (Prioridade: Loja > .Env) ---
-    let tokenDaLoja = process.env.MP_ACCESS_TOKEN; 
-    
-    if (establishmentId) {
-        const loja = await prisma.estabelecimento.findUnique({ where: { id: establishmentId } });
-        if (loja && loja.mercadoPagoToken) {
-            tokenDaLoja = loja.mercadoPagoToken;
-        }
-    }
-
-    if (!tokenDaLoja) return NextResponse.json({ error: "Sem token de pagamento" }, { status: 400 });
-
-    // --- CRIA PIX NO MERCADO PAGO ---
-    const client = new MercadoPagoConfig({ accessToken: tokenDaLoja });
-    const payment = new Payment(client);
-
-    const valorCobrado = paymentType === 'DEPOSIT' ? (Number(price) * 0.20) : Number(price);
-
-    // Link FIXO (Hardcoded) para garantir que funciona
-    const webhookUrl = "https://tameika-semiexpansible-anthony.ngrok-free.dev/api/webhook";
-
-    const mpResponse = await payment.create({
-        body: {
-            transaction_amount: Number(valorCobrado.toFixed(2)),
-            description: `${serviceName} - ${time}`,
-            payment_method_id: 'pix',
-            payer: {
-                email: 'cliente@generico.com',
-                first_name: nomeFinal.split(" ")[0],
-            },
-            notification_url: webhookUrl,
-        }
-    });
-
-    // --- EXTRAI DADOS ---
-    const qrCodeBase64 = mpResponse.point_of_interaction?.transaction_data?.qr_code_base64;
-    const qrCodeCopiaCola = mpResponse.point_of_interaction?.transaction_data?.qr_code;
-    const paymentId = mpResponse.id;
-
-    console.log("🎨 IMAGEM GERADA?", qrCodeBase64 ? "SIM, TEM CÓDIGO!" : "NÃO, VEIO VAZIO!");
-
-    // --- SALVA NO BANCO ---
-    const novoAgendamento = await prisma.agendamento.create({
-      data: {
-        cliente: nomeFinal,
-        telefone: telefoneFinal,
-        data: date, 
-        horario: time,
-        servico: serviceName,
-        valor: Number(valorCobrado),
-        status: "PENDENTE",
-        paymentId: String(paymentId),
-        metodoPagamento: "PIX",
-        establishmentId: establishmentId || null, 
-      },
-    });
-
-    // --- RETORNO BLINDADO (Envia todos os nomes possíveis) ---
-
-    const imagemPronta = `data:image/png;base64,${qrCodeBase64}`;
-    return NextResponse.json({ 
-        success: true, 
-        bookingId: novoAgendamento.id,
-        
-        // 1. Variações CamelCase (Padrão moderno)
-        qrCode: qrCodeBase64,
-        qrCodeBase64: qrCodeBase64,
-        image: qrCodeBase64,
-        base64: qrCodeBase64,
-        
-        // 2. Variações Snake_Case (Padrão antigo/Python/PHP)
-        qr_code: qrCodeBase64,
-        qr_code_base64: qrCodeBase64,
-        
-        // 3. Variações Prontas para HTML (Com prefixo data:image)
-        fullImage: imagemPronta,
-        qrcodeUrl: imagemPronta,
-        url: imagemPronta,
-        
-        // 4. Copia e Cola (Texto)
-        copiaCola: qrCodeCopiaCola,
-        pixCode: qrCodeCopiaCola,
-        payload: qrCodeCopiaCola,
-        
-        // 5. Envia também o ID do pagamento caso o front precise
-        paymentId: paymentId
-    });
-
-  } catch (error: any) {
-    console.error("ERRO CRÍTICO:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}

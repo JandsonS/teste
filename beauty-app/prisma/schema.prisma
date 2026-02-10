@@ -42,6 +42,7 @@ model Estabelecimento {
 // --- AGENDAMENTOS ---
 model Agendamento {
   id              String   @id @default(cuid())
+  slug String?
   
   // Dados do Cliente
   cliente         String
