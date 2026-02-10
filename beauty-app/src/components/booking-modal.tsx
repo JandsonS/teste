@@ -7,22 +7,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, ChevronLeft, X, Copy, CheckCircle2, MessageCircle } from "lucide-react"
+import { Wallet, Loader2, CalendarDays, Clock, AlertCircle, QrCode, CreditCard, Check, ChevronLeft, X, Copy, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { DayPicker } from "react-day-picker"
 import "react-day-picker/dist/style.css"
 
-
 interface BookingModalProps { 
   serviceName: string; 
   price: string; 
+  establishmentId: string;
+  slug: string;
   children: React.ReactNode 
 }
 
-export function BookingModal({ serviceName, price, children }: BookingModalProps) {
+export function BookingModal({ serviceName, price, establishmentId, slug, children }: BookingModalProps) {
   // --- ESTADOS DE FLUXO ---
   const [open, setOpen] = useState(false)
-  const [step, setStep] = useState(1) // 1: Data, 2: Dados, 3: Pagamento, 4: QR Code (Novo)
+  const [step, setStep] = useState(1) // 1: Data, 2: Dados, 3: Pagamento, 4: QR Code
   const [bookingType, setBookingType] = useState<'FULL' | 'DEPOSIT'>('FULL')
   const [loading, setLoading] = useState(false)
 
@@ -37,16 +38,19 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
   // --- PAGAMENTO ---
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD'>('PIX')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  // Novos estados para o Pix Transparente
+  
+  // --- PIX TRANSPARENTE (Novos Estados) ---
   const [pixCode, setPixCode] = useState("")
   const [pixImage, setPixImage] = useState("")
-  const [paymentId, setPaymentId] = useState("")
+  const [bookingId, setBookingId] = useState("") 
+  const [isPaid, setIsPaid] = useState(false) // Para animação de sucesso
 
   // --- DISPONIBILIDADE ---
   const [busySlots, setBusySlots] = useState<string[]>([]) 
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
-  const [config, setConfig] = useState<any>({ porcentagemSinal: 20 })
+  
+  const [config, setConfig] = useState<any>({ porcentagemSinal: 50 })
 
   // --- HELPERS ---
   const formatPhone = (value: string) => value.replace(/\D/g, '').slice(0, 11).replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{4})\d+?$/, '$1')
@@ -58,42 +62,20 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     return parseFloat(c.includes(',') ? c.replace(/\./g, '').replace(',', '.') : c); 
   }, [price])
 
-  const depositValue = (numericPrice * config.porcentagemSinal) / 100
-  const remainingValue = numericPrice - depositValue 
+  const depositValue = (numericPrice * (config.porcentagemSinal || 50)) / 100
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-  // --- INICIO DO ESPIÃO DE PIX ---
+  // --- CARREGA CONFIGURAÇÕES ---
   useEffect(() => {
-    // Só roda se tivermos o ID e estivermos na tela 4
-    if (!paymentId || step !== 4) return; 
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/check-status?id=${paymentId}`);
-        const data = await res.json();
-
-        if (data.status === 'approved') {
-           clearInterval(interval); // Para de perguntar
-           
-           // MENSAGEM DE SUCESSO
-           toast.success("Pagamento Confirmado!", {
-               description: "Seu horário foi agendado. Voltando para o início...",
-               duration: 4000, // Fica 4 segundos na tela
-           });
-           
-           // Espera 3 segundos para o cliente ler e depois recarrega
-           setTimeout(() => {
-               window.location.reload();
-           }, 3000);
-        }
-      } catch (error) {
-        console.error("Erro check status", error);
-      }
-    }, 3000); 
-
-    return () => clearInterval(interval);
-  }, [paymentId, step]);
-  // --- FIM DO ESPIÃO ---
+    if(open && slug) {
+        fetch(`/api/settings?slug=${slug}`)
+        .then((res) => res.json())
+        .then((data) => {
+            if (data && !data.error) setConfig((prev: any) => ({ ...prev, ...data }));
+        })
+        .catch(() => console.log("Usando config padrão"));
+    }
+  }, [open, slug])
 
   // --- RESETAR AO FECHAR ---
   useEffect(() => { 
@@ -104,46 +86,91 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
             setAcceptedTerms(false);
             setPixCode("");
             setPixImage("");
+            setIsPaid(false);
+            setBookingId("");
           }, 300)
       } 
   }, [open])
 
-  // --- CARREGAR CONFIGS ---
-  useEffect(() => {
-    fetch("/api/admin/config")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && !data.error) setConfig((prev: any) => ({ ...prev, ...data }));
-      })
-      .catch(() => console.log("Usando config padrão"));
-  }, [])
+ // --- ESPIÃO DE PAGAMENTO (Polling) ---
+ // Fica verificando se o status mudou para CONFIRMADO enquanto o modal do Pix está aberto
+ useEffect(() => {
+    let interval: NodeJS.Timeout;
 
-  // --- CARREGAR HORÁRIOS ---
+    // Só roda se estiver na tela do Pix (step 4), tiver um ID e ainda não tiver pago
+    if (step === 4 && bookingId && !isPaid) {
+        interval = setInterval(async () => {
+            try {
+                // 👇 1. Chama a rota segura (passando o bookingId)
+                const res = await fetch(`/api/bookings?bookingId=${bookingId}`);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    // 👇 2. A CORREÇÃO ESTÁ AQUI:
+                    // Como o backend agora manda só UM item (objeto), não usamos .find().
+                    // Verificamos o status direto no 'data'.
+                    if (data && (data.status === 'CONFIRMADO' || data.status === 'PAGO')) {
+                        setIsPaid(true);
+                        toast.success("Pagamento Confirmado!", { description: "Seu horário está garantido." });
+                        clearInterval(interval);
+                    }
+                }
+            } catch (error) {
+                console.error("Erro ao verificar status", error);
+            }
+        }, 3000); // Verifica a cada 3 segundos
+    }
+
+    return () => clearInterval(interval);
+ }, [step, bookingId, isPaid]);
+
+ // --- CARREGAR HORÁRIOS ---
   useEffect(() => {
-    if (!date || !isValid(date)) { setBusySlots([]); setSelectedTime(null); return; }
-    setLoadingSlots(true); setBusySlots([]); setSelectedTime(null); 
+    if (!date || !isValid(date)) { 
+        setBusySlots([]); 
+        setSelectedTime(null); 
+        return; 
+    }
+
+    setLoadingSlots(true); 
+    setBusySlots([]); 
+    setSelectedTime(null); 
     
     const params = new URLSearchParams({ 
         date: format(date, "dd/MM/yyyy"), 
-        service: serviceName 
+        service: serviceName,
+        establishmentId: establishmentId 
     })
 
     fetch(`/api/availability?${params.toString()}`)
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error("Erro na API");
+            return res.json();
+        })
         .then(data => { 
             if (data.busy) setBusySlots(data.busy)
             if (data.available) setAvailableSlots(data.available)
+            if (!data.available || data.available.length === 0) {
+                setAvailableSlots(["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"]);
+            }
             setLoadingSlots(false)
         })
-        .catch(() => setLoadingSlots(false))
-  }, [date, serviceName])
+        .catch((err) => {
+            console.error(err);
+            setAvailableSlots(["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"]); 
+            setLoadingSlots(false);
+        })
+  }, [date, establishmentId, serviceName])
 
   const handleTimeClick = (time: string) => {
-    if (busySlots.includes(time)) { toast.error("Horário Indisponível"); return; }
-    setSelectedTime(time)
+    if (busySlots.includes(time)) { 
+        toast.error("Horário Indisponível"); 
+        return; 
+    }
+    setSelectedTime(time);
   }
-
-  // --- FUNÇÃO DE COPIAR PIX ---
+  
   const copyPix = () => {
     navigator.clipboard.writeText(pixCode)
     toast.success("Código Pix copiado!", {
@@ -151,74 +178,80 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
     })
   }
 
-  // --- CHECKOUT CORRIGIDO ---
-  const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
+  // =========================================================
+  // ⚡️ FUNÇÃO CHECKOUT CORRIGIDA
+  // =========================================================
+  const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
     setBookingType(paymentType);
-    if (!acceptedTerms) {
-        toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." })
-        return
-    }
-    if (!date || !selectedTime || !name || !isPhoneValid) {
-        toast.error("Preencha todos os dados corretamente.")
-        return 
-    }
-    
-    setLoading(true)
-    try {
-      const response = await fetch('/api/payment', { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ 
-              serviceName, 
-              date: format(date, "dd/MM/yyyy"), 
-              time: selectedTime, 
-              clientName: name, 
-              clientPhone: phone,
-              method: paymentMethod, 
-              
-              // --- MUDANÇA AQUI ---
-              // Enviamos sempre o PREÇO TOTAL NUMÉRICO (ex: 50.00).
-              // O Backend lê o 'paymentType' e calcula a porcentagem se necessário.
-              price: numericPrice, 
-              // --------------------
+    
+    if (!acceptedTerms) {
+        toast.error("Termos de Uso", { description: "Você precisa aceitar a política de cancelamento." })
+        return
+    }
+    if (!date || !selectedTime || !name || !isPhoneValid) {
+        toast.error("Preencha todos os dados corretamente.")
+        return 
+    }
+    
+    setLoading(true)
+    
+    try {
+      const response = await fetch('/api/bookings', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ 
+              slug, 
+              establishmentId, 
+              name: name, 
+              phone: phone,
+              date: format(date, "yyyy-MM-dd"), 
+              time: selectedTime, 
+              serviceName: serviceName, 
+              price: numericPrice,           
+              method: paymentMethod, 
+              paymentType: paymentType 
+           }), 
+      })
+      
+      const data = await response.json()
+      
+      if (data.error) { 
+          toast.error("Ops!", { description: data.error }); 
+          setLoading(false);
+          return; 
+      }
 
-              paymentType 
-          }), 
-      })
-      
-      const data = await response.json()
-      
-      if (data.error) { 
-          toast.error("Ops!", { description: data.error }); 
-          return; 
-      }
+      // 👇 SUCESSO! AQUI ESTAVA O PROBLEMA ANTES 👇
+      // Agora pegamos a imagem que o Backend mandou e mostramos
+      
+      if (paymentMethod === 'PIX') {
+          // 1. Salva os dados do Pix no estado
+          setPixCode(data.copiaCola || data.payload || data.pixCode);
+          
+          // Tenta pegar qualquer variação de nome da imagem que o backend mandou
+          setPixImage(data.fullImage || data.base64 || data.qrCodeBase64 || data.image);
+          
+          setBookingId(data.bookingId); // Salva o ID para o "Espião" monitorar
 
-      // 1. SE RECEBEU QR CODE (PIX TRANSPARENTE)
-      if (data.qrCodeBase64) {
-          setPixImage(data.qrCodeBase64)
-          setPixCode(data.qrCodeCopyPaste)
-          setPaymentId(data.id)
-          setStep(4) 
-          toast.success("Agendamento pré-reservado!", { description: "Realize o pagamento para confirmar." })
-      } 
-      // 2. SE RECEBEU URL (CARTÃO OU CHECKOUT PRO)
-      else if (data.url) {
-          window.location.href = data.url 
-      }
+          // 2. AVANÇA PARA A TELA 4 (QR CODE) EM VEZ DE FECHAR
+          setStep(4);
+          setLoading(false);
+      } else {
+          // Se for cartão (futuro), fecha
+          toast.success("Agendamento Solicitado!");
+          setOpen(false);
+      }
 
-    } catch (error) { 
-        console.error(error)
-        toast.error("Erro no Servidor") 
-    } finally { 
-        setLoading(false) 
-    }
-  }
+    } catch (error) { 
+        console.error(error)
+        toast.error("Erro no Servidor") 
+        setLoading(false)
+    }
+  }
+
   const handleFinish = () => {
       setOpen(false)
-      toast.success("Aguardando confirmação!", { 
-          description: "Assim que o pagamento cair, você receberá a confirmação." 
-      })
-      window.location.reload() // Opcional: recarrega para atualizar horários
+      window.location.reload()
   }
 
   return (
@@ -231,10 +264,8 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
         sm:left-[50%] sm:top-[50%] sm:-translate-x-1/2 sm:-translate-y-1/2
         animate-in fade-in zoom-in-95 duration-200 flex flex-col">
 
-        {/* ================================================================= */}
-        {/* CSS DO BOTÃO 29 E LAYOUT */}
-        {/* ================================================================= */}
-        <style jsx>{`
+        {/* ESTILOS CSS DO BOTÃO (BTN-29) */}
+        <style jsx global>{`
           .btn-29, .btn-29 *, .btn-29 :after, .btn-29 :before, .btn-29:after, .btn-29:before { border: 0 solid; box-sizing: border-box; }
           .btn-29 { -webkit-tap-highlight-color: transparent; -webkit-appearance: button; background-color: #000; background-image: none; color: #fff; cursor: pointer; font-size: 100%; font-weight: 900; line-height: 1.5; margin: 0; -webkit-mask-image: -webkit-radial-gradient(#000, #fff); padding: 0; text-transform: uppercase; }
           .btn-29:disabled { cursor: default; opacity: 0.5; }
@@ -272,15 +303,14 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                     <p className="text-xs text-zinc-500 font-medium truncate max-w-[180px]">{serviceName}</p>
                 </div>
             </div>
-                            <div className="bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-all duration-300">
-                    <span className="text-emerald-400 font-bold text-sm">
-                        {/* LÓGICA: Se estiver no passo do QR Code (4) E escolheu Depósito, mostra o valor do Depósito */}
-                        {step === 4 && bookingType === 'DEPOSIT' 
-                            ? formatMoney(depositValue) 
-                            : price 
-                        }
-                    </span>
-                </div>
+            <div className="bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-all duration-300">
+                <span className="text-emerald-400 font-bold text-sm">
+                    {step === 4 && bookingType === 'DEPOSIT' 
+                        ? formatMoney(depositValue) 
+                        : price 
+                    }
+                </span>
+            </div>
         </div>
 
         {/* === CORPO (ROLAGEM) === */}
@@ -288,7 +318,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
           
           <div className="p-5 pb-28 sm:pb-5"> 
           
-            {/* PASSO 1: CALENDÁRIO E DATA */}
+            {/* PASSO 1: CALENDÁRIO */}
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="flex justify-center sm:bg-zinc-900/40 sm:border sm:border-zinc-800 sm:rounded-2xl sm:p-2">
@@ -362,7 +392,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
               </div>
             )}
 
-            {/* PASSO 3: PAGAMENTO (ESCOLHA) */}
+            {/* PASSO 3: ESCOLHA PAGAMENTO */}
             {step === 3 && (
               <div className="space-y-5 pt-1 animate-in fade-in slide-in-from-right-8 duration-300">
                   <div className="grid grid-cols-2 bg-zinc-900 p-1.5 rounded-2xl border border-zinc-800">
@@ -389,7 +419,7 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                       <button onClick={() => handleCheckout('FULL')} disabled={loading || !acceptedTerms} className={`group relative overflow-hidden flex items-center justify-between p-5 rounded-2xl border text-left transition-all active:scale-[0.98] ${!acceptedTerms ? 'opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500'}`}>
                           <div className="flex items-center gap-4 relative z-10">
                               <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors">
-                                {loading && paymentMethod === 'PIX' ? <Loader2 className="animate-spin"/> : <Wallet size={24} />}
+                                {loading && bookingType === 'FULL' ? <Loader2 className="animate-spin"/> : <Wallet size={24} />}
                               </div>
                               <div>
                                   <p className="font-bold text-white text-base">
@@ -405,10 +435,10 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
                       <button onClick={() => handleCheckout('DEPOSIT')} disabled={loading || !acceptedTerms} className={`group relative overflow-hidden flex items-center justify-between p-5 rounded-2xl border text-left transition-all active:scale-[0.98] ${!acceptedTerms ? 'opacity-50 cursor-not-allowed bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500'}`}>
                           <div className="flex items-center gap-4 relative z-10">
                               <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors">
-                                {loading && paymentMethod === 'PIX' ? <Loader2 className="animate-spin"/> : <Clock size={24} />}
+                                {loading && bookingType === 'DEPOSIT' ? <Loader2 className="animate-spin"/> : <Clock size={24} />}
                               </div>
                               <div>
-                                  <p className="font-bold text-white text-base">Reservar Vaga ({config.porcentagemSinal}%)</p>
+                                  <p className="font-bold text-white text-base">Reservar Vaga ({config.porcentagemSinal || 50}%)</p>
                                   <p className="text-xs text-zinc-500">Restante do valor no local.</p>
                               </div>
                           </div>
@@ -418,140 +448,161 @@ export function BookingModal({ serviceName, price, children }: BookingModalProps
               </div>
             )}
 
-            {/* PASSO 4: EXIBIÇÃO DO QR CODE (NOVO) */}
-            {/* --- ALERTA DE RESERVA TEMPORÁRIA (15 MIN) --- */}
-<div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 flex gap-3 items-start animate-pulse">
-    <div className="bg-amber-500/20 p-2 rounded-full shrink-0">
-        {/* Ícone de Relógio Alerta */}
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-        </svg>
-    </div>
-    <div>
-        <h4 className="text-amber-400 font-bold text-sm">Reserva Temporária</h4>
-        <p className="text-zinc-400 text-xs mt-1 leading-relaxed">
-            Sua vaga está pré-reservada por <span className="text-amber-300 font-bold">15 minutos</span>. 
-            Realize o pagamento agora para confirmar, ou o horário será liberado automaticamente.
-        </p>
-    </div>
-</div>
-{/* ----------------------------------------------- */}
-         {step === 4 && (
-  <div className="space-y-6">
-      {/* 1. IMAGEM DO QR CODE */}
-      <div className="flex justify-center py-4">
-          <div className="bg-white p-3 rounded-2xl shadow-sm border border-zinc-200">
-              {pixImage ? (
-                  <img 
-                    src={`data:image/jpeg;base64,${pixImage}`} 
-                    alt="QR Code Pix" 
-                    className="w-48 h-48 object-contain" 
-                  />
-              ) : (
-                  <div className="w-48 h-48 flex items-center justify-center text-zinc-400 text-xs">
-                      Carregando QR Code...
-                  </div>
-              )}
-          </div>
-      </div>
+           {/* PASSO 4: EXIBIR PIX E TELA DE SUCESSO */}
+            {step === 4 && (
+                <div className="flex flex-col items-center justify-center pt-2 animate-in zoom-in-95 duration-500 w-full">
+                    {!isPaid ? (
+                        /* --- PARTE 1: TELA DO QR CODE (Aguardando) --- */
+                        <>
+                            <div className="text-center mb-6">
+                                <h3 className="text-white font-bold text-xl mb-2">Pague para Confirmar</h3>
+                                <p className="text-zinc-400 text-sm max-w-[250px] mx-auto leading-relaxed">
+                                    Abra o app do seu banco e escaneie o código abaixo.
+                                </p>
+                            </div>
 
-      {/* 2. INPUT DE COPIAR */}
-      <div className="text-center space-y-3">
-          <p className="text-zinc-400 text-sm font-medium">Escaneie ou copie o código Pix:</p>
-          <div className="w-full flex gap-2">
-              <Input 
-                  value={pixCode} 
-                  readOnly 
-                  className="bg-zinc-900/50 border-zinc-800 text-zinc-400 font-mono text-xs h-12 text-center" 
-              />
-              <Button onClick={copyPix} className="h-12 w-12 shrink-0 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700">
-                  <Copy size={18} />
-              </Button>
-          </div>
-      </div>
+                            <div className="bg-white p-4 rounded-3xl mb-6 shadow-[0_0_40px_rgba(16,185,129,0.15)] relative group">
+                                <div className="absolute inset-0 border-2 border-dashed border-zinc-300 rounded-3xl pointer-events-none group-hover:border-emerald-500 transition-colors"></div>
+                                {pixImage ? (
+                                    <img 
+                                        src={pixImage.startsWith('data:') ? pixImage : `data:image/png;base64,${pixImage}`} 
+                                        alt="Pix QR Code" 
+                                        className="w-48 h-48 sm:w-56 sm:h-56 mix-blend-multiply object-contain" 
+                                    />
+                                ) : (
+                                    <div className="w-48 h-48 bg-zinc-100 flex items-center justify-center text-zinc-400 text-xs rounded-xl">
+                                        <Loader2 className="animate-spin mr-2"/> Gerando Pix...
+                                    </div>
+                                )}
+                            </div>
 
-      {/* 3. AVISO DE AGUARDANDO (Sem botão embaixo) */}
-      <div className="flex flex-col items-center gap-2 bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl text-center">
-           <div className="flex items-center gap-2">
-               <Loader2 className="animate-spin text-emerald-500" size={18} />
-               <p className="text-sm font-bold text-emerald-400">Aguardando confirmação...</p>
-           </div>
-           <p className="text-xs text-zinc-500">
-              Não feche esta tela. Assim que o pagamento for identificado, você será redirecionado automaticamente.
-           </p>
-      </div>
-  </div>
-)}
+                            <div className="w-full space-y-3">
+                                <button onClick={copyPix} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all border border-zinc-700 active:scale-95">
+                                    <Copy size={18} /> Copiar Código Pix
+                                </button>
+                                
+                                <div className="flex items-center justify-center gap-2 text-zinc-500 text-xs mt-4">
+                                    <Loader2 className="animate-spin w-3 h-3"/> Aguardando pagamento...
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        /* --- PARTE 2: NOVA TELA DE SUCESSO (Comprovante) --- */
+                        <div className="flex flex-col items-center py-2 w-full animate-in slide-in-from-bottom-10 fade-in duration-700">
+                            
+                            {/* Ícone Pulsando */}
+                            <div className="relative mb-6">
+                                <div className="absolute inset-0 bg-emerald-500 blur-2xl opacity-20 animate-pulse"></div>
+                                <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center text-black shadow-[0_0_30px_#10b981] relative z-10">
+                                    <CheckCircle2 size={40} className="stroke-[3]"/>
+                                </div>
+                            </div>
+
+                            <h3 className="text-3xl font-black text-white mb-2 text-center tracking-tight">Agendado!</h3>
+                            <p className="text-zinc-400 text-center text-sm mb-6">Te esperamos em breve!</p>
+
+                            {/* Cartão de Resumo (O "Comprovante") */}
+                            <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 mb-6 space-y-4">
+                                <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+                                    <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Serviço</span>
+                                    <span className="text-white font-bold text-sm text-right truncate max-w-[180px]">{serviceName}</span>
+                                </div>
+                                <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+                                    <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Data e Hora</span>
+                                    <div className="text-right">
+                                        <span className="text-white font-bold text-sm block">
+                                            {date ? format(date, "dd/MM", { locale: ptBR }) : ""} às {selectedTime}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Status</span>
+                                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded text-xs font-bold">CONFIRMADO</span>
+                                </div>
+                            </div>
+
+                            {/* Botão de Ação */}
+                            <Button 
+                                onClick={handleFinish} 
+                                className="bg-white text-black hover:bg-zinc-200 font-black text-sm uppercase tracking-wide px-8 py-6 rounded-2xl w-full shadow-lg hover:shadow-xl transition-all active:scale-95"
+                            >
+                                Voltar para o Início
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            )}
           </div>
         </div>
         
-        {/* === RODAPÉ (BOTÕES DE AÇÃO COM ESTILO 29) === */}
-        <div className="flex-none p-5 bg-[#09090b]/90 backdrop-blur-md border-t border-zinc-800/50 z-20 pb-8 sm:pb-5 safe-area-bottom transition-all">
-          
-          {step === 1 && (
-             <div className="flex gap-3 animate-in slide-in-from-bottom-2">
-                 <Button 
-                    className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
-                    onClick={() => setOpen(false)}
-                 >
-                    <ChevronLeft size={24} />
-                 </Button>
+        {/* === RODAPÉ (BOTÕES DE AÇÃO) === */}
+        {step !== 4 && (
+            <div className="flex-none p-5 bg-[#09090b]/90 backdrop-blur-md border-t border-zinc-800/50 z-20 pb-8 sm:pb-5 safe-area-bottom transition-all">
+            
+            {step === 1 && (
+                <div className="flex gap-3 animate-in slide-in-from-bottom-2">
+                    <Button 
+                        className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
+                        onClick={() => setOpen(false)}
+                    >
+                        <ChevronLeft size={24} />
+                    </Button>
 
-                 <div className="flex-1">
-                   {selectedTime ? (
-                       <button className="btn-29 border border-white w-full rounded-2xl h-14" onClick={() => setStep(2)}>
-                          <span className="text-container"><span className="text">CONTINUAR</span></span>
-                       </button>
-                   ) : (
-                       <Button disabled className="w-full h-14 bg-zinc-900 text-zinc-600 font-bold text-base rounded-2xl border border-zinc-800 cursor-not-allowed hover:bg-zinc-900">
-                          ESCOLHA UM HORÁRIO
-                       </Button>
-                   )}
-                 </div>
-             </div>
-          )}
-          
-          {step === 2 && isPhoneValid && name.length > 2 && (
-             <div className="flex gap-3 animate-in slide-in-from-bottom-2">
-                 <Button 
-                    className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
-                    onClick={() => setStep(1)}
-                 >
-                    <ChevronLeft size={24} />
-                 </Button>
-                 
-                 <div className="flex-1">
-                   <button className="btn-29 border border-white w-full rounded-2xl h-14" onClick={() => setStep(3)}>
-                      <span className="text-container"><span className="text">IR PARA PAGAMENTO</span></span>
-                   </button>
-                 </div>
-             </div>
-          )}
-          
-          {step === 3 && (
-             <div className="flex gap-3 animate-in slide-in-from-bottom-2">
-                 <Button 
-                    className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
-                    onClick={() => setStep(2)}
-                 >
-                    <ChevronLeft size={24} />
-                 </Button>
-                 <div className="flex-1 flex items-center justify-center text-zinc-400 text-xs uppercase tracking-widest font-medium">
-                    Revise os dados acima
-                 </div>
-             </div>
-          )}
+                    <div className="flex-1">
+                        {selectedTime ? (
+                            <button className="btn-29 border border-white w-full rounded-2xl h-14" onClick={() => setStep(2)}>
+                            <span className="text-container"><span className="text">CONTINUAR</span></span>
+                            </button>
+                        ) : (
+                            <Button disabled className="w-full h-14 bg-zinc-900 text-zinc-600 font-bold text-base rounded-2xl border border-zinc-800 cursor-not-allowed hover:bg-zinc-900">
+                            ESCOLHA UM HORÁRIO
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            )}
+            
+            {step === 2 && isPhoneValid && name.length > 2 && (
+                <div className="flex gap-3 animate-in slide-in-from-bottom-2">
+                    <Button 
+                        className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
+                        onClick={() => setStep(1)}
+                    >
+                        <ChevronLeft size={24} />
+                    </Button>
+                    
+                    <div className="flex-1">
+                        <button className="btn-29 border border-white w-full rounded-2xl h-14" onClick={() => setStep(3)}>
+                        <span className="text-container"><span className="text">IR PARA PAGAMENTO</span></span>
+                        </button>
+                    </div>
+                </div>
+            )}
+            
+            {step === 3 && (
+                <div className="flex gap-3 animate-in slide-in-from-bottom-2">
+                    <Button 
+                        className="h-14 w-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 flex items-center justify-center transition-all active:scale-90" 
+                        onClick={() => setStep(2)}
+                    >
+                        <ChevronLeft size={24} />
+                    </Button>
+                    <div className="flex-1 flex items-center justify-center text-zinc-400 text-xs uppercase tracking-widest font-medium">
+                        Revise os dados acima
+                    </div>
+                </div>
+            )}
+            </div>
+        )}
 
-          {/* RODAPÉ DO PASSO 4 (FINALIZAR) */}
-          {step === 4 && (
-             <div className="flex gap-3 animate-in slide-in-from-bottom-2">
-                 <button className="btn-29 border border-emerald-500 w-full rounded-2xl h-14" onClick={handleFinish}>
-                    <span className="text-container"><span className="text text-emerald-400">JÁ REALIZEI O PAGAMENTO</span></span>
-                 </button>
-             </div>
-          )}
-        </div>
+        {/* Rodapé especial para o passo 4 se ainda não pagou */}
+        {step === 4 && !isPaid && (
+            <div className="flex-none p-5 bg-[#09090b]/90 backdrop-blur-md border-t border-zinc-800/50 z-20 pb-8 sm:pb-5">
+                <Button onClick={handleFinish} variant="ghost" className="w-full text-zinc-500 hover:text-white hover:bg-zinc-900">
+                    Fechar e Pagar Depois
+                </Button>
+            </div>
+        )}
 
       </DialogContent>
     </Dialog>

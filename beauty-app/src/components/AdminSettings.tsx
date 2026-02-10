@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@supabase/supabase-js" // <--- Importante
+import { useRouter, useParams } from "next/navigation" // <--- ADICIONEI useParams
+import { createClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Settings, Plus, Trash2, Edit2, Power, Loader2, Save, Palette, Store, MessageCircle, Upload, Image as ImageIcon, X } from "lucide-react" // <--- Ícones novos
+import { Settings, Plus, Trash2, Edit2, Power, Loader2, Save, Palette, Store, MessageCircle, Upload, Image as ImageIcon, X } from "lucide-react"
 import { toast } from "sonner"
 
 // --- CONFIGURAÇÃO DO SUPABASE ---
@@ -37,8 +37,11 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'geral' | 'servicos'>('geral');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   
+  const router = useRouter();
+  const params = useParams(); // <--- CAPTURA O SLUG DA URL
+  const slug = params?.slug as string; // Garante que temos o slug
+
   // --- ESTADOS NOVOS PARA UPLOAD DA LOGO ---
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,15 +59,16 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
 
   // Carregar serviços ao abrir a aba
   useEffect(() => {
-    if (open && activeTab === 'servicos') {
+    if (open && activeTab === 'servicos' && slug) {
         fetchServices();
     }
-  }, [open, activeTab]);
+  }, [open, activeTab, slug]);
 
   const fetchServices = async () => {
       setLoadingServices(true);
       try {
-        const res = await fetch("/api/admin/services");
+        // --- MULTI-TENANT: Busca serviços APENAS deste slug ---
+        const res = await fetch(`/api/admin/services?slug=${slug}`);
         const data = await res.json();
         if (Array.isArray(data)) setServices(data);
       } catch (error) {
@@ -74,7 +78,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
       }
   };
 
-  // --- FUNÇÃO DE UPLOAD DA LOGO (NOVA) ---
+  // --- FUNÇÃO DE UPLOAD DA LOGO ---
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -82,7 +86,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
     setUploadingLogo(true);
     try {
         const fileExt = file.name.split('.').pop();
-        const fileName = `logo-${Date.now()}.${fileExt}`;
+        const fileName = `${slug}-logo-${Date.now()}.${fileExt}`; // Nome único por loja
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
@@ -110,49 +114,54 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
       setConfig({ ...config, logoUrl: "" });
   };
 
-  // --- LÓGICA DA ABA GERAL (Sua versão preservada + logoUrl) ---
+  // --- LÓGICA DA ABA GERAL (MULTI-TENANT) ---
   const saveGeneralConfig = async () => {
+    if (!slug) {
+        toast.error("Erro: Loja não identificada.");
+        return;
+    }
+
     setLoading(true);
     try {
+      // Usamos uma rota genérica, mas passamos o SLUG no corpo
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-            porcentagemSinal: Number(config.porcentagemSinal),
-            nomeEstabelecimento: config.nomeEstabelecimento,
-            corPrincipal: config.corPrincipal,
-            telefoneWhatsApp: config.telefoneWhatsApp,
-            logoUrl: config.logoUrl // <--- ADICIONADO AQUI
+            slug: slug, // <--- O PULO DO GATO: Identifica quem está salvando
+            ...config,
+            // Garante conversão de tipos
+            porcentagemSinal: Number(config.porcentagemSinal)
         }),
       });
 
       if (res.ok) {
         toast.success("Configurações salvas!", {
-            description: "Atualizando o sistema...",
+            description: "Atualizando loja...",
             duration: 1500,
         });
         
         if (handleUpdateSettings) handleUpdateSettings();
 
         router.refresh(); 
-
+        
+        // Pequeno delay para recarregar visualmente
         setTimeout(() => {
-            window.location.href = window.location.href;
+            window.location.reload();
         }, 1000);
 
       } else {
-        toast.error("Erro ao salvar.");
+        toast.error("Erro ao salvar configurações.");
         setLoading(false);
       }
     } catch (error) {
       console.error(error);
       toast.error("Erro de conexão.");
       setLoading(false);
-      if (!loading) setLoading(false);
     }
   };
 
-  // --- LÓGICA DA ABA SERVIÇOS (Mantida igual) ---
+  // --- LÓGICA DA ABA SERVIÇOS (MULTI-TENANT) ---
   const handleSaveService = async () => {
       if (!formData.title || !formData.price || !formData.duration) {
           toast.error("Preencha Nome, Preço e Duração.");
@@ -163,8 +172,8 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
       try {
           const method = editingService ? 'PUT' : 'POST';
           const body = editingService 
-            ? { ...formData, id: editingService.id, action: 'update' } 
-            : formData;
+            ? { ...formData, id: editingService.id, action: 'update', slug } // Envia Slug
+            : { ...formData, slug }; // Envia Slug
 
           const res = await fetch("/api/admin/services", {
               method: method,
@@ -189,11 +198,12 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
   };
 
   const handleDeleteService = async (id: string) => {
-      if (!confirm("Tem certeza?")) return;
+      if (!confirm("Tem certeza que deseja excluir?")) return;
       try {
+        // Envia SLUG para garantir que só o dono apague
         const res = await fetch("/api/admin/services", { 
             method: 'PUT', 
-            body: JSON.stringify({ id, action: 'delete' }) 
+            body: JSON.stringify({ id, action: 'delete', slug }) 
         });
         if (res.ok) {
             fetchServices();
@@ -206,12 +216,15 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
 
   const handleToggleService = async (id: string) => {
     try {
-        await fetch("/api/admin/services", { 
+        const res = await fetch("/api/admin/services", { 
             method: 'PUT', 
-            body: JSON.stringify({ id, action: 'toggle' }) 
+            body: JSON.stringify({ id, action: 'toggle', slug }) 
         });
-        fetchServices();
-        toast.success("Status alterado.");
+        
+        if (res.ok) {
+            fetchServices();
+            toast.success("Status alterado.");
+        }
     } catch {
         toast.error("Erro ao alterar status.");
     }
@@ -242,7 +255,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
         <div className="p-6 border-b border-zinc-800">
             <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                <Settings className="text-emerald-500" /> Configurações do Sistema
+                <Settings className="text-emerald-500" /> Configurações da Loja
             </DialogTitle>
             </DialogHeader>
 
@@ -265,31 +278,27 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
         {/* CORPO DO MODAL */}
         <div className="p-6">
             
-            {/* === ABA GERAL (PERSONALIZAÇÃO + FINANCEIRO) === */}
+            {/* === ABA GERAL === */}
             {activeTab === 'geral' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
                     
-                    {/* 1. SEÇÃO DE IDENTIDADE VISUAL */}
+                    {/* VISUAL */}
                     <div className="space-y-4 border-b border-zinc-800 pb-6">
                         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                           <Palette size={16} className="text-emerald-500"/> Personalização da Loja
+                           <Palette size={16} className="text-emerald-500"/> Identidade Visual
                         </h3>
                         
                         <div className="grid gap-4">
 
-                            {/* --- ÁREA DE UPLOAD DE LOGO (ADICIONADA AQUI) --- */}
+                            {/* UPLOAD LOGO */}
                             <div>
                                 <Label className="text-zinc-400 text-xs mb-2 block">Logo da Loja</Label>
                                 <div className="flex items-start gap-4">
-                                    {/* Preview da Imagem */}
                                     <div className="w-20 h-20 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden relative group">
                                         {config.logoUrl ? (
                                             <>
                                                 <img src={config.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                                                <button 
-                                                    onClick={removeLogo}
-                                                    className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
+                                                <button onClick={removeLogo} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <X size={16} className="text-white" />
                                                 </button>
                                             </>
@@ -297,31 +306,16 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                                             <ImageIcon size={24} className="text-zinc-600" />
                                         )}
                                     </div>
-
-                                    {/* Botão de Upload */}
                                     <div className="flex-1">
-                                        <input 
-                                            type="file" 
-                                            ref={fileInputRef} 
-                                            className="hidden" 
-                                            accept="image/*"
-                                            onChange={handleLogoUpload}
-                                        />
-                                        <Button 
-                                            onClick={() => fileInputRef.current?.click()} 
-                                            variant="outline" 
-                                            disabled={uploadingLogo}
-                                            className="w-full border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-zinc-300 h-20 flex flex-col gap-1 items-center justify-center border-dashed"
-                                        >
-                                            {uploadingLogo ? (
-                                                <Loader2 className="animate-spin text-emerald-500" />
-                                            ) : (
-                                                <>
-                                                    <Upload size={18} className="mb-1" />
-                                                    <span className="text-xs">Clique para enviar logo</span>
-                                                </>
-                                            )}
-                                        </Button>
+                                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                                            <Button 
+                                                onClick={() => fileInputRef.current?.click()} 
+                                                variant="outline" 
+                                                disabled={uploadingLogo}
+                                                className="w-full border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-zinc-300 h-20 flex flex-col gap-1 items-center justify-center border-dashed"
+                                            >
+                                                {uploadingLogo ? <Loader2 className="animate-spin text-emerald-500" /> : <><Upload size={18} className="mb-1" /><span className="text-xs">Enviar nova logo</span></>}
+                                            </Button>
                                     </div>
                                 </div>
                             </div>
@@ -333,7 +327,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                                     <Input 
                                         value={config.nomeEstabelecimento || ""} 
                                         onChange={(e) => setConfig({...config, nomeEstabelecimento: e.target.value})}
-                                        placeholder="Digite o nome da loja..."
                                         className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0"
                                     />
                                 </div>
@@ -354,7 +347,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                                 </div>
                                 
                                 <div>
-                                    <Label className="text-zinc-400 text-xs">WhatsApp (Rodapé)</Label>
+                                    <Label className="text-zinc-400 text-xs">WhatsApp</Label>
                                     <div className="flex items-center gap-2 mt-1 bg-zinc-900/50 border border-zinc-800 rounded-lg px-3">
                                         <MessageCircle size={16} className="text-zinc-500"/>
                                         <Input 
@@ -369,7 +362,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                         </div>
                     </div>
 
-                    {/* 2. SEÇÃO FINANCEIRA (JÁ EXISTIA) */}
+                    {/* FINANCEIRO */}
                     <div className="space-y-4">
                         <Label htmlFor="sinal-select" className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Valor do Sinal (Reserva)</Label>
                         <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-zinc-700 transition-colors">
@@ -382,14 +375,10 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                                 <option className="bg-zinc-900" value="0">Sem sinal (Pagamento na Loja)</option>
                                 <option className="bg-zinc-900" value="20">20% do valor total</option>
                                 <option className="bg-zinc-900" value="30">30% do valor total</option>
-                                <option className="bg-zinc-900" value="40">40% do valor total</option>
                                 <option className="bg-zinc-900" value="50">50% do valor total (Recomendado)</option>
                                 <option className="bg-zinc-900" value="100">100% (Pagamento Total)</option>
                             </select>
                         </div>
-                        <p className="text-xs text-zinc-500">
-                            Quanto o cliente paga online para reservar.
-                        </p>
                     </div>
 
                     <div className="pt-4 border-t border-zinc-800">
@@ -397,7 +386,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                             onClick={saveGeneralConfig} 
                             disabled={loading} 
                             className="w-full h-12 font-bold text-white shadow-lg transition-all"
-                            // Usamos a cor escolhida para o botão também!
                             style={{ backgroundColor: config.corPrincipal || '#10b981' }}
                         >
                             {loading ? <Loader2 className="animate-spin mr-2"/> : <Save className="mr-2 w-4 h-4"/>}
@@ -407,7 +395,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                 </div>
             )}
 
-            {/* === ABA SERVIÇOS (MANTIDA IGUAL) === */}
+            {/* === ABA SERVIÇOS === */}
             {activeTab === 'servicos' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                     {!isAdding && !editingService && (
@@ -420,9 +408,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                             </div>
 
                             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                {loadingServices && (
-                                    <div className="flex justify-center py-10"><Loader2 className="animate-spin text-zinc-500"/></div>
-                                )}
+                                {loadingServices && <div className="flex justify-center py-10"><Loader2 className="animate-spin text-zinc-500"/></div>}
                                 {!loadingServices && services.length === 0 && (
                                     <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
                                         <p className="text-zinc-500 text-sm">Nenhum serviço cadastrado.</p>
@@ -466,25 +452,25 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                             <div className="space-y-4">
                                 <div>
                                     <Label className="text-xs text-zinc-400 mb-1.5 block">Nome do Serviço</Label>
-                                    <Input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm focus:border-emerald-500" placeholder="Ex: Corte Degrade" />
+                                    <Input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm focus:border-emerald-500" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <Label className="text-xs text-zinc-400 mb-1.5 block">Preço (R$)</Label>
-                                        <Input type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" placeholder="30.00" />
+                                        <Input type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" />
                                     </div>
                                     <div>
                                         <Label className="text-xs text-zinc-400 mb-1.5 block">Duração (min)</Label>
-                                        <Input type="number" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" placeholder="45" />
+                                        <Input type="number" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" />
                                     </div>
                                 </div>
                                 <div>
                                     <Label className="text-xs text-zinc-400 mb-1.5 block">Descrição (Opcional)</Label>
-                                    <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" placeholder="Detalhes..." />
+                                    <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" />
                                 </div>
                                 <div>
                                     <Label className="text-xs text-zinc-400 mb-1.5 block">URL da Imagem (Opcional)</Label>
-                                    <Input value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" placeholder="https://..." />
+                                    <Input value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" />
                                 </div>
                             </div>
 

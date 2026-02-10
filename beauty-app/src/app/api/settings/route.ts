@@ -1,69 +1,76 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+// --- GET: Busca as configurações de UMA loja específica ---
+export async function GET(request: Request) {
   try {
-    const config = await prisma.configuracao.findUnique({
-      where: { id: "settings" },
-    });
+    // Pega o slug da URL (ex: /api/settings?slug=barbearia-vip)
+    const { searchParams } = new URL(request.url);
+    const slug = searchParams.get("slug");
 
-    if (!config) {
-      return NextResponse.json({
-        porcentagemSinal: 50,
-        precoServico: 0,
-        horarioAbertura: "08:00",
-        horarioFechamento: "20:00",
-        nomeEstabelecimento: "Minha Barbearia",
-        corPrincipal: "#10b981",
-        telefoneWhatsApp: "",
-        logoUrl: "" 
-      });
+    if (!slug) {
+      return NextResponse.json({ error: "Slug da loja não informado" }, { status: 400 });
     }
 
-    return NextResponse.json(config);
+    const loja = await prisma.estabelecimento.findUnique({
+      where: { slug: slug },
+    });
+
+    if (!loja) {
+      return NextResponse.json({ error: "Loja não encontrada" }, { status: 404 });
+    }
+
+    // Retorna no formato que o frontend espera
+    return NextResponse.json({
+        nomeEstabelecimento: loja.nome,
+        corPrincipal: loja.corPrincipal,
+        telefoneWhatsApp: loja.telefoneWhatsApp,
+        logoUrl: loja.logoUrl,
+        porcentagemSinal: loja.porcentagemSinal,
+        horarioAbertura: loja.horarioAbertura,
+        horarioFechamento: loja.horarioFechamento,
+    });
+
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: "Erro ao buscar configurações" }, { status: 500 });
   }
 }
 
+// --- POST: Salva as configurações na loja certa ---
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
-    // Validações básicas para evitar números quebrados
-    const porcentagemSinal = isNaN(Number(body.porcentagemSinal)) ? 50 : Number(body.porcentagemSinal);
-    const precoServico = isNaN(Number(body.precoServico)) ? 0 : Number(body.precoServico);
-    const horarioAbertura = body.horarioAbertura || "08:00";
-    const horarioFechamento = body.horarioFechamento || "20:00";
+    const { slug } = body; // <--- O PULO DO GATO: Recebe o slug do frontend
 
-    const settings = await prisma.configuracao.upsert({
-      where: { id: "settings" },
-      update: {
-        porcentagemSinal: porcentagemSinal,
-        precoServico: precoServico,
-        horarioAbertura: horarioAbertura,
-        horarioFechamento: horarioFechamento,
-        nomeEstabelecimento: body.nomeEstabelecimento || "Minha Loja",
-        telefoneWhatsApp: body.telefoneWhatsApp || "",
-        corPrincipal: body.corPrincipal || "#10b981",
-        logoUrl: body.logoUrl || "", // <--- AGORA ESTÁ NO LUGAR CERTO
-      },
-      create: {
-        id: "settings",
-        porcentagemSinal: porcentagemSinal,
-        precoServico: precoServico,
-        horarioAbertura: horarioAbertura,
-        horarioFechamento: horarioFechamento,
-        nomeEstabelecimento: body.nomeEstabelecimento || "Minha Loja",
-        telefoneWhatsApp: body.telefoneWhatsApp || "",
-        corPrincipal: body.corPrincipal || "#10b981",
-        logoUrl: body.logoUrl || "", // <--- AQUI TAMBÉM
+    if (!slug) {
+        return NextResponse.json({ error: "Erro: Loja não identificada (Slug faltando)" }, { status: 400 });
+    }
+
+    console.log(`📝 Atualizando configurações para a loja: ${slug}`);
+
+    // Atualiza APENAS a linha desta loja específica
+    const lojaAtualizada = await prisma.estabelecimento.update({
+      where: { slug: slug },
+      data: {
+        nome: body.nomeEstabelecimento, // Mapeia o nome do form para o banco
+        telefoneWhatsApp: body.telefoneWhatsApp,
+        corPrincipal: body.corPrincipal,
+        logoUrl: body.logoUrl,
+        
+        // Garante que é número (Float)
+        porcentagemSinal: Number(body.porcentagemSinal), 
+        
+        // Mantém horários se vierem, senão usa padrão
+        horarioAbertura: body.horarioAbertura || "08:00",
+        horarioFechamento: body.horarioFechamento || "20:00",
       },
     });
 
-    return NextResponse.json(settings);
+    return NextResponse.json(lojaAtualizada);
+
   } catch (error) {
-    console.error("Erro ao salvar:", error);
+    console.error("❌ Erro ao salvar settings:", error);
     return NextResponse.json({ error: "Erro ao salvar configurações" }, { status: 500 });
   }
 }

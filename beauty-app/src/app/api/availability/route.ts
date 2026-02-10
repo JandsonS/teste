@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { isToday, format, parse } from "date-fns";
 import * as Info from "@/constants/info"; 
 
-// 1. DEFINIÇÃO DE TIPAGEM (Mantida)
+// Definição de Tipagem
 interface BusinessHours {
   start: number;
   end: number;
@@ -19,16 +19,19 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const dateStr = searchParams.get('date'); 
+  const establishmentId = searchParams.get('establishmentId'); // <--- NOVO: Pegamos o ID da loja
 
   if (!dateStr) return NextResponse.json({ error: 'Data obrigatória' }, { status: 400 });
+  
+  // Se não vier o ID da loja, é um erro de segurança
+  if (!establishmentId) return NextResponse.json({ error: 'ID da barbearia obrigatório' }, { status: 400 });
 
-  // === MUDANÇA: TEMPO LIMITE DE 2 MINUTOS ===
   const tempoLimite = new Date(Date.now() - 2 * 60 * 1000);
 
   try {
     const allSlots: string[] = [];
     
-    // 2. GERAÇÃO DA GRADE (Mantido seu Info original)
+    // Gera a grade de horários (padrão)
     const pauses = BUSINESS_HOURS.pauses || [];
     
     for (let hour = BUSINESS_HOURS.start; hour < BUSINESS_HOURS.end; hour++) {
@@ -48,16 +51,16 @@ export async function GET(request: Request) {
       });
     }
 
-    // 3. BUSCA NO BANCO (Regra de 2 min aplicada)
+    // --- BUSCA NO BANCO COM FILTRO DE LOJA ---
     const agendamentos = await prisma.agendamento.findMany({
       where: { 
+        establishmentId: establishmentId, // <--- O PULO DO GATO: Filtra só desta barbearia
         data: dateStr, 
         status: { not: 'CANCELADO' },
         OR: [
             { status: 'CONFIRMADO' },
             { status: 'PAGO_PIX' },
             { status: 'PAGO_CARTAO' },
-            // Se for PENDENTE, só trava se for MUITO RECENTE (menos de 2 min)
             { 
               status: 'PENDENTE',
               createdAt: { gt: tempoLimite } 
@@ -69,7 +72,7 @@ export async function GET(request: Request) {
     
     const busySlots = agendamentos.map(a => a.horario);
 
-    // 4. FILTRO DE HORÁRIO PASSADO (Mantido)
+    // Filtro de horário passado
     const dataSelecionada = parse(dateStr, 'dd/MM/yyyy', new Date());
     const agoraBrasilia = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
     const horaAtualFormatada = format(agoraBrasilia, "HH:mm");

@@ -2,41 +2,25 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import { SITE_CONFIG } from "@/constants/info";
-import { prisma } from "@/lib/prisma";
+// import { SITE_CONFIG } from "@/constants/info"; // Pode manter ou comentar se não usar
+// import { prisma } from "@/lib/prisma"; // Comentamos pois o layout global não deve chamar o banco
 
 const inter = Inter({ subsets: ["latin"] });
 
 export async function generateMetadata(): Promise<Metadata> {
-  // 1. Padrão: Se o banco falhar, usa "Barbearia App" e a logo local
-  let siteName = "Barbearia App"; 
-  let iconUrl = "/logo.png"; // <--- Garanta que tem um arquivo logo.png na pasta public
-
-  try {
-    const settings = await prisma.configuracao.findUnique({
-      where: { id: "settings" }
-    });
-    
-    if (settings) {
-      // Se o dono mudou o nome, pega do banco
-      if (settings.nomeEstabelecimento) {
-        siteName = settings.nomeEstabelecimento;
-      }
-      // Se o dono subiu logo, pega do banco. Senão, mantém a local /logo.png
-      if (settings.logoUrl && settings.logoUrl.length > 5) {
-        iconUrl = settings.logoUrl;
-      }
-    }
-  } catch (error) {
-    console.error("Erro ao buscar config:", error);
-  }
+  // --- ADAPTAÇÃO: ---
+  // Como o Layout Global não sabe qual barbearia é (isso acontece na URL),
+  // definimos valores genéricos para não quebrar o site.
+  // Os dados reais (Nome da Barbearia) serão carregados na página interna [slug]/page.tsx
+  
+  const siteName = "Agendamento App"; 
+  const iconUrl = "/logo.png"; // Garanta que esta imagem existe em /public
 
   return {
-    // AQUI ESTÁ A CORREÇÃO DO NOME DUPLICADO:
     title: {
       default: siteName,
-      template: `%s`, // Removemos qualquer texto extra aqui
-      absolute: siteName, // <--- O 'absolute' proíbe o Next.js de juntar nomes
+      template: `%s`, 
+      absolute: siteName, 
     },
     description: "Agende seu horário com praticidade.",
     icons: {
@@ -47,18 +31,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// --- 2. CONFIGURAÇÃO DE TEMA (CORES) ---
+// --- 2. CONFIGURAÇÃO DE TEMA (ADAPTADA) ---
+// Mantivemos sua função, mas removemos a chamada ao banco que causava o Erro 500
 async function getThemeSettings() {
-  try {
-    const config = await prisma.configuracao.findUnique({
-       where: { id: "settings" } 
-    });
-    return {
-      color: config?.corPrincipal || "#10b981", 
-    };
-  } catch (error) {
-    return { color: "#10b981" };
-  }
+  // Retornamos uma cor padrão segura.
+  // A cor "Real" da barbearia será aplicada pela página interna depois.
+  return { color: "#10b981" }; 
 }
 
 export default async function RootLayout({
@@ -66,14 +44,14 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Busca a cor para pintar o CSS
+  // Busca a cor padrão (agora sem quebrar o banco)
   const theme = await getThemeSettings();
 
   return (
     <html lang="pt-BR" className="dark">
       <body className={inter.className}>
         
-        {/* Injeta a Cor Dinâmica no CSS Global */}
+        {/* MANTIDA SUA LÓGICA DE CSS EXATAMENTE IGUAL */}
         <style>{`
           :root {
             --primary-color: ${theme.color};

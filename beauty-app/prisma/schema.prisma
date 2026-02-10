@@ -8,58 +8,90 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// --- TABELA PAI (A Barbearia/Loja) ---
+model Estabelecimento {
+  id                String   @id @default(cuid())
+  slug              String   @unique // O link da loja (ex: barbearia-vip)
+  nome              String   // Nome que aparece no topo
+  
+  // --- FINANCEIRO & INTEGRAÇÕES ---
+  mercadoPagoToken  String?  // Token específico desta loja
+  
+  // --- PERSONALIZAÇÃO VISUAL (Painel Admin) ---
+  logoUrl            String?  // Logo da loja
+  backgroundImageUrl String?  // Banner de fundo
+  corPrincipal       String   @default("#acb9b5") // Cor do tema
+  
+  // --- CONTATO & RODAPÉ ---
+  telefoneWhatsApp   String?  // Botão flutuante
+  endereco           String?  // Novo: Para mostrar no rodapé
+  
+  // --- REGRAS DE NEGÓCIO (Configurações) ---
+  porcentagemSinal   Float    @default(50.0) // 0.0 a 100.0 (Sinal dinâmico)
+  horarioAbertura    String   @default("08:00")
+  horarioFechamento  String   @default("20:00")
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // --- RELAÇÕES (O que pertence a esta loja) ---
+  agendamentos       Agendamento[]
+  servicos           Service[]
+}
+
+// --- AGENDAMENTOS ---
 model Agendamento {
   id              String   @id @default(cuid())
+  
+  // Dados do Cliente
   cliente         String
+  telefone        String?
   
-  // NOVO CAMPO ADICIONADO (Opcional para não quebrar dados antigos)
-  telefone        String?  
-  
+  // Dados do Serviço
   servico         String
   data            String
   horario         String
-  status          String   @default("PENDENTE")
   valor           Float
-  paymentId       String?
   
-  metodoPagamento String?  
+  // Status e Pagamento
+  status          String   @default("PENDENTE") // PENDENTE, CONFIRMADO, CANCELADO
+  paymentId       String?  // ID do Mercado Pago
+  metodoPagamento String?  // PIX, CARTAO, etc.
   
   createdAt       DateTime @default(now())
+
+  // RELAÇÃO COM A LOJA (Essencial para Multi-tenant)
+  establishmentId String?  
+  establishment   Estabelecimento? @relation(fields: [establishmentId], references: [id])
 }
 
+// --- SERVIÇOS ---
+model Service {
+  id          String  @id @default(cuid())
+  
+  // Detalhes
+  title       String  // Nome do corte
+  description String? // Descrição
+  price       Float   // Preço
+  duration    Int     // Duração em minutos
+  imageUrl    String? // Foto do serviço
+  
+  // CONTROLE DO DONO (Ligar/Desligar serviço)
+  active      Boolean @default(true) 
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // RELAÇÃO COM A LOJA (Para não misturar serviços de lojas diferentes)
+  establishmentId String?
+  establishment   Estabelecimento? @relation(fields: [establishmentId], references: [id])
+}
+
+// --- NOTIFICAÇÕES (Sistema Geral) ---
 model PushSubscription {
   id        String   @id @default(cuid())
   endpoint  String   @unique
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
-}
-
-model Configuracao {
-  id                  String   @id @default("settings")
-  porcentagemSinal    Float    @default(50.0)
-  precoServico        Float    @default(1.0)
-  horarioAbertura     String   @default("08:00")
-  horarioFechamento   String   @default("20:00")
-  
-  nomeEstabelecimento String   @default("Minha Barbearia") 
-  telefoneWhatsApp    String?
-  corPrincipal        String   @default("#acb9b5")
-  logoUrl             String?  // Link da logo da Loja
-  backgroundImageUrl  String?  // Backgroud 
-  updatedAt           DateTime @updatedAt
-}
-
-// Tabela de Serviços
-model Service {
-  id          String   @id @default(cuid())
-  title       String   // Ex: "Corte Social"
-  description String?  // Ex: "Acompanha lavagem"
-  price       Float    // Ex: 30.00
-  duration    Int      // Ex: 30 (minutos)
-  imageUrl    String?  // Link da foto do serviço
-  active      Boolean  @default(true) 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
 }

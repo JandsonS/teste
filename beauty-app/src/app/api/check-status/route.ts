@@ -1,39 +1,31 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma"; // Confirme se o caminho do seu prisma está certo
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const paymentId = searchParams.get("id");
+    const id = searchParams.get("id"); // Recebe o ID do agendamento (Ex: cmlcz...)
 
-    if (!paymentId) return NextResponse.json({ status: "error", message: "ID faltando" });
+    if (!id) {
+      return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
+    }
 
-    // Busca o agendamento (tenta como string ou número para garantir)
-    const agendamento = await prisma.agendamento.findFirst({
-      where: { 
-        OR: [
-          { paymentId: String(paymentId) },
-          // Se o seu banco salva como Int, descomente a linha abaixo:
-          // { paymentId: Number(paymentId) } 
-        ]
-      }
+    // 1. Busca direto no seu Banco de Dados
+    const agendamento = await prisma.agendamento.findUnique({
+        where: { id: id },
+        select: { status: true } // Só precisamos saber o status
     });
 
     if (!agendamento) {
-        // Se não achou, ainda está pendente ou ID errado
-        return NextResponse.json({ status: "pending" });
+        return NextResponse.json({ error: "Agendamento não encontrado" }, { status: 404 });
     }
 
-    // Se estiver CONFIRMADO ou PAGO, avisa o frontend
-    const aprovado = agendamento.status === "CONFIRMADO" || agendamento.status === "PAGO";
-    
-    return NextResponse.json({ 
-      status: aprovado ? "approved" : "pending" 
-    });
+    // 2. Devolve exatamente o que está no banco
+    // Se você colocou "CONFIRMADO" lá, vai sair "CONFIRMADO" aqui.
+    return NextResponse.json({ status: agendamento.status });
 
   } catch (error) {
-    return NextResponse.json({ status: "error" });
+    console.error("Erro ao verificar status:", error);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
