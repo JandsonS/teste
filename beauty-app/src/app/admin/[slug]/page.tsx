@@ -70,7 +70,7 @@ export default function AdminDashboard() {
     if (!silent) setLoading(true);
     try {
       // --- MUDANÇA: Adicionado ?slug=${slug} na chamada ---
-      const res = await fetch(`/api/admin/bookings?slug=${slug}`, { cache: "no-store" });
+      const res = await fetch(`/api/bookings?slug=${slug}`, { cache: "no-store" });
       
       if (res.status === 401) { router.push("/admin/login"); return; }
       const data = await res.json();
@@ -137,7 +137,7 @@ export default function AdminDashboard() {
     setDeletingId(id);
     try {
       // --- MUDANÇA: Passamos o slug no body para segurança extra (opcional mas bom) ---
-      const res = await fetch("/api/admin/bookings", {
+      const res = await fetch("/api/bookings", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, slug }), 
@@ -167,7 +167,7 @@ export default function AdminDashboard() {
     if (!confirm(`Deseja confirmar o recebimento do saldo restante (${porcentagemRestante}%) deste cliente no balcão?`)) return;
     
     try {
-      const res = await fetch("/api/admin/bookings/confirm", {
+      const res = await fetch("/api/bookings/confirm", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, slug }), // --- MUDANÇA: Slug adicionado aqui também
