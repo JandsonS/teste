@@ -441,19 +441,26 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                     {/* Configuração de Sinal */}
                     <div className="space-y-2 pt-4 border-t border-zinc-800">
                         <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Valor do Sinal (Reserva)</Label>
-                        <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+                        <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-zinc-700 transition-colors">
                             <select 
                                 className="w-full bg-transparent text-white outline-none font-medium cursor-pointer text-sm"
                                 value={config.porcentagemSinal}
                                 onChange={(e) => setConfig({ ...config, porcentagemSinal: e.target.value })}
                             >
-                                <option className="bg-zinc-900" value="0">Sem sinal (Paga na Loja)</option>
+                                <option className="bg-zinc-900" value="10">10% do valor</option>
                                 <option className="bg-zinc-900" value="20">20% do valor</option>
                                 <option className="bg-zinc-900" value="30">30% do valor</option>
+                                <option className="bg-zinc-900" value="40">40% do valor</option>
                                 <option className="bg-zinc-900" value="50">50% do valor (Padrão)</option>
-                                <option className="bg-zinc-900" value="100">100% (Pagamento Total)</option>
+                                <option className="bg-zinc-900" value="60">60% do valor</option>
+                                <option className="bg-zinc-900" value="70">70% do valor</option>
+                                <option className="bg-zinc-900" value="80">80% do valor</option>
+                                <option className="bg-zinc-900" value="90">90% do valor</option>
                             </select>
                         </div>
+                        <p className="text-[10px] text-zinc-500 px-1">
+                            Define a porcentagem cobrada na opção "Reservar Vaga". O restante é pago no local.
+                        </p>
                     </div>
 
                     <Button onClick={saveGeneralConfig} disabled={loading} className="w-full h-12 font-bold text-white shadow-lg mt-4" style={{ backgroundColor: config.corPrincipal || '#10b981' }}>

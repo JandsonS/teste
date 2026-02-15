@@ -65,6 +65,14 @@ export function BookingModal({ serviceName, price, establishmentId, slug, childr
   const depositValue = (numericPrice * (config.porcentagemSinal || 50)) / 100
   const formatMoney = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+  // --- AJUSTE MULTI-BANCOS: Renderiza QR Code corretamente (Link ou Base64) ---
+  const renderQrCode = (imgString: string) => {
+    if (!imgString) return "";
+    if (imgString.startsWith("http")) return imgString; // PagBank manda Link
+    if (imgString.startsWith("data:")) return imgString; // Já tem prefixo
+    return `data:image/png;base64,${imgString}`; // Adiciona prefixo se faltar
+  };
+
   // --- CARREGA CONFIGURAÇÕES ---
   useEffect(() => {
     if(open && slug) {
@@ -88,28 +96,22 @@ export function BookingModal({ serviceName, price, establishmentId, slug, childr
             setPixImage("");
             setIsPaid(false);
             setBookingId("");
+            setLoading(false); // Garante reset do loading
           }, 300)
       } 
   }, [open])
 
  // --- ESPIÃO DE PAGAMENTO (Polling) ---
- // Fica verificando se o status mudou para CONFIRMADO enquanto o modal do Pix está aberto
  useEffect(() => {
     let interval: NodeJS.Timeout;
 
-    // Só roda se estiver na tela do Pix (step 4), tiver um ID e ainda não tiver pago
     if (step === 4 && bookingId && !isPaid) {
         interval = setInterval(async () => {
             try {
-                // 👇 1. Chama a rota segura (passando o bookingId)
                 const res = await fetch(`/api/bookings?bookingId=${bookingId}`);
-                
                 if (res.ok) {
                     const data = await res.json();
-                    
-                    // 👇 2. A CORREÇÃO ESTÁ AQUI:
-                    // Como o backend agora manda só UM item (objeto), não usamos .find().
-                    // Verificamos o status direto no 'data'.
+                    // Verifica status CONFIRMADO ou PAGO
                     if (data && (data.status === 'CONFIRMADO' || data.status === 'PAGO')) {
                         setIsPaid(true);
                         toast.success("Pagamento Confirmado!", { description: "Seu horário está garantido." });
@@ -119,9 +121,8 @@ export function BookingModal({ serviceName, price, establishmentId, slug, childr
             } catch (error) {
                 console.error("Erro ao verificar status", error);
             }
-        }, 3000); // Verifica a cada 3 segundos
+        }, 3000);
     }
-
     return () => clearInterval(interval);
  }, [step, bookingId, isPaid]);
 
@@ -151,6 +152,7 @@ export function BookingModal({ serviceName, price, establishmentId, slug, childr
         .then(data => { 
             if (data.busy) setBusySlots(data.busy)
             if (data.available) setAvailableSlots(data.available)
+            // Fallback se API não retornar slots
             if (!data.available || data.available.length === 0) {
                 setAvailableSlots(["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"]);
             }
@@ -179,7 +181,7 @@ export function BookingModal({ serviceName, price, establishmentId, slug, childr
   }
 
   // =========================================================
-  // ⚡️ FUNÇÃO CHECKOUT CORRIGIDA
+  // ⚡️ FUNÇÃO CHECKOUT (Compatível com Multi-Bancos)
   // =========================================================
   const handleCheckout = async (paymentType: 'FULL' | 'DEPOSIT') => {
     setBookingType(paymentType);
@@ -221,23 +223,17 @@ export function BookingModal({ serviceName, price, establishmentId, slug, childr
           return; 
       }
 
-      // 👇 SUCESSO! AQUI ESTAVA O PROBLEMA ANTES 👇
-      // Agora pegamos a imagem que o Backend mandou e mostramos
-      
+      // SUCESSO! Leitura universal da resposta
       if (paymentMethod === 'PIX') {
-          // 1. Salva os dados do Pix no estado
-          setPixCode(data.copiaCola || data.payload || data.pixCode);
+          // Lê os campos novos padronizados, mantendo fallback para os antigos
+          setPixCode(data.qrCodeCopiaCola || data.copiaCola || data.payload || data.pixCode);
+          setPixImage(data.qrCodeBase64 || data.fullImage || data.base64 || data.image);
           
-          // Tenta pegar qualquer variação de nome da imagem que o backend mandou
-          setPixImage(data.fullImage || data.base64 || data.qrCodeBase64 || data.image);
-          
-          setBookingId(data.bookingId); // Salva o ID para o "Espião" monitorar
+          setBookingId(data.bookingId); 
 
-          // 2. AVANÇA PARA A TELA 4 (QR CODE) EM VEZ DE FECHAR
           setStep(4);
           setLoading(false);
       } else {
-          // Se for cartão (futuro), fecha
           toast.success("Agendamento Solicitado!");
           setOpen(false);
       }
@@ -465,7 +461,7 @@ export function BookingModal({ serviceName, price, establishmentId, slug, childr
                                 <div className="absolute inset-0 border-2 border-dashed border-zinc-300 rounded-3xl pointer-events-none group-hover:border-emerald-500 transition-colors"></div>
                                 {pixImage ? (
                                     <img 
-                                        src={pixImage.startsWith('data:') ? pixImage : `data:image/png;base64,${pixImage}`} 
+                                        src={renderQrCode(pixImage)} 
                                         alt="Pix QR Code" 
                                         className="w-48 h-48 sm:w-56 sm:h-56 mix-blend-multiply object-contain" 
                                     />
