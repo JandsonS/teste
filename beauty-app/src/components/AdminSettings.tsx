@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Settings, Plus, Trash2, Edit2, Power, Loader2, Save, Palette, Store, MessageCircle, Upload, Image as ImageIcon, X, CreditCard, Lock } from "lucide-react"
+import { Settings, Plus, Trash2, Edit2, Power, Loader2, Save, Palette, Store, MessageCircle, Upload, Image as ImageIcon, X, CreditCard, Lock, Wallet, Landmark } from "lucide-react"
 import { toast } from "sonner"
 
 // --- CONFIGURAÇÃO DO SUPABASE ---
@@ -34,7 +34,6 @@ interface AdminSettingsProps {
 
 export default function AdminSettings({ config, setConfig, handleUpdateSettings }: AdminSettingsProps) {
   const [open, setOpen] = useState(false);
-  // Adicionei a aba 'pagamento'
   const [activeTab, setActiveTab] = useState<'geral' | 'pagamento' | 'servicos'>('geral');
   const [loading, setLoading] = useState(false);
   
@@ -128,7 +127,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
 
     setLoading(true);
     try {
-      // Prepara os dados normais
+      // Prepara os dados normais (incluindo Asaas e PagBank)
       let payload = { 
           slug: slug, 
           ...config,
@@ -330,94 +329,112 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                 </div>
             )}
 
-            {/* === ABA PAGAMENTO (NOVA!) === */}
+            {/* === ABA PAGAMENTO (MULTI-BANK) === */}
             {activeTab === 'pagamento' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                     
-                    {/* Seletor de Banco */}
+                    {/* Seletor de Banco (Grid 2x2) */}
                     <div className="space-y-4">
-                        <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Banco Principal</Label>
+                        <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Selecione o Banco Principal</Label>
                         <div className="grid grid-cols-2 gap-3">
-                            <div 
-                                onClick={() => setConfig({...config, provedor: 'MERCADOPAGO'})}
-                                className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${config.provedor === 'MERCADOPAGO' ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
-                            >
+                            {/* Mercado Pago */}
+                            <div onClick={() => setConfig({...config, provedor: 'MERCADOPAGO'})}
+                                className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${config.provedor === 'MERCADOPAGO' ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
                                 <CreditCard size={24} />
                                 <span className="text-xs font-bold">Mercado Pago</span>
                             </div>
-                            <div 
-                                onClick={() => setConfig({...config, provedor: 'INTER'})}
-                                className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${config.provedor === 'INTER' ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
-                            >
-                                <Store size={24} />
+
+                            {/* Banco Inter */}
+                            <div onClick={() => setConfig({...config, provedor: 'INTER'})}
+                                className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${config.provedor === 'INTER' ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+                                <Landmark size={24} />
                                 <span className="text-xs font-bold">Banco Inter</span>
+                            </div>
+
+                            {/* Asaas */}
+                            <div onClick={() => setConfig({...config, provedor: 'ASAAS'})}
+                                className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${config.provedor === 'ASAAS' ? 'bg-slate-500/10 border-slate-500 text-slate-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+                                <Wallet size={24} />
+                                <span className="text-xs font-bold">Asaas</span>
+                            </div>
+
+                            {/* PagBank */}
+                            <div onClick={() => setConfig({...config, provedor: 'PAGBANK'})}
+                                className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${config.provedor === 'PAGBANK' ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>
+                                <CreditCard size={24} />
+                                <span className="text-xs font-bold">PagBank</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Configuração Mercado Pago */}
+                    {/* --- FORMULÁRIOS DINÂMICOS --- */}
+
+                    {/* 1. Mercado Pago */}
                     {config.provedor === 'MERCADOPAGO' && (
                         <div className="space-y-4 bg-blue-900/10 p-4 rounded-xl border border-blue-900/30 animate-in slide-in-from-top-2">
                              <Label className="text-blue-400 text-xs font-bold">Token de Acesso (Access Token)</Label>
                              <div className="flex items-center gap-2 bg-black/40 border border-blue-500/20 rounded-lg px-3">
                                 <Lock size={14} className="text-blue-500"/>
-                                <Input 
-                                    type="password"
-                                    value={config.mercadoPagoToken || ""} 
-                                    onChange={(e) => setConfig({...config, mercadoPagoToken: e.target.value})}
-                                    placeholder="APP_USR-xxxx-xxxx..."
-                                    className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0 text-white placeholder:text-zinc-600" 
-                                />
+                                <Input type="password" value={config.mercadoPagoToken || ""} onChange={(e) => setConfig({...config, mercadoPagoToken: e.target.value})} placeholder="APP_USR-xxxx..." className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0 text-white" />
                              </div>
                              <p className="text-[10px] text-zinc-500">Cole aqui o token de produção do Mercado Pago.</p>
                         </div>
                     )}
 
-                    {/* Configuração Banco Inter */}
+                    {/* 2. Banco Inter */}
                     {config.provedor === 'INTER' && (
                         <div className="space-y-4 bg-orange-900/10 p-4 rounded-xl border border-orange-900/30 animate-in slide-in-from-top-2">
                              <div className="grid gap-4">
                                 <div>
                                     <Label className="text-orange-400 text-xs font-bold">Client ID</Label>
-                                    <Input 
-                                        value={config.interClientId || ""} 
-                                        onChange={(e) => setConfig({...config, interClientId: e.target.value})}
-                                        className="bg-black/40 border-orange-500/20 text-white mt-1" 
-                                        placeholder="Ex: abcd-1234..."
-                                    />
+                                    <Input value={config.interClientId || ""} onChange={(e) => setConfig({...config, interClientId: e.target.value})} className="bg-black/40 border-orange-500/20 text-white mt-1" />
                                 </div>
                                 <div>
                                     <Label className="text-orange-400 text-xs font-bold">Client Secret</Label>
-                                    <Input 
-                                        value={config.interClientSecret || ""} 
-                                        onChange={(e) => setConfig({...config, interClientSecret: e.target.value})}
-                                        className="bg-black/40 border-orange-500/20 text-white mt-1" 
-                                        placeholder="Ex: xxxx-yyyy-zzzz"
-                                    />
+                                    <Input value={config.interClientSecret || ""} onChange={(e) => setConfig({...config, interClientSecret: e.target.value})} className="bg-black/40 border-orange-500/20 text-white mt-1" />
                                 </div>
-
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <Label className="text-orange-400 text-xs font-bold mb-1 block">Certificado (.crt)</Label>
                                         <div className="relative">
                                             <input type="file" onChange={(e) => setCertFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" accept=".crt,.pem" />
-                                            <div className={`h-12 border border-dashed rounded-lg flex items-center justify-center text-xs ${certFile ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-orange-500/30 text-zinc-400'}`}>
-                                                {certFile ? certFile.name : config.interCert ? "Já Enviado ✅" : "Upload .crt"}
-                                            </div>
+                                            <div className={`h-12 border border-dashed rounded-lg flex items-center justify-center text-xs ${certFile ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-orange-500/30 text-zinc-400'}`}>{certFile ? certFile.name : config.interCert ? "Já Enviado ✅" : "Upload .crt"}</div>
                                         </div>
                                     </div>
                                     <div>
                                         <Label className="text-orange-400 text-xs font-bold mb-1 block">Chave Privada (.key)</Label>
                                         <div className="relative">
                                             <input type="file" onChange={(e) => setKeyFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" accept=".key" />
-                                            <div className={`h-12 border border-dashed rounded-lg flex items-center justify-center text-xs ${keyFile ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-orange-500/30 text-zinc-400'}`}>
-                                                {keyFile ? keyFile.name : config.interKey ? "Já Enviado ✅" : "Upload .key"}
-                                            </div>
+                                            <div className={`h-12 border border-dashed rounded-lg flex items-center justify-center text-xs ${keyFile ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-orange-500/30 text-zinc-400'}`}>{keyFile ? keyFile.name : config.interKey ? "Já Enviado ✅" : "Upload .key"}</div>
                                         </div>
                                     </div>
                                 </div>
                              </div>
                              <p className="text-[10px] text-zinc-500">Faça o upload dos arquivos gerados no Internet Banking PJ.</p>
+                        </div>
+                    )}
+
+                    {/* 3. Asaas */}
+                    {config.provedor === 'ASAAS' && (
+                        <div className="space-y-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700 animate-in slide-in-from-top-2">
+                             <Label className="text-slate-300 text-xs font-bold">API Key (Chave de API)</Label>
+                             <div className="flex items-center gap-2 bg-black/40 border border-slate-600 rounded-lg px-3">
+                                <Lock size={14} className="text-slate-400"/>
+                                <Input type="password" value={config.asaasToken || ""} onChange={(e) => setConfig({...config, asaasToken: e.target.value})} placeholder="$aact_..." className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0 text-white" />
+                             </div>
+                             <p className="text-[10px] text-zinc-500">Cole a chave de API gerada no painel do Asaas.</p>
+                        </div>
+                    )}
+
+                    {/* 4. PagBank */}
+                    {config.provedor === 'PAGBANK' && (
+                        <div className="space-y-4 bg-yellow-900/10 p-4 rounded-xl border border-yellow-500/20 animate-in slide-in-from-top-2">
+                             <Label className="text-yellow-500 text-xs font-bold">Token de Acesso</Label>
+                             <div className="flex items-center gap-2 bg-black/40 border border-yellow-500/20 rounded-lg px-3">
+                                <Lock size={14} className="text-yellow-500"/>
+                                <Input type="password" value={config.pagbankToken || ""} onChange={(e) => setConfig({...config, pagbankToken: e.target.value})} placeholder="Token do PagSeguro..." className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0 text-white" />
+                             </div>
+                             <p className="text-[10px] text-zinc-500">Token gerado no painel PagSeguro Developer.</p>
                         </div>
                     )}
 
