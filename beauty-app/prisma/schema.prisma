@@ -8,33 +8,61 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// 1. LISTA DE BANCOS ACEITOS
+// Aqui definimos as opções que o sistema vai ter
+enum ProvedorPagamento {
+  MERCADOPAGO
+  INTER
+  ASAAS
+  PAGBANK
+}
+
 // --- TABELA PAI (A Barbearia/Loja) ---
 model Estabelecimento {
-  id                String   @id @default(cuid())
-  slug              String   @unique // O link da loja (ex: barbearia-vip)
-  nome              String   // Nome que aparece no topo
+  id                 String   @id @default(cuid())
+  slug               String   @unique 
+  nome               String   
+
+  // --- SELETOR DE BANCO (NOVO!) ---
+  // Define quem manda nessa loja. O padrão continua Mercado Pago.
+  provedor           ProvedorPagamento @default(MERCADOPAGO)
+
+  // --- CREDENCIAIS FINANCEIRAS ---
   
-  // --- FINANCEIRO & INTEGRAÇÕES ---
-  mercadoPagoToken  String?  // Token específico desta loja
+  // 🟡 Mercado Pago (Simples)
+  mercadoPagoToken   String?  
+
+  // 🟠 Banco Inter (Segurança Bancária - Certificados)
+  interClientId      String?
+  interClientSecret  String?
+  interCert          String?  @db.Text // O arquivo .crt (Texto Gigante)
+  interKey           String?  @db.Text // O arquivo .key (Texto Gigante)
+
+  // 🔵 Asaas (Preparado para o futuro)
+  asaasToken         String?
+  asaasWalletId      String?
+
+  // 🟢 PagBank (Preparado para o futuro)
+  pagbankToken       String?
   
-  // --- PERSONALIZAÇÃO VISUAL (Painel Admin) ---
-  logoUrl            String?  // Logo da loja
-  backgroundImageUrl String?  // Banner de fundo
-  corPrincipal       String   @default("#acb9b5") // Cor do tema
+  // --- PERSONALIZAÇÃO VISUAL ---
+  logoUrl            String?  
+  backgroundImageUrl String?  
+  corPrincipal       String   @default("#acb9b5") 
   
   // --- CONTATO & RODAPÉ ---
-  telefoneWhatsApp   String?  // Botão flutuante
-  endereco           String?  // Novo: Para mostrar no rodapé
+  telefoneWhatsApp   String?  
+  endereco           String?  
   
-  // --- REGRAS DE NEGÓCIO (Configurações) ---
-  porcentagemSinal   Float    @default(50.0) // 0.0 a 100.0 (Sinal dinâmico)
+  // --- REGRAS DE NEGÓCIO ---
+  porcentagemSinal   Float    @default(50.0) 
   horarioAbertura    String   @default("08:00")
   horarioFechamento  String   @default("20:00")
   
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  // --- RELAÇÕES (O que pertence a esta loja) ---
+  // --- RELAÇÕES ---
   agendamentos       Agendamento[]
   servicos           Service[]
 }
@@ -42,7 +70,7 @@ model Estabelecimento {
 // --- AGENDAMENTOS ---
 model Agendamento {
   id              String   @id @default(cuid())
-  slug String?
+  slug            String?
   
   // Dados do Cliente
   cliente         String
@@ -55,13 +83,13 @@ model Agendamento {
   valor           Float
   
   // Status e Pagamento
-  status          String   @default("PENDENTE") // PENDENTE, CONFIRMADO, CANCELADO
-  paymentId       String?  // ID do Mercado Pago
-  metodoPagamento String?  // PIX, CARTAO, etc.
+  status          String   @default("PENDENTE") 
+  paymentId       String?  
+  metodoPagamento String?  
   
   createdAt       DateTime @default(now())
 
-  // RELAÇÃO COM A LOJA (Essencial para Multi-tenant)
+  // RELAÇÃO COM A LOJA
   establishmentId String?  
   establishment   Estabelecimento? @relation(fields: [establishmentId], references: [id])
 }
@@ -71,24 +99,24 @@ model Service {
   id          String  @id @default(cuid())
   
   // Detalhes
-  title       String  // Nome do corte
-  description String? // Descrição
-  price       Float   // Preço
-  duration    Int     // Duração em minutos
-  imageUrl    String? // Foto do serviço
+  title       String  
+  description String? 
+  price       Float   
+  duration    Int     
+  imageUrl    String? 
   
-  // CONTROLE DO DONO (Ligar/Desligar serviço)
+  // CONTROLE DO DONO
   active      Boolean @default(true) 
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // RELAÇÃO COM A LOJA (Para não misturar serviços de lojas diferentes)
+  // RELAÇÃO COM A LOJA
   establishmentId String?
   establishment   Estabelecimento? @relation(fields: [establishmentId], references: [id])
 }
 
-// --- NOTIFICAÇÕES (Sistema Geral) ---
+// --- NOTIFICAÇÕES ---
 model PushSubscription {
   id        String   @id @default(cuid())
   endpoint  String   @unique
