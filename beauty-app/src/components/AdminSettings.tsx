@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useRouter, useParams } from "next/navigation" // <--- ADICIONEI useParams
+import { useRouter, useParams } from "next/navigation"
 import { createClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Settings, Plus, Trash2, Edit2, Power, Loader2, Save, Palette, Store, MessageCircle, Upload, Image as ImageIcon, X } from "lucide-react"
+import { Settings, Plus, Trash2, Edit2, Power, Loader2, Save, Palette, Store, MessageCircle, Upload, Image as ImageIcon, X, CreditCard, Lock } from "lucide-react"
 import { toast } from "sonner"
 
 // --- CONFIGURAÇÃO DO SUPABASE ---
@@ -16,7 +16,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Definição do Tipo de Serviço
 interface Service {
   id: string;
   title: string;
@@ -35,29 +34,28 @@ interface AdminSettingsProps {
 
 export default function AdminSettings({ config, setConfig, handleUpdateSettings }: AdminSettingsProps) {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'geral' | 'servicos'>('geral');
+  // Adicionei a aba 'pagamento'
+  const [activeTab, setActiveTab] = useState<'geral' | 'pagamento' | 'servicos'>('geral');
   const [loading, setLoading] = useState(false);
   
   const router = useRouter();
-  const params = useParams(); // <--- CAPTURA O SLUG DA URL
-  const slug = params?.slug as string; // Garante que temos o slug
+  const params = useParams(); 
+  const slug = params?.slug as string;
 
-  // --- ESTADOS NOVOS PARA UPLOAD DA LOGO ---
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Estado dos Serviços
+  // --- ESTADOS PARA O BANCO INTER ---
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [keyFile, setKeyFile] = useState<File | null>(null);
+  
+  // Serviços
   const [services, setServices] = useState<Service[]>([]);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
+  const [formData, setFormData] = useState({ title: "", price: "", duration: "", description: "", imageUrl: "" });
 
-  // Form para Adicionar/Editar
-  const [formData, setFormData] = useState({
-      title: "", price: "", duration: "", description: "", imageUrl: ""
-  });
-
-  // Carregar serviços ao abrir a aba
   useEffect(() => {
     if (open && activeTab === 'servicos' && slug) {
         fetchServices();
@@ -67,7 +65,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
   const fetchServices = async () => {
       setLoadingServices(true);
       try {
-        // --- MULTI-TENANT: Busca serviços APENAS deste slug ---
         const res = await fetch(`/api/admin/services?slug=${slug}`);
         const data = await res.json();
         if (Array.isArray(data)) setServices(data);
@@ -78,7 +75,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
       }
   };
 
-  // --- FUNÇÃO DE UPLOAD DA LOGO ---
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -86,7 +82,7 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
     setUploadingLogo(true);
     try {
         const fileExt = file.name.split('.').pop();
-        const fileName = `${slug}-logo-${Date.now()}.${fileExt}`; // Nome único por loja
+        const fileName = `${slug}-logo-${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
@@ -100,11 +96,11 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
             .getPublicUrl(filePath);
 
         setConfig({ ...config, logoUrl: publicUrl });
-        toast.success("Logo carregada! Clique em Salvar para confirmar.");
+        toast.success("Logo carregada! Salve as configurações.");
 
     } catch (error) {
         console.error(error);
-        toast.error("Erro ao fazer upload da imagem.");
+        toast.error("Erro ao fazer upload.");
     } finally {
         setUploadingLogo(false);
     }
@@ -114,7 +110,16 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
       setConfig({ ...config, logoUrl: "" });
   };
 
-  // --- LÓGICA DA ABA GERAL (MULTI-TENANT) ---
+  // --- FUNÇÃO INTELIGENTE PARA LER ARQUIVOS DO INTER ---
+  const readFileContent = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => resolve(event.target?.result as string);
+          reader.onerror = (error) => reject(error);
+          reader.readAsText(file); // Lê como texto puro
+      });
+  };
+
   const saveGeneralConfig = async () => {
     if (!slug) {
         toast.error("Erro: Loja não identificada.");
@@ -123,57 +128,59 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
 
     setLoading(true);
     try {
-      // Usamos uma rota genérica, mas passamos o SLUG no corpo
+      // Prepara os dados normais
+      let payload = { 
+          slug: slug, 
+          ...config,
+          porcentagemSinal: Number(config.porcentagemSinal)
+      };
+
+      // Se tiver arquivos do Inter selecionados, lê o conteúdo e anexa
+      if (config.provedor === 'INTER') {
+          if (certFile) {
+              const certContent = await readFileContent(certFile);
+              payload.interCert = certContent; // Manda o texto do arquivo
+          }
+          if (keyFile) {
+              const keyContent = await readFileContent(keyFile);
+              payload.interKey = keyContent; // Manda o texto do arquivo
+          }
+      }
+
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-            slug: slug, // <--- O PULO DO GATO: Identifica quem está salvando
-            ...config,
-            // Garante conversão de tipos
-            porcentagemSinal: Number(config.porcentagemSinal)
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        toast.success("Configurações salvas!", {
-            description: "Atualizando loja...",
-            duration: 1500,
-        });
-        
+        toast.success("Configurações salvas!", { duration: 1500 });
         if (handleUpdateSettings) handleUpdateSettings();
-
         router.refresh(); 
-        
-        // Pequeno delay para recarregar visualmente
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000);
-
+        setCertFile(null); // Limpa seleção
+        setKeyFile(null);
       } else {
-        toast.error("Erro ao salvar configurações.");
-        setLoading(false);
+        toast.error("Erro ao salvar.");
       }
     } catch (error) {
-      console.error(error);
       toast.error("Erro de conexão.");
+    } finally {
       setLoading(false);
     }
   };
 
-  // --- LÓGICA DA ABA SERVIÇOS (MULTI-TENANT) ---
+  // ... (Funções de Serviço mantidas iguais)
   const handleSaveService = async () => {
       if (!formData.title || !formData.price || !formData.duration) {
           toast.error("Preencha Nome, Preço e Duração.");
           return;
       }
-      
       setLoading(true);
       try {
           const method = editingService ? 'PUT' : 'POST';
           const body = editingService 
-            ? { ...formData, id: editingService.id, action: 'update', slug } // Envia Slug
-            : { ...formData, slug }; // Envia Slug
+            ? { ...formData, id: editingService.id, action: 'update', slug } 
+            : { ...formData, slug };
 
           const res = await fetch("/api/admin/services", {
               method: method,
@@ -200,7 +207,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
   const handleDeleteService = async (id: string) => {
       if (!confirm("Tem certeza que deseja excluir?")) return;
       try {
-        // Envia SLUG para garantir que só o dono apague
         const res = await fetch("/api/admin/services", { 
             method: 'PUT', 
             body: JSON.stringify({ id, action: 'delete', slug }) 
@@ -220,7 +226,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
             method: 'PUT', 
             body: JSON.stringify({ id, action: 'toggle', slug }) 
         });
-        
         if (res.ok) {
             fetchServices();
             toast.success("Status alterado.");
@@ -251,46 +256,28 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
       
       <DialogContent className="bg-[#09090b] border-zinc-800 text-white w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar p-0 gap-0">
         
-        {/* HEADER DO MODAL */}
         <div className="p-6 border-b border-zinc-800">
             <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                <Settings className="text-emerald-500" /> Configurações da Loja
+                <Settings className="text-emerald-500" /> Painel de Controle
             </DialogTitle>
             </DialogHeader>
 
             <div className="flex gap-2 mt-6 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800/50">
-                <button 
-                    onClick={() => setActiveTab('geral')}
-                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'geral' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
-                >
-                    Geral & Visual
-                </button>
-                <button 
-                    onClick={() => setActiveTab('servicos')}
-                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'servicos' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
-                >
-                    Meus Serviços
-                </button>
+                <button onClick={() => setActiveTab('geral')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'geral' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Geral</button>
+                <button onClick={() => setActiveTab('pagamento')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'pagamento' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Pagamento</button>
+                <button onClick={() => setActiveTab('servicos')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'servicos' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>Serviços</button>
             </div>
         </div>
 
-        {/* CORPO DO MODAL */}
         <div className="p-6">
             
             {/* === ABA GERAL === */}
             {activeTab === 'geral' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
-                    
-                    {/* VISUAL */}
                     <div className="space-y-4 border-b border-zinc-800 pb-6">
-                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                           <Palette size={16} className="text-emerald-500"/> Identidade Visual
-                        </h3>
-                        
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2"><Palette size={16} className="text-emerald-500"/> Identidade Visual</h3>
                         <div className="grid gap-4">
-
-                            {/* UPLOAD LOGO */}
                             <div>
                                 <Label className="text-zinc-400 text-xs mb-2 block">Logo da Loja</Label>
                                 <div className="flex items-start gap-4">
@@ -298,100 +285,163 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                                         {config.logoUrl ? (
                                             <>
                                                 <img src={config.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                                                <button onClick={removeLogo} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <X size={16} className="text-white" />
-                                                </button>
+                                                <button onClick={removeLogo} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X size={16} className="text-white" /></button>
                                             </>
-                                        ) : (
-                                            <ImageIcon size={24} className="text-zinc-600" />
-                                        )}
+                                        ) : (<ImageIcon size={24} className="text-zinc-600" />)}
                                     </div>
                                     <div className="flex-1">
                                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
-                                            <Button 
-                                                onClick={() => fileInputRef.current?.click()} 
-                                                variant="outline" 
-                                                disabled={uploadingLogo}
-                                                className="w-full border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-zinc-300 h-20 flex flex-col gap-1 items-center justify-center border-dashed"
-                                            >
+                                            <Button onClick={() => fileInputRef.current?.click()} variant="outline" disabled={uploadingLogo} className="w-full border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-zinc-300 h-20 flex flex-col gap-1 items-center justify-center border-dashed">
                                                 {uploadingLogo ? <Loader2 className="animate-spin text-emerald-500" /> : <><Upload size={18} className="mb-1" /><span className="text-xs">Enviar nova logo</span></>}
                                             </Button>
                                     </div>
                                 </div>
                             </div>
-
                             <div>
                                 <Label className="text-zinc-400 text-xs">Nome do Estabelecimento</Label>
                                 <div className="flex items-center gap-2 mt-1 bg-zinc-900/50 border border-zinc-800 rounded-lg px-3">
                                     <Store size={16} className="text-zinc-500"/>
-                                    <Input 
-                                        value={config.nomeEstabelecimento || ""} 
-                                        onChange={(e) => setConfig({...config, nomeEstabelecimento: e.target.value})}
-                                        className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0"
-                                    />
+                                    <Input value={config.nomeEstabelecimento || ""} onChange={(e) => setConfig({...config, nomeEstabelecimento: e.target.value})} className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0" />
                                 </div>
                             </div>
-
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label className="text-zinc-400 text-xs">Cor Principal</Label>
                                     <div className="flex items-center gap-3 mt-1 bg-zinc-900/50 border border-zinc-800 rounded-lg p-2 h-10">
-                                        <input
-                                            type="color"
-                                            value={config.corPrincipal || "#10b981"}
-                                            onChange={(e) => setConfig({...config, corPrincipal: e.target.value})}
-                                            className="h-6 w-8 rounded cursor-pointer bg-transparent border-0 p-0"
-                                        />
+                                        <input type="color" value={config.corPrincipal || "#10b981"} onChange={(e) => setConfig({...config, corPrincipal: e.target.value})} className="h-6 w-8 rounded cursor-pointer bg-transparent border-0 p-0" />
                                         <span className="text-xs text-zinc-500 font-mono">{config.corPrincipal}</span>
                                     </div>
                                 </div>
-                                
                                 <div>
                                     <Label className="text-zinc-400 text-xs">WhatsApp</Label>
                                     <div className="flex items-center gap-2 mt-1 bg-zinc-900/50 border border-zinc-800 rounded-lg px-3">
                                         <MessageCircle size={16} className="text-zinc-500"/>
-                                        <Input 
-                                            value={config.telefoneWhatsApp || ""} 
-                                            onChange={(e) => setConfig({...config, telefoneWhatsApp: e.target.value})}
-                                            placeholder="Ex: 11999999999"
-                                            className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0"
-                                        />
+                                        <Input value={config.telefoneWhatsApp || ""} onChange={(e) => setConfig({...config, telefoneWhatsApp: e.target.value})} placeholder="Ex: 11999999999" className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0" />
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    <div className="pt-4 border-t border-zinc-800">
+                        <Button onClick={saveGeneralConfig} disabled={loading} className="w-full h-12 font-bold text-white shadow-lg transition-all" style={{ backgroundColor: config.corPrincipal || '#10b981' }}>
+                            {loading ? <Loader2 className="animate-spin mr-2"/> : <Save className="mr-2 w-4 h-4"/>} {loading ? "Salvando..." : "Salvar Configurações"}
+                        </Button>
+                    </div>
+                </div>
+            )}
 
-                    {/* FINANCEIRO */}
+            {/* === ABA PAGAMENTO (NOVA!) === */}
+            {activeTab === 'pagamento' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                    
+                    {/* Seletor de Banco */}
                     <div className="space-y-4">
-                        <Label htmlFor="sinal-select" className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Valor do Sinal (Reserva)</Label>
-                        <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-zinc-700 transition-colors">
+                        <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Banco Principal</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div 
+                                onClick={() => setConfig({...config, provedor: 'MERCADOPAGO'})}
+                                className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${config.provedor === 'MERCADOPAGO' ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+                            >
+                                <CreditCard size={24} />
+                                <span className="text-xs font-bold">Mercado Pago</span>
+                            </div>
+                            <div 
+                                onClick={() => setConfig({...config, provedor: 'INTER'})}
+                                className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${config.provedor === 'INTER' ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+                            >
+                                <Store size={24} />
+                                <span className="text-xs font-bold">Banco Inter</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Configuração Mercado Pago */}
+                    {config.provedor === 'MERCADOPAGO' && (
+                        <div className="space-y-4 bg-blue-900/10 p-4 rounded-xl border border-blue-900/30 animate-in slide-in-from-top-2">
+                             <Label className="text-blue-400 text-xs font-bold">Token de Acesso (Access Token)</Label>
+                             <div className="flex items-center gap-2 bg-black/40 border border-blue-500/20 rounded-lg px-3">
+                                <Lock size={14} className="text-blue-500"/>
+                                <Input 
+                                    type="password"
+                                    value={config.mercadoPagoToken || ""} 
+                                    onChange={(e) => setConfig({...config, mercadoPagoToken: e.target.value})}
+                                    placeholder="APP_USR-xxxx-xxxx..."
+                                    className="border-0 bg-transparent focus-visible:ring-0 h-10 px-0 text-white placeholder:text-zinc-600" 
+                                />
+                             </div>
+                             <p className="text-[10px] text-zinc-500">Cole aqui o token de produção do Mercado Pago.</p>
+                        </div>
+                    )}
+
+                    {/* Configuração Banco Inter */}
+                    {config.provedor === 'INTER' && (
+                        <div className="space-y-4 bg-orange-900/10 p-4 rounded-xl border border-orange-900/30 animate-in slide-in-from-top-2">
+                             <div className="grid gap-4">
+                                <div>
+                                    <Label className="text-orange-400 text-xs font-bold">Client ID</Label>
+                                    <Input 
+                                        value={config.interClientId || ""} 
+                                        onChange={(e) => setConfig({...config, interClientId: e.target.value})}
+                                        className="bg-black/40 border-orange-500/20 text-white mt-1" 
+                                        placeholder="Ex: abcd-1234..."
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-orange-400 text-xs font-bold">Client Secret</Label>
+                                    <Input 
+                                        value={config.interClientSecret || ""} 
+                                        onChange={(e) => setConfig({...config, interClientSecret: e.target.value})}
+                                        className="bg-black/40 border-orange-500/20 text-white mt-1" 
+                                        placeholder="Ex: xxxx-yyyy-zzzz"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label className="text-orange-400 text-xs font-bold mb-1 block">Certificado (.crt)</Label>
+                                        <div className="relative">
+                                            <input type="file" onChange={(e) => setCertFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" accept=".crt,.pem" />
+                                            <div className={`h-12 border border-dashed rounded-lg flex items-center justify-center text-xs ${certFile ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-orange-500/30 text-zinc-400'}`}>
+                                                {certFile ? certFile.name : config.interCert ? "Já Enviado ✅" : "Upload .crt"}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label className="text-orange-400 text-xs font-bold mb-1 block">Chave Privada (.key)</Label>
+                                        <div className="relative">
+                                            <input type="file" onChange={(e) => setKeyFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" accept=".key" />
+                                            <div className={`h-12 border border-dashed rounded-lg flex items-center justify-center text-xs ${keyFile ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-orange-500/30 text-zinc-400'}`}>
+                                                {keyFile ? keyFile.name : config.interKey ? "Já Enviado ✅" : "Upload .key"}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                             </div>
+                             <p className="text-[10px] text-zinc-500">Faça o upload dos arquivos gerados no Internet Banking PJ.</p>
+                        </div>
+                    )}
+
+                    {/* Configuração de Sinal */}
+                    <div className="space-y-2 pt-4 border-t border-zinc-800">
+                        <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Valor do Sinal (Reserva)</Label>
+                        <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
                             <select 
-                                id="sinal-select"
-                                className="w-full bg-transparent text-white outline-none font-medium cursor-pointer"
+                                className="w-full bg-transparent text-white outline-none font-medium cursor-pointer text-sm"
                                 value={config.porcentagemSinal}
                                 onChange={(e) => setConfig({ ...config, porcentagemSinal: e.target.value })}
                             >
-                                <option className="bg-zinc-900" value="0">Sem sinal (Pagamento na Loja)</option>
-                                <option className="bg-zinc-900" value="20">20% do valor total</option>
-                                <option className="bg-zinc-900" value="30">30% do valor total</option>
-                                <option className="bg-zinc-900" value="50">50% do valor total (Recomendado)</option>
+                                <option className="bg-zinc-900" value="0">Sem sinal (Paga na Loja)</option>
+                                <option className="bg-zinc-900" value="20">20% do valor</option>
+                                <option className="bg-zinc-900" value="30">30% do valor</option>
+                                <option className="bg-zinc-900" value="50">50% do valor (Padrão)</option>
                                 <option className="bg-zinc-900" value="100">100% (Pagamento Total)</option>
                             </select>
                         </div>
                     </div>
 
-                    <div className="pt-4 border-t border-zinc-800">
-                        <Button 
-                            onClick={saveGeneralConfig} 
-                            disabled={loading} 
-                            className="w-full h-12 font-bold text-white shadow-lg transition-all"
-                            style={{ backgroundColor: config.corPrincipal || '#10b981' }}
-                        >
-                            {loading ? <Loader2 className="animate-spin mr-2"/> : <Save className="mr-2 w-4 h-4"/>}
-                            {loading ? "Salvando..." : "Salvar Configurações"}
-                        </Button>
-                    </div>
+                    <Button onClick={saveGeneralConfig} disabled={loading} className="w-full h-12 font-bold text-white shadow-lg mt-4" style={{ backgroundColor: config.corPrincipal || '#10b981' }}>
+                        {loading ? <Loader2 className="animate-spin mr-2"/> : <Save className="mr-2 w-4 h-4"/>} Salvar Configurações
+                    </Button>
                 </div>
             )}
 
@@ -406,7 +456,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                                     <Plus size={14} className="mr-1"/> Novo Serviço
                                 </Button>
                             </div>
-
                             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                 {loadingServices && <div className="flex justify-center py-10"><Loader2 className="animate-spin text-zinc-500"/></div>}
                                 {!loadingServices && services.length === 0 && (
@@ -448,7 +497,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                             <div className="flex justify-between items-center mb-2">
                                 <p className="font-bold text-white text-sm">{isAdding ? "Adicionar Novo Serviço" : "Editar Serviço"}</p>
                             </div>
-                            
                             <div className="space-y-4">
                                 <div>
                                     <Label className="text-xs text-zinc-400 mb-1.5 block">Nome do Serviço</Label>
@@ -473,7 +521,6 @@ export default function AdminSettings({ config, setConfig, handleUpdateSettings 
                                     <Input value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="bg-black border-zinc-700 h-10 text-sm" />
                                 </div>
                             </div>
-
                             <div className="flex gap-3 pt-2">
                                 <Button onClick={() => { setIsAdding(false); setEditingService(null); }} variant="outline" className="flex-1 border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-300">Cancelar</Button>
                                 <Button onClick={handleSaveService} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
